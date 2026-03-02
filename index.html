@@ -118,6 +118,18 @@ input[type="number"]{-moz-appearance:textfield}
 .my-row:hover td{background:#FFF3E8 !important}
 .my-row td.col-name{font-weight:600;color:var(--primary)}
 
+/* === Team rows === */
+.team-header-row td{background:#F0EBF5 !important;color:#8B6EAE;font-weight:700;font-size:13px;padding:8px 6px;border-top:2px solid #D8CCE8}
+.team-header-row td.col-idx,.team-header-row td.col-name{background:#F0EBF5 !important}
+.team-subtotal td{background:#FDF6E3 !important;font-weight:600;font-size:11px;color:#B5960F;border-bottom:2px solid #E8DFC0}
+.team-subtotal td.col-idx,.team-subtotal td.col-name{background:#FDF6E3 !important}
+.team-select{display:flex;gap:16px;justify-content:center;margin-bottom:14px}
+.team-select label{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;padding:8px 16px;border:2px solid var(--border);border-radius:10px;transition:all .15s}
+.team-select label:has(input:checked){border-color:var(--primary);background:var(--primary-lt)}
+.team-select input[type="radio"]{accent-color:var(--primary)}
+.team-tag{font-size:12px;color:#8B6EAE;cursor:pointer;padding:3px 8px;border-radius:6px;background:var(--purple-lt)}
+.team-tag:hover{background:#E0D6EC}
+
 /* === Notice banner === */
 .notice{margin:0 24px;padding-top:18px}
 .notice details{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden}
@@ -145,6 +157,11 @@ input[type="number"]{-moz-appearance:textfield}
     <h3>Claude Code 贴纸拼团</h3>
     <p>请输入你的昵称（群内昵称，方便大家认出你）</p>
     <input type="text" id="nickInput" placeholder="你的昵称..." maxlength="20" autocomplete="off">
+    <p style="font-size:13px;color:var(--text2);margin-bottom:6px">选择你的分团</p>
+    <div class="team-select">
+      <label><input type="radio" name="team" value="1" checked> 团1</label>
+      <label><input type="radio" name="team" value="2"> 团2</label>
+    </div>
     <button id="nickBtn" onclick="confirmNick()" disabled>加入拼团</button>
   </div>
 </div>
@@ -153,6 +170,7 @@ input[type="number"]{-moz-appearance:textfield}
   <h1>Claude Code 贴纸拼团统计 <span class="conn-dot" id="connDot" title="连接中..."></span></h1>
   <div class="settings">
     <span class="nick-tag" id="nickTag" onclick="changeNick()" title="点击修改昵称"></span>
+    <span class="team-tag" id="teamTag" onclick="changeTeam()" title="点击切换分团"></span>
     <label>汇率 1 USD = <input type="number" class="s-input" id="rateInput" step="0.01" min="0"> CNY</label>
     <span class="grand-total" id="grandTotal"></span>
     <span class="last-saved" id="lastSaved"></span>
@@ -276,7 +294,9 @@ const TYPE_CLS = {dc:'badge-dc', holo:'badge-holo', glt:'badge-glt'};
 
 // ============ STATE ============
 let myName = localStorage.getItem('gb_nickname') || '';
+let myTeam = parseInt(localStorage.getItem('gb_team')) || 1;
 let allOrders = {}; // {name: {stickerId: qty}}
+let allTeams = {}; // {name: teamNumber (1 or 2)}
 let rate = 7.25;
 let sb = null;
 let connected = false;
@@ -309,8 +329,11 @@ async function loadAll() {
   const {data: orders, error: e1} = await sb.from('orders').select('*');
   if (e1) throw e1;
   allOrders = {};
+  allTeams = {};
   for (const row of orders) {
-    if (row.quantity > 0) {
+    if (row.sticker_id === '_team') {
+      allTeams[row.name] = row.quantity;
+    } else if (row.quantity > 0) {
       if (!allOrders[row.name]) allOrders[row.name] = {};
       allOrders[row.name][row.sticker_id] = row.quantity;
     }
@@ -337,8 +360,19 @@ function handleOrderEvent(payload) {
   const row = payload.new || payload.old;
   if (!row || row.name === myName) return; // skip my own echoes
 
+  // Handle team assignment changes
+  if (row.sticker_id === '_team') {
+    if (payload.eventType === 'DELETE') {
+      delete allTeams[row.name];
+    } else {
+      allTeams[payload.new.name] = payload.new.quantity;
+    }
+    scheduleRender();
+    saveOffline();
+    return;
+  }
+
   if (payload.eventType === 'DELETE') {
-    // Unlikely since we upsert with qty=0 instead of deleting, but handle it
     if (allOrders[row.name]) {
       delete allOrders[row.name][row.sticker_id];
       if (Object.keys(allOrders[row.name]).length === 0) delete allOrders[row.name];
@@ -402,13 +436,13 @@ async function writeRate(r) {
 
 // ============ OFFLINE FALLBACK ============
 function saveOffline() {
-  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, rate})); } catch(e) {}
+  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, rate})); } catch(e) {}
 }
 
 function loadOffline() {
   try {
     const d = JSON.parse(localStorage.getItem('gb_cache'));
-    if (d) { allOrders = d.allOrders || {}; rate = d.rate || 7.25; }
+    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; rate = d.rate || 7.25; }
   } catch(e) {}
 }
 
@@ -440,9 +474,18 @@ function confirmNick() {
   const name = document.getElementById('nickInput').value.trim();
   if (!name) return;
   myName = name;
+  myTeam = parseInt(document.querySelector('input[name="team"]:checked')?.value) || 1;
   localStorage.setItem('gb_nickname', myName);
+  localStorage.setItem('gb_team', myTeam);
+  allTeams[myName] = myTeam;
   document.getElementById('nickOverlay').style.display = 'none';
   updateNickDisplay();
+  if (sb) {
+    sb.from('orders').upsert(
+      {name: myName, sticker_id: '_team', quantity: myTeam, updated_at: new Date().toISOString()},
+      {onConflict: 'name,sticker_id'}
+    );
+  }
   renderTable();
   recalculate();
 }
@@ -453,12 +496,14 @@ function changeNick() {
     const oldName = myName;
     myName = newName.trim();
     localStorage.setItem('gb_nickname', myName);
-    // Migrate orders in local state
     if (allOrders[oldName]) {
       allOrders[myName] = allOrders[oldName];
       delete allOrders[oldName];
     }
-    // Migrate in Supabase
+    if (allTeams[oldName]) {
+      allTeams[myName] = allTeams[oldName];
+      delete allTeams[oldName];
+    }
     if (sb) {
       sb.from('orders').update({name: myName, updated_at: new Date().toISOString()}).eq('name', oldName)
         .then(({error}) => { if (error) console.error('Nickname migration failed:', error); });
@@ -469,9 +514,28 @@ function changeNick() {
   }
 }
 
+function changeTeam() {
+  const newTeam = myTeam === 1 ? 2 : 1;
+  if (!confirm('切换到团' + newTeam + '？')) return;
+  myTeam = newTeam;
+  localStorage.setItem('gb_team', myTeam);
+  allTeams[myName] = myTeam;
+  updateNickDisplay();
+  if (sb) {
+    sb.from('orders').upsert(
+      {name: myName, sticker_id: '_team', quantity: myTeam, updated_at: new Date().toISOString()},
+      {onConflict: 'name,sticker_id'}
+    );
+  }
+  renderTable();
+  recalculate();
+}
+
 function updateNickDisplay() {
   const el = document.getElementById('nickTag');
   if (el) el.textContent = myName;
+  const tEl = document.getElementById('teamTag');
+  if (tEl) tEl.textContent = '团' + myTeam;
 }
 
 // ============ PRICING ============
@@ -540,7 +604,7 @@ function updateCards(data) {
 }
 
 // ============ RENDER TABLE ============
-function getSortedNames() {
+function getTeamsData() {
   const names = new Set(Object.keys(allOrders));
   names.add(myName);
   const arr = [...names].filter(n => {
@@ -548,23 +612,40 @@ function getSortedNames() {
     const o = allOrders[n];
     return o && Object.values(o).some(q => q > 0);
   });
-  arr.sort((a, b) => {
-    if (a === myName) return -1;
-    if (b === myName) return 1;
-    return a.localeCompare(b, 'zh-CN');
-  });
-  return arr;
+
+  const groups = {1: [], 2: [], 0: []};
+  for (const n of arr) {
+    const t = allTeams[n] || 0;
+    if (!groups[t]) groups[t] = [];
+    groups[t].push(n);
+  }
+  for (const t of Object.keys(groups)) {
+    groups[t].sort((a, b) => {
+      if (a === myName) return -1;
+      if (b === myName) return 1;
+      return a.localeCompare(b, 'zh-CN');
+    });
+  }
+
+  const result = [];
+  if (groups[1].length > 0) result.push({team: 1, names: groups[1]});
+  if (groups[2].length > 0) result.push({team: 2, names: groups[2]});
+  if (groups[0].length > 0) result.push({team: 0, names: groups[0]});
+  return result;
 }
 
 function renderTable() {
   const tbl = document.getElementById('orderTable');
-  const names = getSortedNames();
+  const teamsData = getTeamsData();
 
-  const activeCount = names.filter(n => {
-    const o = allOrders[n];
-    return o && Object.values(o).some(q => q > 0);
-  }).length;
-  document.getElementById('memberCount').textContent = activeCount > 0 ? '（' + activeCount + ' 人参团）' : '';
+  let totalActive = 0;
+  teamsData.forEach(g => {
+    totalActive += g.names.filter(n => {
+      const o = allOrders[n];
+      return o && Object.values(o).some(q => q > 0);
+    }).length;
+  });
+  document.getElementById('memberCount').textContent = totalActive > 0 ? '（' + totalActive + ' 人参团）' : '';
 
   let h = '<thead><tr><th class="col-idx">#</th><th class="col-name">昵称</th>';
   S.forEach(s => {
@@ -573,7 +654,7 @@ function renderTable() {
   h += '<th>总件数</th><th>USD</th><th>CNY</th></tr></thead>';
 
   h += '<tbody>';
-  // Summary rows
+  // Combined summary rows (pricing uses combined totals across all teams)
   h += '<tr class="s-row r-qty"><td class="col-idx"></td><td class="col-name">总数量</td>';
   S.forEach(s => { h += '<td id="sq-' + s.id + '">0</td>'; });
   h += '<td></td><td></td><td></td></tr>';
@@ -586,24 +667,44 @@ function renderTable() {
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
   h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td></tr>';
 
-  // Participant rows
-  names.forEach((name, i) => {
-    const isMe = name === myName;
-    const orders = allOrders[name] || {};
-    h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-name="' + esc(name) + '">';
-    h += '<td class="col-idx">' + (i + 1) + '</td>';
-    h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + '</td>';
-    S.forEach(s => {
-      const v = orders[s.id] || 0;
-      if (isMe) {
-        h += '<td><input type="number" min="0" value="' + (v || '') + '" data-si="' + s.id + '"></td>';
-      } else {
-        h += '<td>' + (v || '') + '</td>';
-      }
+  // Team sections
+  let personIdx = 0;
+  teamsData.forEach(g => {
+    const teamLabel = g.team > 0 ? '团' + g.team : '未分组';
+
+    // Team header row
+    h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + teamLabel + '（' + g.names.length + ' 人）</td>';
+    S.forEach(() => { h += '<td></td>'; });
+    h += '<td></td><td></td><td></td></tr>';
+
+    // Person rows
+    g.names.forEach(name => {
+      const isMe = name === myName;
+      const orders = allOrders[name] || {};
+      h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-name="' + esc(name) + '">';
+      h += '<td class="col-idx">' + (personIdx + 1) + '</td>';
+      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + '</td>';
+      S.forEach(s => {
+        const v = orders[s.id] || 0;
+        if (isMe) {
+          h += '<td><input type="number" min="0" value="' + (v || '') + '" data-si="' + s.id + '"></td>';
+        } else {
+          h += '<td>' + (v || '') + '</td>';
+        }
+      });
+      h += '<td class="pt-items" id="pi-' + personIdx + '">0</td>';
+      h += '<td class="pt-usd" id="pu-' + personIdx + '">\u2014</td>';
+      h += '<td class="pt-cny" id="pc-' + personIdx + '">\u2014</td>';
+      h += '</tr>';
+      personIdx++;
     });
-    h += '<td class="pt-items" id="pi-' + i + '">0</td>';
-    h += '<td class="pt-usd" id="pu-' + i + '">\u2014</td>';
-    h += '<td class="pt-cny" id="pc-' + i + '">\u2014</td>';
+
+    // Team subtotal row
+    h += '<tr class="team-subtotal"><td class="col-idx"></td><td class="col-name">' + teamLabel + '小计</td>';
+    S.forEach(s => { h += '<td id="tsq-' + g.team + '-' + s.id + '"></td>'; });
+    h += '<td id="tsi-' + g.team + '"></td>';
+    h += '<td id="tsu-' + g.team + '"></td>';
+    h += '<td id="tsc-' + g.team + '"></td>';
     h += '</tr>';
   });
 
@@ -635,9 +736,10 @@ function esc(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(
 
 // ============ RECALCULATE ============
 function recalculate() {
-  const names = getSortedNames();
+  const teamsData = getTeamsData();
   const data = {};
 
+  // Combined totals for pricing (both teams together = better price)
   S.forEach(s => {
     let totalQty = 0;
     for (const name in allOrders) { totalQty += (allOrders[name][s.id] || 0); }
@@ -651,23 +753,50 @@ function recalculate() {
     if (stEl) stEl.textContent = totalQty > 0 ? '$' + (totalQty * up).toFixed(2) : '\u2014';
   });
 
+  // Per-person totals and per-team subtotals
   let grandUSD = 0;
-  names.forEach((name, i) => {
-    const orders = allOrders[name] || {};
-    let items = 0, usd = 0;
-    S.forEach(s => {
-      const q = orders[s.id] || 0;
-      items += q;
-      usd += q * data[s.id].unitPrice;
+  let personIdx = 0;
+
+  teamsData.forEach(g => {
+    let teamItems = 0, teamUSD = 0;
+    const teamStickerQty = {};
+    S.forEach(s => { teamStickerQty[s.id] = 0; });
+
+    g.names.forEach(name => {
+      const orders = allOrders[name] || {};
+      let items = 0, usd = 0;
+      S.forEach(s => {
+        const q = orders[s.id] || 0;
+        items += q;
+        usd += q * data[s.id].unitPrice;
+        teamStickerQty[s.id] += q;
+      });
+      const cny = usd * rate;
+      grandUSD += usd;
+      teamItems += items;
+      teamUSD += usd;
+
+      const piEl = document.getElementById('pi-' + personIdx);
+      const puEl = document.getElementById('pu-' + personIdx);
+      const pcEl = document.getElementById('pc-' + personIdx);
+      if (piEl) piEl.textContent = items;
+      if (puEl) puEl.textContent = items > 0 ? '$' + usd.toFixed(2) : '\u2014';
+      if (pcEl) pcEl.textContent = items > 0 ? '\u00A5' + cny.toFixed(2) : '\u2014';
+      personIdx++;
     });
-    const cny = usd * rate;
-    grandUSD += usd;
-    const piEl = document.getElementById('pi-' + i);
-    const puEl = document.getElementById('pu-' + i);
-    const pcEl = document.getElementById('pc-' + i);
-    if (piEl) piEl.textContent = items;
-    if (puEl) puEl.textContent = items > 0 ? '$' + usd.toFixed(2) : '\u2014';
-    if (pcEl) pcEl.textContent = items > 0 ? '\u00A5' + cny.toFixed(2) : '\u2014';
+
+    // Fill team subtotal row
+    const teamCNY = teamUSD * rate;
+    S.forEach(s => {
+      const el = document.getElementById('tsq-' + g.team + '-' + s.id);
+      if (el) el.textContent = teamStickerQty[s.id] || '';
+    });
+    const tsiEl = document.getElementById('tsi-' + g.team);
+    const tsuEl = document.getElementById('tsu-' + g.team);
+    const tscEl = document.getElementById('tsc-' + g.team);
+    if (tsiEl) tsiEl.textContent = teamItems;
+    if (tsuEl) tsuEl.textContent = teamItems > 0 ? '$' + teamUSD.toFixed(2) : '\u2014';
+    if (tscEl) tscEl.textContent = teamItems > 0 ? '\u00A5' + teamCNY.toFixed(2) : '\u2014';
   });
 
   const grandCNY = grandUSD * rate;
@@ -784,10 +913,24 @@ function closeModal() {
 
   updateNickDisplay();
   document.getElementById('rateInput').value = rate;
-  // Show loading
   document.getElementById('orderTable').innerHTML = '<tbody><tr><td style="text-align:center;padding:40px;color:#999" colspan="16">连接中...</td></tr></tbody>';
 
   await initSupabase();
+
+  // Sync team for returning users
+  if (myName && allTeams[myName]) {
+    myTeam = allTeams[myName];
+    localStorage.setItem('gb_team', myTeam);
+  } else if (myName && !allTeams[myName]) {
+    allTeams[myName] = myTeam;
+    if (sb) {
+      sb.from('orders').upsert(
+        {name: myName, sticker_id: '_team', quantity: myTeam, updated_at: new Date().toISOString()},
+        {onConflict: 'name,sticker_id'}
+      );
+    }
+  }
+  updateNickDisplay();
 
   document.getElementById('rateInput').value = rate;
   renderTable();
