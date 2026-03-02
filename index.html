@@ -681,7 +681,7 @@ function renderTable() {
   S.forEach(s => { h += '<td id="sq-' + s.id + '">0</td>'; });
   h += '<td></td><td></td><td></td></tr>';
 
-  h += '<tr class="s-row r-price"><td class="col-idx"></td><td class="col-name">单价($)</td>';
+  h += '<tr class="s-row r-price"><td class="col-idx"></td><td class="col-name">单价(¥)</td>';
   S.forEach(s => { h += '<td id="sp-' + s.id + '">\u2014</td>'; });
   h += '<td></td><td></td><td></td></tr>';
 
@@ -779,7 +779,7 @@ function recalculate() {
     const spEl = document.getElementById('sp-' + s.id);
     const stEl = document.getElementById('st-' + s.id);
     if (sqEl) sqEl.textContent = totalQty;
-    if (spEl) spEl.textContent = totalQty > 0 ? '$' + up.toFixed(4) : '\u2014';
+    if (spEl) spEl.textContent = totalQty > 0 ? '¥' + (up * rate).toFixed(2) : '\u2014';
     if (stEl) stEl.textContent = totalQty > 0 ? '$' + (totalQty * up).toFixed(2) : '\u2014';
   });
 
