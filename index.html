@@ -129,6 +129,9 @@ input[type="number"]{-moz-appearance:textfield}
 .team-select input[type="radio"]{accent-color:var(--primary)}
 .team-tag{font-size:12px;color:#8B6EAE;cursor:pointer;padding:3px 8px;border-radius:6px;background:var(--purple-lt)}
 .team-tag:hover{background:#E0D6EC}
+.btn-my-export{display:block;width:100%;max-width:340px;margin:0 auto 16px;padding:13px 20px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3);transition:all .15s;letter-spacing:.5px}
+.btn-my-export:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,113,74,.4)}
+.btn-my-export:active{transform:translateY(0)}
 
 /* === Notice banner === */
 .notice{margin:0 24px;padding-top:18px}
@@ -223,6 +226,7 @@ input[type="number"]{-moz-appearance:textfield}
 
 <section>
   <div class="section-title">拼团统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
+  <button class="btn-my-export" onclick="exportMyOrder()">导出我的订单</button>
   <div class="table-controls">
     <button class="btn btn-g" onclick="showExport()">导出数据</button>
     <button class="btn btn-v" onclick="showImport()">导入数据</button>
@@ -302,6 +306,8 @@ let myName = localStorage.getItem('gb_nickname') || '';
 let myTeam = parseInt(localStorage.getItem('gb_team')) || 1;
 let allOrders = {}; // {name: {stickerId: qty}}
 let allTeams = {}; // {name: teamNumber (1 or 2)}
+let allJoinOrder = {}; // {name: minRecordId} — for global join sequence
+let globalSeqMap = {}; // {name: globalSequenceNumber}
 let rate = 7.25;
 let sb = null;
 let connected = false;
@@ -335,7 +341,9 @@ async function loadAll() {
   if (e1) throw e1;
   allOrders = {};
   allTeams = {};
+  const joinOrd = {};
   for (const row of orders) {
+    if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
     if (row.sticker_id === '_team') {
       allTeams[row.name] = row.quantity;
     } else if (row.quantity > 0) {
@@ -343,6 +351,7 @@ async function loadAll() {
       allOrders[row.name][row.sticker_id] = row.quantity;
     }
   }
+  allJoinOrder = joinOrd;
   const {data: settings, error: e2} = await sb.from('settings').select('*').eq('key', 'rate');
   if (e2) throw e2;
   if (settings && settings[0]) rate = parseFloat(settings[0].value) || 7.25;
@@ -364,6 +373,12 @@ function subscribeRealtime() {
 function handleOrderEvent(payload) {
   const row = payload.new || payload.old;
   if (!row || row.name === myName) return; // skip my own echoes
+
+  // Track join order for new arrivals
+  if (payload.new && payload.new.id) {
+    const n = payload.new.name;
+    if (!allJoinOrder[n] || payload.new.id < allJoinOrder[n]) allJoinOrder[n] = payload.new.id;
+  }
 
   // Handle team assignment changes
   if (row.sticker_id === '_team') {
@@ -441,13 +456,13 @@ async function writeRate(r) {
 
 // ============ OFFLINE FALLBACK ============
 function saveOffline() {
-  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, rate})); } catch(e) {}
+  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate})); } catch(e) {}
 }
 
 function loadOffline() {
   try {
     const d = JSON.parse(localStorage.getItem('gb_cache'));
-    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; rate = d.rate || 7.25; }
+    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 7.25; }
   } catch(e) {}
 }
 
@@ -628,7 +643,7 @@ function getTeamsData() {
     groups[t].sort((a, b) => {
       if (a === myName) return -1;
       if (b === myName) return 1;
-      return a.localeCompare(b, 'zh-CN');
+      return (allJoinOrder[a] || Infinity) - (allJoinOrder[b] || Infinity);
     });
   }
 
@@ -672,6 +687,14 @@ function renderTable() {
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
   h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td></tr>';
 
+  // Compute global join-order sequence numbers
+  const allNamesFlat = [];
+  teamsData.forEach(g => { allNamesFlat.push(...g.names); });
+  const sortedByJoin = [...allNamesFlat].sort((a, b) => (allJoinOrder[a] || Infinity) - (allJoinOrder[b] || Infinity));
+  const seqMap = {};
+  sortedByJoin.forEach((name, i) => { seqMap[name] = i + 1; });
+  globalSeqMap = seqMap;
+
   // Team sections
   let personIdx = 0;
   teamsData.forEach(g => {
@@ -687,8 +710,8 @@ function renderTable() {
       const isMe = name === myName;
       const orders = allOrders[name] || {};
       h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-name="' + esc(name) + '">';
-      h += '<td class="col-idx">' + (personIdx + 1) + '</td>';
-      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + '</td>';
+      h += '<td class="col-idx">' + (seqMap[name] || '') + '</td>';
+      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small> <button class="del-btn" onclick="clearMyOrders()" title="清空我的订单">\u00D7</button>' : '') + '</td>';
       S.forEach(s => {
         const v = orders[s.id] || 0;
         if (isMe) {
@@ -831,6 +854,58 @@ document.getElementById('orderTable').addEventListener('input', function(e) {
     saveOffline();
   }
 });
+
+function exportMyOrder() {
+  const seq = globalSeqMap[myName] || '?';
+  const teamLabel = myTeam > 0 ? '团' + myTeam : '未分组';
+  const orders = allOrders[myName] || {};
+  const data = {};
+  S.forEach(s => {
+    let totalQty = 0;
+    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
+    data[s.id] = {unitPrice: unitPrice(s, totalQty)};
+  });
+  const lines = ['Claude Code 贴纸拼团 - 订单详情', '序号：#' + seq, '昵称：' + myName, '分团：' + teamLabel, ''];
+  let totalItems = 0, totalUSD = 0;
+  const details = [];
+  S.forEach(s => {
+    const q = orders[s.id] || 0;
+    if (q > 0) {
+      const up = data[s.id].unitPrice;
+      const sub = q * up;
+      details.push(s.name + '(' + TYPE_LABEL[s.type] + ') x' + q + ' = $' + sub.toFixed(2));
+      totalItems += q;
+      totalUSD += sub;
+    }
+  });
+  if (details.length === 0) {
+    lines.push('暂无订购');
+  } else {
+    lines.push(...details);
+  }
+  lines.push('', '总件数：' + totalItems, '总金额：$' + totalUSD.toFixed(2) + ' / \u00A5' + (totalUSD * rate).toFixed(2));
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text)
+    .then(() => alert('已复制到剪贴板，可以直接粘贴到群里！'))
+    .catch(() => { prompt('请手动复制：', text); });
+}
+
+function clearMyOrders() {
+  if (!confirm('确定要清空你的所有订单吗？')) return;
+  const sids = Object.keys(allOrders[myName] || {});
+  delete allOrders[myName];
+  renderTable();
+  recalculate();
+  saveOffline();
+  if (sb && sids.length > 0) {
+    const rows = sids.map(sid => ({name: myName, sticker_id: sid, quantity: 0, updated_at: new Date().toISOString()}));
+    sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'})
+      .then(({error}) => {
+        if (error) console.error('Clear failed:', error);
+        else updateStatus('已清空');
+      });
+  }
+}
 
 document.getElementById('rateInput').addEventListener('input', function() {
   rate = parseFloat(this.value) || 7.25;
