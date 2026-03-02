@@ -76,8 +76,8 @@ td input[type="number"]:hover{border-color:var(--border);background:var(--bg)}
 td input[type="number"]:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 2px var(--primary-lt)}
 .name-input{width:78px;padding:2px 4px;border:1px solid transparent;border-radius:4px;font-size:12px;text-align:left;background:transparent}
 .name-input:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 2px var(--primary-lt)}
-.del-btn{width:20px;height:20px;border:none;border-radius:50%;background:transparent;color:#ccc;cursor:pointer;font-size:13px;line-height:20px;transition:all .15s}
-.del-btn:hover{background:#FDEAEA;color:var(--danger)}
+.del-btn{border:1px solid #e0d6d6;border-radius:6px;background:#faf5f5;color:#c49;cursor:pointer;font-size:11px;padding:2px 8px;margin-left:6px;transition:all .15s;vertical-align:middle}
+.del-btn:hover{background:#FDEAEA;color:#fff;background:var(--danger);border-color:var(--danger)}
 .pt-items{font-weight:600;font-size:11px}
 .pt-usd{font-weight:600;font-size:11px;color:var(--primary)}
 .pt-cny{font-weight:600;font-size:11px;color:#8B6EAE}
@@ -710,7 +710,7 @@ function renderTable() {
       const orders = allOrders[name] || {};
       h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-name="' + esc(name) + '">';
       h += '<td class="col-idx">' + (seqMap[name] || '') + '</td>';
-      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small> <button class="del-btn" onclick="clearMyOrders()" title="清空我的订单">\u00D7</button>' : '') + '</td>';
+      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small> <button class="del-btn" onclick="clearMyOrders()" title="清空我的订单">清空</button>' : '') + '</td>';
       S.forEach(s => {
         const v = orders[s.id] || 0;
         if (isMe) {
