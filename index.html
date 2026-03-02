@@ -506,7 +506,7 @@ function confirmNick() {
     sb.from('orders').upsert(
       {name: myName, sticker_id: '_team', quantity: myTeam, updated_at: new Date().toISOString()},
       {onConflict: 'name,sticker_id'}
-    );
+    ).select().then(r => { if (r.error) console.error('team save failed:', r.error); });
   }
   renderTable();
   recalculate();
@@ -547,7 +547,7 @@ function changeTeam() {
     sb.from('orders').upsert(
       {name: myName, sticker_id: '_team', quantity: myTeam, updated_at: new Date().toISOString()},
       {onConflict: 'name,sticker_id'}
-    );
+    ).select().then(r => { if (r.error) console.error('team change failed:', r.error); });
   }
   renderTable();
   recalculate();
@@ -628,16 +628,13 @@ function updateCards(data) {
 // ============ RENDER TABLE ============
 function getTeamsData() {
   const names = new Set(Object.keys(allOrders));
+  Object.keys(allTeams).forEach(n => names.add(n));
   names.add(myName);
-  const arr = [...names].filter(n => {
-    if (n === myName) return true;
-    const o = allOrders[n];
-    return o && Object.values(o).some(q => q > 0);
-  });
+  const arr = [...names];
 
   const groups = {1: [], 2: [], 0: []};
   for (const n of arr) {
-    const t = allTeams[n] || 0;
+    const t = allTeams[n] || 1;
     if (!groups[t]) groups[t] = [];
     groups[t].push(n);
   }
@@ -925,7 +922,9 @@ function showExport() {
     for (const [sid, qty] of Object.entries(orders)) {
       if (qty > 0) nonZero[sid] = qty;
     }
-    if (Object.keys(nonZero).length > 0) people.push({name, orders: nonZero});
+    if (Object.keys(nonZero).length > 0) {
+      people.push({name, team: allTeams[name] || 1, orders: nonZero});
+    }
   }
   document.getElementById('modalTitle').textContent = '导出数据';
   document.getElementById('modalText').value = JSON.stringify({rate, people}, null, 2);
@@ -952,6 +951,9 @@ function showImport() {
       for (const p of d.people) {
         for (const [sid, qty] of Object.entries(p.orders || {})) {
           if (qty > 0) rows.push({name: p.name, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()});
+        }
+        if (p.team) {
+          rows.push({name: p.name, sticker_id: '_team', quantity: p.team, updated_at: new Date().toISOString()});
         }
       }
       if (rows.length > 0) {
@@ -1006,10 +1008,10 @@ function closeModal() {
   } else if (myName && !allTeams[myName]) {
     allTeams[myName] = myTeam;
     if (sb) {
-      sb.from('orders').upsert(
+      await sb.from('orders').upsert(
         {name: myName, sticker_id: '_team', quantity: myTeam, updated_at: new Date().toISOString()},
         {onConflict: 'name,sticker_id'}
-      );
+      ).select();
     }
   }
   updateNickDisplay();
