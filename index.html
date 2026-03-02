@@ -42,6 +42,21 @@ section{padding:18px 24px}
 .card-link{font-size:11px;color:var(--text2);text-decoration:none;display:inline-block;margin-top:4px}
 .card-link:hover{color:var(--primary)}
 
+/* === Card quantity selector === */
+.card-my{display:flex;align-items:center;justify-content:space-between;margin:8px 0 4px;padding:6px 0;border-top:1px dashed var(--border)}
+.card-my-label{font-size:11px;color:var(--text2)}
+.card-my-qty{font-size:14px;font-weight:700;color:var(--primary)}
+.qty-ctrl{display:flex;align-items:center;gap:0;border:2px solid var(--border);border-radius:10px;overflow:hidden;margin-top:6px}
+.qty-btn{width:34px;height:34px;border:none;background:var(--bg);color:var(--text);font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;user-select:none;line-height:1}
+.qty-btn:hover{background:var(--primary-lt);color:var(--primary)}
+.qty-btn:active{background:var(--primary);color:#fff}
+.qty-btn.minus{border-right:1px solid var(--border)}
+.qty-btn.plus{border-left:1px solid var(--border)}
+.qty-val{flex:1;text-align:center;font-size:15px;font-weight:600;min-width:36px;padding:0 4px;background:var(--card);color:var(--text)}
+.qty-val.has-qty{color:var(--primary)}
+.card-total-row{display:flex;align-items:baseline;gap:6px;margin-bottom:2px}
+.card-total-label{font-size:11px;color:var(--text2)}
+
 .table-controls{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .btn{padding:7px 14px;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
 .btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:#D4623E}
@@ -600,10 +615,18 @@ function renderCards() {
       + '<div class="card-name">' + s.name + '</div>'
       + '<span class="type-badge ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span>'
       + '<span class="card-size">' + s.size + '</span>'
-      + '<div class="card-qty" id="cq-' + s.id + '">0</div>'
+      + '<div class="card-total-row"><span class="card-total-label">全团</span> <span class="card-qty" id="cq-' + s.id + '">0</span></div>'
       + '<div class="card-price" id="cp-' + s.id + '">暂无订购</div>'
       + '<div class="card-price-cny" id="cc-' + s.id + '"></div>'
       + '<div class="card-tier" id="ct-' + s.id + '"></div>'
+      + '<div class="card-my">'
+      +   '<div><span class="card-my-label">我选的</span> <span class="card-my-qty" id="cmq-' + s.id + '">0 张</span></div>'
+      + '</div>'
+      + '<div class="qty-ctrl">'
+      +   '<button class="qty-btn minus" data-sid="' + s.id + '" data-dir="-1">\u2212</button>'
+      +   '<span class="qty-val" id="cv-' + s.id + '">0</span>'
+      +   '<button class="qty-btn plus" data-sid="' + s.id + '" data-dir="1">+</button>'
+      + '</div>'
       + '<a class="card-link" href="' + url + '" target="_blank">查看原页 \u2192</a>'
       + '</div>';
   });
@@ -627,6 +650,15 @@ function updateCards(data) {
     const el = document.getElementById('ct-' + s.id);
     el.textContent = ti.txt;
     el.className = 'card-tier' + (ti.warn ? ' warn' : '');
+    // Update personal quantity on card
+    const myQty = (allOrders[myName] && allOrders[myName][s.id]) || 0;
+    const cmq = document.getElementById('cmq-' + s.id);
+    if (cmq) cmq.textContent = myQty + ' 张';
+    const cv = document.getElementById('cv-' + s.id);
+    if (cv) {
+      cv.textContent = myQty;
+      cv.className = 'qty-val' + (myQty > 0 ? ' has-qty' : '');
+    }
   });
 }
 
@@ -992,6 +1024,27 @@ function closeModal() {
 // ============ INIT ============
 (async function init() {
   renderCards();
+
+  // Card qty +/- buttons
+  document.getElementById('stickerGrid').addEventListener('click', function(e) {
+    const btn = e.target.closest('.qty-btn');
+    if (!btn || !myName) return;
+    const sid = btn.dataset.sid;
+    const dir = parseInt(btn.dataset.dir);
+    if (!allOrders[myName]) allOrders[myName] = {};
+    const cur = allOrders[myName][sid] || 0;
+    const next = Math.max(0, cur + dir);
+    if (next > 0) {
+      allOrders[myName][sid] = next;
+    } else {
+      delete allOrders[myName][sid];
+      if (Object.keys(allOrders[myName]).length === 0) delete allOrders[myName];
+    }
+    recalculate();
+    renderTable();
+    debouncedWrite(sid, next);
+    saveOffline();
+  });
 
   if (!myName) {
     showNicknamePopup();
