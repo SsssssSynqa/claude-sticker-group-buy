@@ -510,6 +510,11 @@ function confirmNick() {
   }
   renderTable();
   recalculate();
+  // Auto-scroll to table so mobile users can see it
+  setTimeout(() => {
+    const tbl = document.getElementById('orderTable');
+    if (tbl) tbl.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }, 300);
 }
 
 function changeNick() {
@@ -647,9 +652,11 @@ function getTeamsData() {
   }
 
   const result = [];
-  if (groups[1].length > 0) result.push({team: 1, names: groups[1]});
-  if (groups[2].length > 0) result.push({team: 2, names: groups[2]});
-  if (groups[0].length > 0) result.push({team: 0, names: groups[0]});
+  // Put user's team first
+  const otherTeam = myTeam === 2 ? 1 : 2;
+  if (groups[myTeam] && groups[myTeam].length > 0) result.push({team: myTeam, names: groups[myTeam]});
+  if (groups[otherTeam] && groups[otherTeam].length > 0) result.push({team: otherTeam, names: groups[otherTeam]});
+  if (groups[0] && groups[0].length > 0) result.push({team: 0, names: groups[0]});
   return result;
 }
 
