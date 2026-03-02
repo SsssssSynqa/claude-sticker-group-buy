@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code 贴纸拼团统计</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#FFF8F0;--card:#FFF;--primary:#E8714A;--primary-lt:#FDEEE8;
+  --purple:#B8A9C9;--purple-lt:#F0EBF5;--green:#7BC9A0;--green-lt:#E8F7EF;
+  --gold:#E8C84A;--gold-lt:#FDF6E3;--text:#3D3D3D;--text2:#999;
+  --border:#E8E0D8;--danger:#E74C3C;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+header{background:linear-gradient(135deg,#FDE8DC 0%,#F5E1F0 50%,#E0E8F5 100%);padding:18px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+header h1{font-size:21px;font-weight:700;color:var(--primary);margin-bottom:6px}
+.settings{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:13px}
+.settings label{display:flex;align-items:center;gap:5px}
+.s-input{width:65px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:center;background:var(--card)}
+.s-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-lt)}
+.grand-total{font-weight:600;color:var(--primary)}
+.last-saved{font-size:11px;color:#bbb;margin-left:auto}
+
+section{padding:18px 24px}
+.section-title{font-size:17px;font-weight:600;margin-bottom:14px}
+.sticker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px}
+.sticker-card{background:var(--card);border-radius:12px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);border:1px solid var(--border);transition:transform .2s,box-shadow .2s}
+.sticker-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.1)}
+.sticker-card img{width:100%;height:90px;object-fit:contain;border-radius:6px;background:#f9f9f9;margin-bottom:8px}
+.card-name{font-weight:600;font-size:13px;margin-bottom:3px}
+.card-size{font-size:11px;color:var(--text2);margin-bottom:6px}
+.type-badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:500;margin-right:4px}
+.badge-dc{background:var(--primary-lt);color:var(--primary)}
+.badge-holo{background:var(--purple-lt);color:#8B6EAE}
+.badge-glt{background:var(--gold-lt);color:#B5960F}
+.card-qty{font-size:20px;font-weight:700;margin:4px 0 2px}
+.card-price{font-size:13px;font-weight:600;color:var(--primary);margin-bottom:2px}
+.card-price-cny{font-size:12px;color:var(--purple)}
+.card-tier{font-size:11px;color:var(--green);margin-top:3px}
+.card-tier.warn{color:var(--danger)}
+.card-link{font-size:11px;color:var(--text2);text-decoration:none;display:inline-block;margin-top:4px}
+.card-link:hover{color:var(--primary)}
+
+.table-controls{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.btn{padding:7px 14px;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:#D4623E}
+.btn-g{background:var(--green-lt);color:#3DA06B}.btn-g:hover{background:#D0EDD9}
+.btn-v{background:var(--purple-lt);color:#8B6EAE}.btn-v:hover{background:#E0D6EC}
+.btn-d{background:#FDEAEA;color:var(--danger)}.btn-d:hover{background:#F8D0D0}
+
+.table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border);background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+table{border-collapse:collapse;width:max-content;min-width:100%;font-size:12px}
+th,td{padding:5px 6px;border:1px solid #EEEAE5;text-align:center;white-space:nowrap}
+thead th{background:var(--primary-lt);color:var(--primary);font-weight:600;font-size:11px;position:sticky;top:0;z-index:20}
+.col-idx{position:sticky;left:0;z-index:21;width:32px;min-width:32px}
+.col-name{position:sticky;left:32px;z-index:21;width:88px;min-width:88px;text-align:left}
+thead .col-idx,thead .col-name{background:var(--primary-lt);z-index:25}
+
+.s-row td{font-weight:600;font-size:11px}
+.s-row td.col-idx,.s-row td.col-name{z-index:22}
+.s-row.r-qty td{background:#FFF5EE;color:var(--text)}
+.s-row.r-price td{background:#FFF0E8;color:var(--primary)}
+.s-row.r-total td{background:#F5F0FA;color:#8B6EAE}
+.s-row.r-qty td.col-idx,.s-row.r-qty td.col-name{background:#FFF5EE}
+.s-row.r-price td.col-idx,.s-row.r-price td.col-name{background:#FFF0E8}
+.s-row.r-total td.col-idx,.s-row.r-total td.col-name{background:#F5F0FA}
+
+tbody .col-idx,tbody .col-name{background:var(--card)}
+.p-row:hover td{background:#FFFAF6}
+.p-row:hover td.col-idx,.p-row:hover td.col-name{background:#FFFAF6}
+.p-row td.col-idx{color:var(--text2);font-size:11px}
+
+td input[type="number"]{width:42px;padding:2px 3px;border:1px solid transparent;border-radius:4px;text-align:center;font-size:12px;background:transparent;transition:all .15s}
+td input[type="number"]:hover{border-color:var(--border);background:var(--bg)}
+td input[type="number"]:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 2px var(--primary-lt)}
+.name-input{width:78px;padding:2px 4px;border:1px solid transparent;border-radius:4px;font-size:12px;text-align:left;background:transparent}
+.name-input:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 2px var(--primary-lt)}
+.del-btn{width:20px;height:20px;border:none;border-radius:50%;background:transparent;color:#ccc;cursor:pointer;font-size:13px;line-height:20px;transition:all .15s}
+.del-btn:hover{background:#FDEAEA;color:var(--danger)}
+.pt-items{font-weight:600;font-size:11px}
+.pt-usd{font-weight:600;font-size:11px;color:var(--primary)}
+.pt-cny{font-weight:600;font-size:11px;color:#8B6EAE}
+
+.modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.35);z-index:1000;align-items:center;justify-content:center}
+.modal-bg.on{display:flex}
+.modal{background:#fff;border-radius:14px;padding:22px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,.18)}
+.modal h3{margin-bottom:10px;color:var(--primary);font-size:15px}
+.modal textarea{width:100%;height:180px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:11px;resize:vertical;margin-bottom:10px}
+.modal textarea:focus{outline:none;border-color:var(--primary)}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end}
+
+footer{text-align:center;padding:18px;font-size:11px;color:var(--text2)}
+input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type="number"]{-moz-appearance:textfield}
+@media(max-width:768px){header{padding:14px}section{padding:14px}.sticker-grid{grid-template-columns:repeat(2,1fr);gap:10px}header h1{font-size:17px}}
+
+.th-type{font-size:9px;font-weight:400;display:block;margin-top:2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Claude Code 贴纸拼团统计</h1>
+  <div class="settings">
+    <label>汇率 1 USD = <input type="number" class="s-input" id="rateInput" step="0.01" min="0"> CNY</label>
+    <span class="grand-total" id="grandTotal"></span>
+    <span class="last-saved" id="lastSaved"></span>
+  </div>
+</header>
+
+<section>
+  <div class="section-title">贴纸一览</div>
+  <div class="sticker-grid" id="stickerGrid"></div>
+</section>
+
+<section>
+  <div class="section-title">拼团统计表</div>
+  <div class="table-controls">
+    <button class="btn btn-p" onclick="addParticipant()">+ 添加成员</button>
+    <button class="btn btn-g" onclick="showExport()">导出数据</button>
+    <button class="btn btn-v" onclick="showImport()">导入数据</button>
+    <button class="btn btn-d" onclick="clearAll()">清空数据</button>
+  </div>
+  <div class="table-wrap">
+    <table id="orderTable"></table>
+  </div>
+</section>
+
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3 id="modalTitle"></h3>
+    <textarea id="modalText"></textarea>
+    <div class="modal-btns">
+      <button class="btn btn-v" onclick="closeModal()">取消</button>
+      <button class="btn btn-p" id="modalOk"></button>
+    </div>
+  </div>
+</div>
+
+<footer>Claude Code Sticker Group Buy Tool · Made with love by Sylux</footer>
+
+<script>
+// ============ STICKER DATA ============
+const S = [
+  {id:'clawd', name:'Clawd', type:'dc', size:'2"×1.6"', itemId:19156131,
+   img:'https://storage.googleapis.com/sm-artworks/5719926a-04ae-4afb-9925-f1f4521d38ce/large.png?cacheFor=b1c948c6194db63359b0f8564d4a7eed',
+   t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,89],[300,106],[500,138]]},
+  {id:'ultrathink', name:'ultrathink', type:'dc', size:'4.21"×0.75"', itemId:19236575,
+   img:'https://storage.googleapis.com/sm-artworks/0006ba04-0f46-4c86-930b-1b41a9480f14/large.png?cacheFor=f7003b57a2fc7bafc920f3ed2acb368a',
+   t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,88],[300,106],[500,137]]},
+  {id:'clawd-happy', name:'Clawd happy', type:'dc', size:'2"×1.6"', itemId:19156132,
+   img:'https://storage.googleapis.com/sm-artworks/be75b541-e429-4b61-a058-6a04bc35f712/large.png?cacheFor=26b5d38b95c02b9de101edd57a5846a9',
+   t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,89],[300,106],[500,138]]},
+  {id:'vibing-dc', name:'Vibing', type:'dc', size:'3.21"×0.75"', itemId:17478826,
+   img:'https://storage.googleapis.com/sm-artworks/c6e41ee6-4500-403f-a36c-3e6e72596e3a/large.png?cacheFor=e67ba358b1881dbc5ebedc5943e67dcb',
+   t:[[1,5],[5,9],[10,16],[50,56],[100,65],[200,82],[300,97],[500,123]]},
+  {id:'clawd-shiny', name:'Clawd shiny', type:'holo', size:'2"×1.61"', itemId:19156133,
+   img:'https://storage.googleapis.com/sm-artworks/1c69d7fd-a6de-42a8-99be-3edc7b32c8f1/large.png?cacheFor=31a4293c9f5cc540655eb3642dd66c15',
+   t:[[10,17],[50,63],[100,76],[200,99],[300,120],[500,158]]},
+  {id:'claudecode', name:'claudecode', type:'dc', size:'5.13"×0.75"', itemId:19156134,
+   img:'https://storage.googleapis.com/sm-artworks/1a18c149-6820-437c-83a3-4053259f28d5/large.png?cacheFor=5d8dcc208c6c3caee71731b8daf13233',
+   t:[[1,5],[5,10],[10,17],[50,60],[100,72],[200,94],[300,114],[500,149]]},
+  {id:'vibing-holo', name:'Vibing', type:'holo', size:'3.21"×0.75"', itemId:17478832,
+   img:'https://storage.googleapis.com/sm-artworks/d85490fc-cd48-4248-b208-0bda8dad0e59/large.png?cacheFor=7ba69e81720e19d7d1fbb48a8163cbd9',
+   t:[[10,17],[50,60],[100,71],[200,90],[300,108],[500,139]]},
+  {id:'reticulating', name:'reticulating', type:'dc', size:'5.13"×0.75"', itemId:19156130,
+   img:'https://storage.googleapis.com/sm-artworks/3133e32f-64d5-48ee-9215-be6453365d8b/large.png?cacheFor=666df05e24c335393669a33fa071c47c',
+   t:[[1,5],[5,10],[10,17],[50,60],[100,72],[200,94],[300,114],[500,150]]},
+  {id:'shipping', name:'Shipping', type:'dc', size:'3.63"×0.75"', itemId:17478831,
+   img:'https://storage.googleapis.com/sm-artworks/4296af64-9d1c-4e87-889f-e5397b680e4a/large.png?cacheFor=ed5d463f001823bf25db91888595a687',
+   t:[[1,5],[5,10],[10,16],[50,57],[100,68],[200,86],[300,103],[500,132]]},
+  {id:'manifesting-holo', name:'Manifesting', type:'holo', size:'5.13"×0.75"', itemId:19156128,
+   img:'https://storage.googleapis.com/sm-artworks/7c5cd395-b662-440f-a668-bf9052c8aafc/large.png?cacheFor=1f302fa314f6fee5ed260ed773250db6',
+   t:[[10,18],[50,64],[100,78],[200,104],[300,126],[500,167]]},
+  {id:'baking', name:'Baking', type:'dc', size:'3.13"×0.75"', itemId:17478829,
+   img:'https://storage.googleapis.com/sm-artworks/32774d7b-adab-48ca-8fc4-18fb0b0ec1c2/large.png?cacheFor=3bd97a513abf6349abb718b2cbdc00a7',
+   t:[[1,5],[5,9],[10,16],[50,56],[100,65],[200,82],[300,96],[500,123]]},
+  {id:'clawd-wave', name:'Clawd wave', type:'dc', size:'2.4"×1.5"', itemId:19235847,
+   img:'https://storage.googleapis.com/sm-artworks/f1ec9028-203f-4d6f-a360-5eea91e9723e/large.png?cacheFor=73d7616389ce26a3ea44a9d279ca3ed9',
+   t:[[1,5],[5,10],[10,17],[50,59],[100,71],[200,93],[300,112],[500,146]]},
+  {id:'manifesting-glt', name:'Manifesting', type:'glt', size:'5.13"×0.75"', itemId:17478833,
+   img:'https://storage.googleapis.com/sm-artworks/7c5cd395-b662-440f-a668-bf9052c8aafc/large.png?cacheFor=1f302fa314f6fee5ed260ed773250db6',
+   t:[[10,18],[50,64],[100,78],[200,104],[300,126],[500,167]]}
+];
+
+const TYPE_LABEL = {dc:'模切', holo:'全息', glt:'闪粉'};
+const TYPE_CLS = {dc:'badge-dc', holo:'badge-holo', glt:'badge-glt'};
+const STORE_KEY = 'claude_sticker_gb';
+
+// ============ STATE ============
+let state = loadState() || {rate: 7.25, people: []};
+let saveTimer = null;
+
+function loadState() {
+  try { const d = localStorage.getItem(STORE_KEY); return d ? JSON.parse(d) : null; }
+  catch(e) { return null; }
+}
+function saveState() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    const el = document.getElementById('lastSaved');
+    if (el) el.textContent = '已保存 ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+  }, 300);
+}
+
+// ============ PRICING ============
+function unitPrice(sticker, qty) {
+  if (qty <= 0) return sticker.t[0][1] / sticker.t[0][0]; // show first tier price
+  let tier = sticker.t[0];
+  for (const t of sticker.t) { if (qty >= t[0]) tier = t; }
+  return tier[1] / tier[0];
+}
+
+function tierInfo(sticker, qty) {
+  const tiers = sticker.t;
+  const minQ = tiers[0][0];
+  if (qty === 0) return {txt: '起订 ' + minQ + ' 张', warn: false};
+  if (qty < minQ) return {txt: '需至少' + minQ + '张 (差' + (minQ - qty) + '张)', warn: true};
+  let ci = 0;
+  for (let i = 0; i < tiers.length; i++) { if (qty >= tiers[i][0]) ci = i; }
+  if (ci < tiers.length - 1) {
+    const nxt = tiers[ci + 1];
+    const diff = nxt[0] - qty;
+    const np = (nxt[1] / nxt[0]).toFixed(2);
+    return {txt: tiers[ci][0] + '档 \u00B7 再' + diff + '张\u2192' + nxt[0] + '档($' + np + ')', warn: false};
+  }
+  return {txt: tiers[ci][0] + '档 (最高)', warn: false};
+}
+
+// ============ RENDER CARDS ============
+function renderCards() {
+  const grid = document.getElementById('stickerGrid');
+  let html = '';
+  S.forEach(s => {
+    const url = 'https://www.stickermule.com/claudecode/item/' + s.itemId + '?origin=PUBLIC_PROFILE';
+    html += '<div class="sticker-card" id="card-' + s.id + '">'
+      + '<img src="' + s.img + '" alt="' + s.name + '" loading="lazy">'
+      + '<div class="card-name">' + s.name + '</div>'
+      + '<span class="type-badge ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span>'
+      + '<span class="card-size">' + s.size + '</span>'
+      + '<div class="card-qty" id="cq-' + s.id + '">0</div>'
+      + '<div class="card-price" id="cp-' + s.id + '">暂无订购</div>'
+      + '<div class="card-price-cny" id="cc-' + s.id + '"></div>'
+      + '<div class="card-tier" id="ct-' + s.id + '"></div>'
+      + '<a class="card-link" href="' + url + '" target="_blank">查看原页 \u2192</a>'
+      + '</div>';
+  });
+  grid.innerHTML = html;
+}
+
+function updateCards(data) {
+  const rate = state.rate;
+  S.forEach(s => {
+    const d = data[s.id];
+    const q = d.totalQty;
+    const up = d.unitPrice;
+    document.getElementById('cq-' + s.id).textContent = q + ' 张';
+    if (q > 0) {
+      document.getElementById('cp-' + s.id).textContent = '$' + up.toFixed(4) + '/张';
+      document.getElementById('cc-' + s.id).textContent = '\u00A5' + (up * rate).toFixed(4) + '/张';
+    } else {
+      document.getElementById('cp-' + s.id).textContent = '暂无订购';
+      document.getElementById('cc-' + s.id).textContent = '';
+    }
+    const ti = tierInfo(s, q);
+    const el = document.getElementById('ct-' + s.id);
+    el.textContent = ti.txt;
+    el.className = 'card-tier' + (ti.warn ? ' warn' : '');
+  });
+}
+
+// ============ RENDER TABLE ============
+function renderTable() {
+  const tbl = document.getElementById('orderTable');
+  let h = '<thead><tr><th class="col-idx">#</th><th class="col-name">昵称</th>';
+  S.forEach(s => {
+    h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
+  });
+  h += '<th>总件数</th><th>USD</th><th>CNY</th><th></th></tr></thead>';
+
+  h += '<tbody>';
+  // Summary rows
+  h += '<tr class="s-row r-qty"><td class="col-idx"></td><td class="col-name">总数量</td>';
+  S.forEach(s => { h += '<td id="sq-' + s.id + '">0</td>'; });
+  h += '<td></td><td></td><td></td><td></td></tr>';
+
+  h += '<tr class="s-row r-price"><td class="col-idx"></td><td class="col-name">单价($)</td>';
+  S.forEach(s => { h += '<td id="sp-' + s.id + '">\u2014</td>'; });
+  h += '<td></td><td></td><td></td><td></td></tr>';
+
+  h += '<tr class="s-row r-total"><td class="col-idx"></td><td class="col-name">该款总价</td>';
+  S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
+  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td></td></tr>';
+
+  // Participant rows
+  state.people.forEach((p, i) => {
+    h += '<tr class="p-row"><td class="col-idx">' + (i + 1) + '</td>';
+    h += '<td class="col-name"><input class="name-input" value="' + esc(p.name) + '" data-pi="' + i + '" placeholder="昵称"></td>';
+    S.forEach(s => {
+      const v = p.orders[s.id] || 0;
+      h += '<td><input type="number" min="0" value="' + (v || '') + '" data-pi="' + i + '" data-si="' + s.id + '"></td>';
+    });
+    h += '<td class="pt-items" id="pi-' + i + '">0</td>';
+    h += '<td class="pt-usd" id="pu-' + i + '">\u2014</td>';
+    h += '<td class="pt-cny" id="pc-' + i + '">\u2014</td>';
+    h += '<td><button class="del-btn" onclick="removePerson(' + i + ')">\u00D7</button></td>';
+    h += '</tr>';
+  });
+
+  h += '</tbody>';
+  tbl.innerHTML = h;
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ============ RECALCULATE ============
+function recalculate() {
+  const rate = state.rate;
+  const data = {};
+  // Step 1: sticker totals
+  S.forEach(s => {
+    let totalQty = 0;
+    state.people.forEach(p => { totalQty += (p.orders[s.id] || 0); });
+    const up = unitPrice(s, totalQty);
+    data[s.id] = {totalQty, unitPrice: up};
+
+    const sqEl = document.getElementById('sq-' + s.id);
+    const spEl = document.getElementById('sp-' + s.id);
+    const stEl = document.getElementById('st-' + s.id);
+    if (sqEl) sqEl.textContent = totalQty;
+    if (spEl) spEl.textContent = totalQty > 0 ? '$' + up.toFixed(4) : '\u2014';
+    if (stEl) stEl.textContent = totalQty > 0 ? '$' + (totalQty * up).toFixed(2) : '\u2014';
+  });
+
+  // Step 2: person totals
+  let grandUSD = 0;
+  state.people.forEach((p, i) => {
+    let items = 0, usd = 0;
+    S.forEach(s => {
+      const q = p.orders[s.id] || 0;
+      items += q;
+      usd += q * data[s.id].unitPrice;
+    });
+    const cny = usd * rate;
+    grandUSD += usd;
+
+    const piEl = document.getElementById('pi-' + i);
+    const puEl = document.getElementById('pu-' + i);
+    const pcEl = document.getElementById('pc-' + i);
+    if (piEl) piEl.textContent = items;
+    if (puEl) puEl.textContent = items > 0 ? '$' + usd.toFixed(2) : '\u2014';
+    if (pcEl) pcEl.textContent = items > 0 ? '\u00A5' + cny.toFixed(2) : '\u2014';
+  });
+
+  // Step 3: grand totals
+  const grandCNY = grandUSD * rate;
+  document.getElementById('grandTotal').textContent =
+    '总金额 $' + grandUSD.toFixed(2) + ' / \u00A5' + grandCNY.toFixed(2);
+  const sgU = document.getElementById('st-grand-usd');
+  const sgC = document.getElementById('st-grand-cny');
+  if (sgU) sgU.textContent = '$' + grandUSD.toFixed(2);
+  if (sgC) sgC.textContent = '\u00A5' + grandCNY.toFixed(2);
+
+  // Update cards
+  updateCards(data);
+}
+
+function render() {
+  renderCards();
+  renderTable();
+  recalculate();
+}
+
+// ============ EVENT HANDLERS ============
+function addParticipant() {
+  state.people.push({name: '', orders: {}});
+  renderTable();
+  recalculate();
+  saveState();
+  // Focus the new name input
+  const inputs = document.querySelectorAll('.name-input');
+  if (inputs.length > 0) inputs[inputs.length - 1].focus();
+}
+
+function removePerson(idx) {
+  if (!confirm('确定删除第 ' + (idx + 1) + ' 行 "' + (state.people[idx].name || '未命名') + '" 吗？')) return;
+  state.people.splice(idx, 1);
+  renderTable();
+  recalculate();
+  saveState();
+}
+
+function clearAll() {
+  if (!confirm('确定清空所有数据？此操作不可撤销。')) return;
+  state.people = [];
+  renderTable();
+  recalculate();
+  saveState();
+}
+
+// Event delegation for table inputs
+document.getElementById('orderTable').addEventListener('input', function(e) {
+  const el = e.target;
+  if (el.matches('input[type="number"]') && el.dataset.si) {
+    const pi = parseInt(el.dataset.pi);
+    const si = el.dataset.si;
+    const v = Math.max(0, parseInt(el.value) || 0);
+    if (v === 0) {
+      delete state.people[pi].orders[si];
+    } else {
+      state.people[pi].orders[si] = v;
+    }
+    recalculate();
+    saveState();
+  } else if (el.matches('.name-input')) {
+    const pi = parseInt(el.dataset.pi);
+    state.people[pi].name = el.value;
+    saveState();
+  }
+});
+
+// Exchange rate
+document.getElementById('rateInput').addEventListener('input', function() {
+  state.rate = parseFloat(this.value) || 7.25;
+  recalculate();
+  saveState();
+});
+
+// ============ IMPORT / EXPORT ============
+function showExport() {
+  document.getElementById('modalTitle').textContent = '导出数据';
+  document.getElementById('modalText').value = JSON.stringify(state, null, 2);
+  document.getElementById('modalOk').textContent = '复制到剪贴板';
+  document.getElementById('modalOk').onclick = function() {
+    navigator.clipboard.writeText(document.getElementById('modalText').value)
+      .then(() => { alert('已复制！'); closeModal(); })
+      .catch(() => { document.getElementById('modalText').select(); document.execCommand('copy'); alert('已复制！'); closeModal(); });
+  };
+  document.getElementById('modalBg').classList.add('on');
+}
+
+function showImport() {
+  document.getElementById('modalTitle').textContent = '导入数据';
+  document.getElementById('modalText').value = '';
+  document.getElementById('modalOk').textContent = '导入';
+  document.getElementById('modalOk').onclick = function() {
+    try {
+      const d = JSON.parse(document.getElementById('modalText').value);
+      if (d && Array.isArray(d.people)) {
+        state = d;
+        if (!state.rate) state.rate = 7.25;
+        document.getElementById('rateInput').value = state.rate;
+        render();
+        saveState();
+        closeModal();
+        alert('导入成功！共 ' + state.people.length + ' 人');
+      } else {
+        alert('数据格式不正确，需包含 people 数组');
+      }
+    } catch(e) {
+      alert('JSON解析失败: ' + e.message);
+    }
+  };
+  document.getElementById('modalBg').classList.add('on');
+}
+
+function closeModal() {
+  document.getElementById('modalBg').classList.remove('on');
+}
+
+// ============ INIT ============
+document.getElementById('rateInput').value = state.rate;
+render();
+</script>
+</body>
+</html>
