@@ -117,6 +117,25 @@ input[type="number"]{-moz-appearance:textfield}
 .my-row td{background:#FFF8F0 !important}
 .my-row:hover td{background:#FFF3E8 !important}
 .my-row td.col-name{font-weight:600;color:var(--primary)}
+
+/* === Notice banner === */
+.notice{margin:0 24px;padding-top:18px}
+.notice details{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden}
+.notice summary{padding:14px 18px;cursor:pointer;font-size:15px;font-weight:600;color:var(--primary);list-style:none;display:flex;align-items:center;gap:8px;user-select:none}
+.notice summary::-webkit-details-marker{display:none}
+.notice summary::before{content:'';display:inline-block;width:0;height:0;border-left:6px solid var(--primary);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .2s}
+.notice details[open] summary::before{transform:rotate(90deg)}
+.notice-body{padding:0 18px 18px;font-size:13px;line-height:1.8;color:var(--text)}
+.notice-body h4{font-size:14px;font-weight:600;margin:14px 0 6px;color:var(--primary);display:flex;align-items:center;gap:6px}
+.notice-body h4:first-child{margin-top:4px}
+.notice-body p{margin:2px 0}
+.notice-body .tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:8px;font-weight:500}
+.tag-date{background:#E8F7EF;color:#2D8B5E}
+.tag-warn{background:#FDEAEA;color:var(--danger)}
+.notice-body ol,.notice-body ul{padding-left:20px;margin:4px 0}
+.notice-body li{margin:2px 0}
+.notice-divider{height:1px;background:var(--border);margin:14px 0}
+@media(max-width:768px){.notice{margin:0 14px;padding-top:14px}}
 </style>
 </head>
 <body>
@@ -139,6 +158,40 @@ input[type="number"]{-moz-appearance:textfield}
     <span class="last-saved" id="lastSaved"></span>
   </div>
 </header>
+
+<div class="notice">
+  <details open>
+    <summary>开团须知 · 请先阅读</summary>
+    <div class="notice-body">
+      <h4>流程与时间</h4>
+      <p><span class="tag tag-date">3月6日</span> 截单 — 截单前可随时修改数量，截单后锁定不可更改</p>
+      <p><span class="tag tag-date">3月8日</span> 截止收款 — 按表单显示金额付款，具体收款方式截单前群内通知</p>
+      <p>全员到账后团长统一下单，<strong>团长不垫付</strong>，先收钱再下单</p>
+
+      <h4>费用说明</h4>
+      <p>本次先收<strong>贴纸本体费用</strong>（Sticker Mule 免国际运费，不需要额外付海外邮费）</p>
+      <p>汇率以下单当日实际汇率为准，届时统一更新</p>
+      <p>如被海关征税，税费由全体团员<strong>平摊</strong></p>
+      <p>国内邮费等到货发货时再收，走闲鱼付运费</p>
+
+      <h4>注意事项</h4>
+      <p><span class="tag tag-warn">重要</span> 下单后不接受退款（贴纸为定制商品）</p>
+      <p>请在收款截止日期前付清全款，并将付款截图发到群里</p>
+      <p>买的人越多单价越低，拉人有益！每款贴纸的当前单价会实时显示在下方卡片上</p>
+
+      <div class="notice-divider"></div>
+
+      <h4>网站使用说明</h4>
+      <ol>
+        <li>首次打开网页会弹出昵称输入框，请填写你的<strong>群昵称</strong>（方便团长对账）</li>
+        <li>在下方统计表里找到你的行（标有 <small style="color:var(--primary)">(你)</small>），直接填写想要的贴纸数量</li>
+        <li>数据自动保存并实时同步，所有人都能看到最新的汇总情况</li>
+        <li>贴纸卡片上会显示每款的总数量、当前单价和下一档价格，方便决策</li>
+        <li>如需修改昵称，点击页面左上角你的昵称即可</li>
+      </ol>
+    </div>
+  </details>
+</div>
 
 <section>
   <div class="section-title">贴纸一览</div>
