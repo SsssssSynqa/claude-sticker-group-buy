@@ -96,12 +96,44 @@ input[type="number"]{-moz-appearance:textfield}
 @media(max-width:768px){header{padding:14px}section{padding:14px}.sticker-grid{grid-template-columns:repeat(2,1fr);gap:10px}header h1{font-size:17px}}
 
 .th-type{font-size:9px;font-weight:400;display:block;margin-top:2px}
+
+/* === NEW: Nickname overlay === */
+.nick-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center}
+.nick-popup{background:#fff;border-radius:16px;padding:28px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+.nick-popup h3{color:var(--primary);font-size:18px;margin-bottom:8px}
+.nick-popup p{font-size:13px;color:var(--text2);margin-bottom:16px}
+.nick-popup input{width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;text-align:center;margin-bottom:14px}
+.nick-popup input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-lt)}
+.nick-popup button{width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+.nick-popup button:hover{background:#D4623E}
+.nick-popup button:disabled{opacity:.5;cursor:not-allowed}
+
+/* === NEW: Connection & nickname === */
+.conn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;margin-left:8px;vertical-align:middle;transition:background .3s}
+.conn-dot.on{background:#4CAF50}
+.conn-dot.off{background:#E74C3C}
+.nick-tag{font-size:12px;color:var(--text2);cursor:pointer;padding:3px 8px;border-radius:6px;background:var(--primary-lt)}
+.nick-tag:hover{background:#FDDDD0}
+.my-row td{background:#FFF8F0 !important}
+.my-row:hover td{background:#FFF3E8 !important}
+.my-row td.col-name{font-weight:600;color:var(--primary)}
 </style>
 </head>
 <body>
+
+<div class="nick-overlay" id="nickOverlay" style="display:none">
+  <div class="nick-popup">
+    <h3>Claude Code 贴纸拼团</h3>
+    <p>请输入你的昵称（群内昵称，方便大家认出你）</p>
+    <input type="text" id="nickInput" placeholder="你的昵称..." maxlength="20" autocomplete="off">
+    <button id="nickBtn" onclick="confirmNick()" disabled>加入拼团</button>
+  </div>
+</div>
+
 <header>
-  <h1>Claude Code 贴纸拼团统计</h1>
+  <h1>Claude Code 贴纸拼团统计 <span class="conn-dot" id="connDot" title="连接中..."></span></h1>
   <div class="settings">
+    <span class="nick-tag" id="nickTag" onclick="changeNick()" title="点击修改昵称"></span>
     <label>汇率 1 USD = <input type="number" class="s-input" id="rateInput" step="0.01" min="0"> CNY</label>
     <span class="grand-total" id="grandTotal"></span>
     <span class="last-saved" id="lastSaved"></span>
@@ -114,12 +146,10 @@ input[type="number"]{-moz-appearance:textfield}
 </section>
 
 <section>
-  <div class="section-title">拼团统计表</div>
+  <div class="section-title">拼团统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
   <div class="table-controls">
-    <button class="btn btn-p" onclick="addParticipant()">+ 添加成员</button>
     <button class="btn btn-g" onclick="showExport()">导出数据</button>
     <button class="btn btn-v" onclick="showImport()">导入数据</button>
-    <button class="btn btn-d" onclick="clearAll()">清空数据</button>
   </div>
   <div class="table-wrap">
     <table id="orderTable"></table>
@@ -139,74 +169,261 @@ input[type="number"]{-moz-appearance:textfield}
 
 <footer>Claude Code Sticker Group Buy Tool · Made with love by Sylux</footer>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
+// ============ CONFIG ============
+const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
+
 // ============ STICKER DATA ============
 const S = [
-  {id:'clawd', name:'Clawd', type:'dc', size:'2"×1.6"', itemId:19156131,
+  {id:'clawd', name:'Clawd', type:'dc', size:'2"x1.6"', itemId:19156131,
    img:'https://storage.googleapis.com/sm-artworks/5719926a-04ae-4afb-9925-f1f4521d38ce/large.png?cacheFor=b1c948c6194db63359b0f8564d4a7eed',
    t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,89],[300,106],[500,138]]},
-  {id:'ultrathink', name:'ultrathink', type:'dc', size:'4.21"×0.75"', itemId:19236575,
+  {id:'ultrathink', name:'ultrathink', type:'dc', size:'4.21"x0.75"', itemId:19236575,
    img:'https://storage.googleapis.com/sm-artworks/0006ba04-0f46-4c86-930b-1b41a9480f14/large.png?cacheFor=f7003b57a2fc7bafc920f3ed2acb368a',
    t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,88],[300,106],[500,137]]},
-  {id:'clawd-happy', name:'Clawd happy', type:'dc', size:'2"×1.6"', itemId:19156132,
+  {id:'clawd-happy', name:'Clawd happy', type:'dc', size:'2"x1.6"', itemId:19156132,
    img:'https://storage.googleapis.com/sm-artworks/be75b541-e429-4b61-a058-6a04bc35f712/large.png?cacheFor=26b5d38b95c02b9de101edd57a5846a9',
    t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,89],[300,106],[500,138]]},
-  {id:'vibing-dc', name:'Vibing', type:'dc', size:'3.21"×0.75"', itemId:17478826,
+  {id:'vibing-dc', name:'Vibing', type:'dc', size:'3.21"x0.75"', itemId:17478826,
    img:'https://storage.googleapis.com/sm-artworks/c6e41ee6-4500-403f-a36c-3e6e72596e3a/large.png?cacheFor=e67ba358b1881dbc5ebedc5943e67dcb',
    t:[[1,5],[5,9],[10,16],[50,56],[100,65],[200,82],[300,97],[500,123]]},
-  {id:'clawd-shiny', name:'Clawd shiny', type:'holo', size:'2"×1.61"', itemId:19156133,
+  {id:'clawd-shiny', name:'Clawd shiny', type:'holo', size:'2"x1.61"', itemId:19156133,
    img:'https://storage.googleapis.com/sm-artworks/1c69d7fd-a6de-42a8-99be-3edc7b32c8f1/large.png?cacheFor=31a4293c9f5cc540655eb3642dd66c15',
    t:[[10,17],[50,63],[100,76],[200,99],[300,120],[500,158]]},
-  {id:'claudecode', name:'claudecode', type:'dc', size:'5.13"×0.75"', itemId:19156134,
+  {id:'claudecode', name:'claudecode', type:'dc', size:'5.13"x0.75"', itemId:19156134,
    img:'https://storage.googleapis.com/sm-artworks/1a18c149-6820-437c-83a3-4053259f28d5/large.png?cacheFor=5d8dcc208c6c3caee71731b8daf13233',
    t:[[1,5],[5,10],[10,17],[50,60],[100,72],[200,94],[300,114],[500,149]]},
-  {id:'vibing-holo', name:'Vibing', type:'holo', size:'3.21"×0.75"', itemId:17478832,
+  {id:'vibing-holo', name:'Vibing', type:'holo', size:'3.21"x0.75"', itemId:17478832,
    img:'https://storage.googleapis.com/sm-artworks/d85490fc-cd48-4248-b208-0bda8dad0e59/large.png?cacheFor=7ba69e81720e19d7d1fbb48a8163cbd9',
    t:[[10,17],[50,60],[100,71],[200,90],[300,108],[500,139]]},
-  {id:'reticulating', name:'reticulating', type:'dc', size:'5.13"×0.75"', itemId:19156130,
+  {id:'reticulating', name:'reticulating', type:'dc', size:'5.13"x0.75"', itemId:19156130,
    img:'https://storage.googleapis.com/sm-artworks/3133e32f-64d5-48ee-9215-be6453365d8b/large.png?cacheFor=666df05e24c335393669a33fa071c47c',
    t:[[1,5],[5,10],[10,17],[50,60],[100,72],[200,94],[300,114],[500,150]]},
-  {id:'shipping', name:'Shipping', type:'dc', size:'3.63"×0.75"', itemId:17478831,
+  {id:'shipping', name:'Shipping', type:'dc', size:'3.63"x0.75"', itemId:17478831,
    img:'https://storage.googleapis.com/sm-artworks/4296af64-9d1c-4e87-889f-e5397b680e4a/large.png?cacheFor=ed5d463f001823bf25db91888595a687',
    t:[[1,5],[5,10],[10,16],[50,57],[100,68],[200,86],[300,103],[500,132]]},
-  {id:'manifesting-holo', name:'Manifesting', type:'holo', size:'5.13"×0.75"', itemId:19156128,
+  {id:'manifesting-holo', name:'Manifesting', type:'holo', size:'5.13"x0.75"', itemId:19156128,
    img:'https://storage.googleapis.com/sm-artworks/7c5cd395-b662-440f-a668-bf9052c8aafc/large.png?cacheFor=1f302fa314f6fee5ed260ed773250db6',
    t:[[10,18],[50,64],[100,78],[200,104],[300,126],[500,167]]},
-  {id:'baking', name:'Baking', type:'dc', size:'3.13"×0.75"', itemId:17478829,
+  {id:'baking', name:'Baking', type:'dc', size:'3.13"x0.75"', itemId:17478829,
    img:'https://storage.googleapis.com/sm-artworks/32774d7b-adab-48ca-8fc4-18fb0b0ec1c2/large.png?cacheFor=3bd97a513abf6349abb718b2cbdc00a7',
    t:[[1,5],[5,9],[10,16],[50,56],[100,65],[200,82],[300,96],[500,123]]},
-  {id:'clawd-wave', name:'Clawd wave', type:'dc', size:'2.4"×1.5"', itemId:19235847,
+  {id:'clawd-wave', name:'Clawd wave', type:'dc', size:'2.4"x1.5"', itemId:19235847,
    img:'https://storage.googleapis.com/sm-artworks/f1ec9028-203f-4d6f-a360-5eea91e9723e/large.png?cacheFor=73d7616389ce26a3ea44a9d279ca3ed9',
    t:[[1,5],[5,10],[10,17],[50,59],[100,71],[200,93],[300,112],[500,146]]},
-  {id:'manifesting-glt', name:'Manifesting', type:'glt', size:'5.13"×0.75"', itemId:17478833,
+  {id:'manifesting-glt', name:'Manifesting', type:'glt', size:'5.13"x0.75"', itemId:17478833,
    img:'https://storage.googleapis.com/sm-artworks/7c5cd395-b662-440f-a668-bf9052c8aafc/large.png?cacheFor=1f302fa314f6fee5ed260ed773250db6',
    t:[[10,18],[50,64],[100,78],[200,104],[300,126],[500,167]]}
 ];
 
 const TYPE_LABEL = {dc:'模切', holo:'全息', glt:'闪粉'};
 const TYPE_CLS = {dc:'badge-dc', holo:'badge-holo', glt:'badge-glt'};
-const STORE_KEY = 'claude_sticker_gb';
 
 // ============ STATE ============
-let state = loadState() || {rate: 7.25, people: []};
-let saveTimer = null;
+let myName = localStorage.getItem('gb_nickname') || '';
+let allOrders = {}; // {name: {stickerId: qty}}
+let rate = 7.25;
+let sb = null;
+let connected = false;
+let writeTimers = {};
+let renderTimer = null;
 
-function loadState() {
-  try { const d = localStorage.getItem(STORE_KEY); return d ? JSON.parse(d) : null; }
-  catch(e) { return null; }
+// ============ SUPABASE ============
+async function initSupabase() {
+  if (typeof window.supabase === 'undefined') {
+    setConnected(false);
+    updateStatus('SDK加载失败，离线模式');
+    loadOffline();
+    return;
+  }
+  try {
+    sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+    await loadAll();
+    subscribeRealtime();
+    setConnected(true);
+    updateStatus('已连接');
+  } catch(e) {
+    console.error('Supabase init failed:', e);
+    setConnected(false);
+    updateStatus('连接失败，离线模式');
+    loadOffline();
+  }
 }
-function saveState() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    localStorage.setItem(STORE_KEY, JSON.stringify(state));
-    const el = document.getElementById('lastSaved');
-    if (el) el.textContent = '已保存 ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
-  }, 300);
+
+async function loadAll() {
+  const {data: orders, error: e1} = await sb.from('orders').select('*');
+  if (e1) throw e1;
+  allOrders = {};
+  for (const row of orders) {
+    if (row.quantity > 0) {
+      if (!allOrders[row.name]) allOrders[row.name] = {};
+      allOrders[row.name][row.sticker_id] = row.quantity;
+    }
+  }
+  const {data: settings, error: e2} = await sb.from('settings').select('*').eq('key', 'rate');
+  if (e2) throw e2;
+  if (settings && settings[0]) rate = parseFloat(settings[0].value) || 7.25;
+}
+
+function subscribeRealtime() {
+  sb.channel('gb-sync')
+    .on('postgres_changes', {event: '*', schema: 'public', table: 'orders'}, payload => {
+      handleOrderEvent(payload);
+    })
+    .on('postgres_changes', {event: '*', schema: 'public', table: 'settings'}, payload => {
+      handleSettingsEvent(payload);
+    })
+    .subscribe(status => {
+      setConnected(status === 'SUBSCRIBED');
+    });
+}
+
+function handleOrderEvent(payload) {
+  const row = payload.new || payload.old;
+  if (!row || row.name === myName) return; // skip my own echoes
+
+  if (payload.eventType === 'DELETE') {
+    // Unlikely since we upsert with qty=0 instead of deleting, but handle it
+    if (allOrders[row.name]) {
+      delete allOrders[row.name][row.sticker_id];
+      if (Object.keys(allOrders[row.name]).length === 0) delete allOrders[row.name];
+    }
+  } else {
+    const {name, sticker_id, quantity} = payload.new;
+    if (!allOrders[name]) allOrders[name] = {};
+    if (quantity > 0) {
+      allOrders[name][sticker_id] = quantity;
+    } else {
+      delete allOrders[name][sticker_id];
+      if (Object.keys(allOrders[name]).length === 0) delete allOrders[name];
+    }
+  }
+  scheduleRender();
+  saveOffline();
+}
+
+function handleSettingsEvent(payload) {
+  if (payload.new && payload.new.key === 'rate') {
+    rate = parseFloat(payload.new.value) || 7.25;
+    document.getElementById('rateInput').value = rate;
+    recalculate();
+    saveOffline();
+  }
+}
+
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(() => {
+    renderTable();
+    recalculate();
+  }, 100);
+}
+
+function debouncedWrite(sid, qty) {
+  clearTimeout(writeTimers[sid]);
+  writeTimers[sid] = setTimeout(async () => {
+    if (!sb) return;
+    try {
+      await sb.from('orders').upsert(
+        {name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()},
+        {onConflict: 'name,sticker_id'}
+      );
+      updateStatus('已同步');
+    } catch(e) {
+      console.error('Write failed:', e);
+      updateStatus('同步失败');
+    }
+  }, 500);
+}
+
+async function writeRate(r) {
+  if (!sb) return;
+  try {
+    await sb.from('settings').update({value: String(r), updated_at: new Date().toISOString()}).eq('key', 'rate');
+  } catch(e) {
+    console.error('Rate write failed:', e);
+  }
+}
+
+// ============ OFFLINE FALLBACK ============
+function saveOffline() {
+  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, rate})); } catch(e) {}
+}
+
+function loadOffline() {
+  try {
+    const d = JSON.parse(localStorage.getItem('gb_cache'));
+    if (d) { allOrders = d.allOrders || {}; rate = d.rate || 7.25; }
+  } catch(e) {}
+}
+
+// ============ UI HELPERS ============
+function setConnected(on) {
+  connected = on;
+  const dot = document.getElementById('connDot');
+  dot.className = 'conn-dot ' + (on ? 'on' : 'off');
+  dot.title = on ? '已连接 · 实时同步中' : '未连接';
+}
+
+function updateStatus(msg) {
+  const el = document.getElementById('lastSaved');
+  if (el) el.textContent = msg + ' ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+}
+
+// ============ NICKNAME ============
+function showNicknamePopup() {
+  const overlay = document.getElementById('nickOverlay');
+  overlay.style.display = 'flex';
+  const inp = document.getElementById('nickInput');
+  const btn = document.getElementById('nickBtn');
+  inp.addEventListener('input', () => { btn.disabled = !inp.value.trim(); });
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter' && inp.value.trim()) confirmNick(); });
+  inp.focus();
+}
+
+function confirmNick() {
+  const name = document.getElementById('nickInput').value.trim();
+  if (!name) return;
+  myName = name;
+  localStorage.setItem('gb_nickname', myName);
+  document.getElementById('nickOverlay').style.display = 'none';
+  updateNickDisplay();
+  renderTable();
+  recalculate();
+}
+
+function changeNick() {
+  const newName = prompt('修改昵称:', myName);
+  if (newName && newName.trim() && newName.trim() !== myName) {
+    const oldName = myName;
+    myName = newName.trim();
+    localStorage.setItem('gb_nickname', myName);
+    // Migrate orders in local state
+    if (allOrders[oldName]) {
+      allOrders[myName] = allOrders[oldName];
+      delete allOrders[oldName];
+    }
+    // Migrate in Supabase
+    if (sb) {
+      sb.from('orders').update({name: myName, updated_at: new Date().toISOString()}).eq('name', oldName)
+        .then(({error}) => { if (error) console.error('Nickname migration failed:', error); });
+    }
+    updateNickDisplay();
+    renderTable();
+    recalculate();
+  }
+}
+
+function updateNickDisplay() {
+  const el = document.getElementById('nickTag');
+  if (el) el.textContent = myName;
 }
 
 // ============ PRICING ============
 function unitPrice(sticker, qty) {
-  if (qty <= 0) return sticker.t[0][1] / sticker.t[0][0]; // show first tier price
+  if (qty <= 0) return sticker.t[0][1] / sticker.t[0][0];
   let tier = sticker.t[0];
   for (const t of sticker.t) { if (qty >= t[0]) tier = t; }
   return tier[1] / tier[0];
@@ -250,7 +467,6 @@ function renderCards() {
 }
 
 function updateCards(data) {
-  const rate = state.rate;
   S.forEach(s => {
     const d = data[s.id];
     const q = d.totalQty;
@@ -271,60 +487,109 @@ function updateCards(data) {
 }
 
 // ============ RENDER TABLE ============
+function getSortedNames() {
+  const names = new Set(Object.keys(allOrders));
+  names.add(myName);
+  const arr = [...names].filter(n => {
+    if (n === myName) return true;
+    const o = allOrders[n];
+    return o && Object.values(o).some(q => q > 0);
+  });
+  arr.sort((a, b) => {
+    if (a === myName) return -1;
+    if (b === myName) return 1;
+    return a.localeCompare(b, 'zh-CN');
+  });
+  return arr;
+}
+
 function renderTable() {
   const tbl = document.getElementById('orderTable');
+  const names = getSortedNames();
+
+  const activeCount = names.filter(n => {
+    const o = allOrders[n];
+    return o && Object.values(o).some(q => q > 0);
+  }).length;
+  document.getElementById('memberCount').textContent = activeCount > 0 ? '（' + activeCount + ' 人参团）' : '';
+
   let h = '<thead><tr><th class="col-idx">#</th><th class="col-name">昵称</th>';
   S.forEach(s => {
     h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
   });
-  h += '<th>总件数</th><th>USD</th><th>CNY</th><th></th></tr></thead>';
+  h += '<th>总件数</th><th>USD</th><th>CNY</th></tr></thead>';
 
   h += '<tbody>';
   // Summary rows
   h += '<tr class="s-row r-qty"><td class="col-idx"></td><td class="col-name">总数量</td>';
   S.forEach(s => { h += '<td id="sq-' + s.id + '">0</td>'; });
-  h += '<td></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-price"><td class="col-idx"></td><td class="col-name">单价($)</td>';
   S.forEach(s => { h += '<td id="sp-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-total"><td class="col-idx"></td><td class="col-name">该款总价</td>';
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td></td></tr>';
+  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td></tr>';
 
   // Participant rows
-  state.people.forEach((p, i) => {
-    h += '<tr class="p-row"><td class="col-idx">' + (i + 1) + '</td>';
-    h += '<td class="col-name"><input class="name-input" value="' + esc(p.name) + '" data-pi="' + i + '" placeholder="昵称"></td>';
+  names.forEach((name, i) => {
+    const isMe = name === myName;
+    const orders = allOrders[name] || {};
+    h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-name="' + esc(name) + '">';
+    h += '<td class="col-idx">' + (i + 1) + '</td>';
+    h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + '</td>';
     S.forEach(s => {
-      const v = p.orders[s.id] || 0;
-      h += '<td><input type="number" min="0" value="' + (v || '') + '" data-pi="' + i + '" data-si="' + s.id + '"></td>';
+      const v = orders[s.id] || 0;
+      if (isMe) {
+        h += '<td><input type="number" min="0" value="' + (v || '') + '" data-si="' + s.id + '"></td>';
+      } else {
+        h += '<td>' + (v || '') + '</td>';
+      }
     });
     h += '<td class="pt-items" id="pi-' + i + '">0</td>';
     h += '<td class="pt-usd" id="pu-' + i + '">\u2014</td>';
     h += '<td class="pt-cny" id="pc-' + i + '">\u2014</td>';
-    h += '<td><button class="del-btn" onclick="removePerson(' + i + ')">\u00D7</button></td>';
     h += '</tr>';
   });
 
   h += '</tbody>';
+
+  // Save focus state
+  const focused = document.activeElement;
+  let focusSid = null, focusVal = null, focusPos = null;
+  if (focused && focused.dataset && focused.dataset.si) {
+    focusSid = focused.dataset.si;
+    focusVal = focused.value;
+    focusPos = focused.selectionStart;
+  }
+
   tbl.innerHTML = h;
+
+  // Restore focus
+  if (focusSid) {
+    const inp = tbl.querySelector('input[data-si="' + focusSid + '"]');
+    if (inp) {
+      inp.value = focusVal;
+      inp.focus();
+      try { inp.setSelectionRange(focusPos, focusPos); } catch(e) {}
+    }
+  }
 }
 
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ============ RECALCULATE ============
 function recalculate() {
-  const rate = state.rate;
+  const names = getSortedNames();
   const data = {};
-  // Step 1: sticker totals
+
   S.forEach(s => {
     let totalQty = 0;
-    state.people.forEach(p => { totalQty += (p.orders[s.id] || 0); });
+    for (const name in allOrders) { totalQty += (allOrders[name][s.id] || 0); }
     const up = unitPrice(s, totalQty);
     data[s.id] = {totalQty, unitPrice: up};
-
     const sqEl = document.getElementById('sq-' + s.id);
     const spEl = document.getElementById('sp-' + s.id);
     const stEl = document.getElementById('st-' + s.id);
@@ -333,18 +598,17 @@ function recalculate() {
     if (stEl) stEl.textContent = totalQty > 0 ? '$' + (totalQty * up).toFixed(2) : '\u2014';
   });
 
-  // Step 2: person totals
   let grandUSD = 0;
-  state.people.forEach((p, i) => {
+  names.forEach((name, i) => {
+    const orders = allOrders[name] || {};
     let items = 0, usd = 0;
     S.forEach(s => {
-      const q = p.orders[s.id] || 0;
+      const q = orders[s.id] || 0;
       items += q;
       usd += q * data[s.id].unitPrice;
     });
     const cny = usd * rate;
     grandUSD += usd;
-
     const piEl = document.getElementById('pi-' + i);
     const puEl = document.getElementById('pu-' + i);
     const pcEl = document.getElementById('pc-' + i);
@@ -353,84 +617,54 @@ function recalculate() {
     if (pcEl) pcEl.textContent = items > 0 ? '\u00A5' + cny.toFixed(2) : '\u2014';
   });
 
-  // Step 3: grand totals
   const grandCNY = grandUSD * rate;
-  document.getElementById('grandTotal').textContent =
-    '总金额 $' + grandUSD.toFixed(2) + ' / \u00A5' + grandCNY.toFixed(2);
+  document.getElementById('grandTotal').textContent = '总金额 $' + grandUSD.toFixed(2) + ' / \u00A5' + grandCNY.toFixed(2);
   const sgU = document.getElementById('st-grand-usd');
   const sgC = document.getElementById('st-grand-cny');
   if (sgU) sgU.textContent = '$' + grandUSD.toFixed(2);
   if (sgC) sgC.textContent = '\u00A5' + grandCNY.toFixed(2);
 
-  // Update cards
   updateCards(data);
 }
 
-function render() {
-  renderCards();
-  renderTable();
-  recalculate();
-}
-
 // ============ EVENT HANDLERS ============
-function addParticipant() {
-  state.people.push({name: '', orders: {}});
-  renderTable();
-  recalculate();
-  saveState();
-  // Focus the new name input
-  const inputs = document.querySelectorAll('.name-input');
-  if (inputs.length > 0) inputs[inputs.length - 1].focus();
-}
-
-function removePerson(idx) {
-  if (!confirm('确定删除第 ' + (idx + 1) + ' 行 "' + (state.people[idx].name || '未命名') + '" 吗？')) return;
-  state.people.splice(idx, 1);
-  renderTable();
-  recalculate();
-  saveState();
-}
-
-function clearAll() {
-  if (!confirm('确定清空所有数据？此操作不可撤销。')) return;
-  state.people = [];
-  renderTable();
-  recalculate();
-  saveState();
-}
-
-// Event delegation for table inputs
 document.getElementById('orderTable').addEventListener('input', function(e) {
   const el = e.target;
   if (el.matches('input[type="number"]') && el.dataset.si) {
-    const pi = parseInt(el.dataset.pi);
-    const si = el.dataset.si;
+    const sid = el.dataset.si;
     const v = Math.max(0, parseInt(el.value) || 0);
-    if (v === 0) {
-      delete state.people[pi].orders[si];
+    if (!allOrders[myName]) allOrders[myName] = {};
+    if (v > 0) {
+      allOrders[myName][sid] = v;
     } else {
-      state.people[pi].orders[si] = v;
+      delete allOrders[myName][sid];
     }
     recalculate();
-    saveState();
-  } else if (el.matches('.name-input')) {
-    const pi = parseInt(el.dataset.pi);
-    state.people[pi].name = el.value;
-    saveState();
+    debouncedWrite(sid, v);
+    saveOffline();
   }
 });
 
-// Exchange rate
 document.getElementById('rateInput').addEventListener('input', function() {
-  state.rate = parseFloat(this.value) || 7.25;
+  rate = parseFloat(this.value) || 7.25;
   recalculate();
-  saveState();
+  clearTimeout(writeTimers._rate);
+  writeTimers._rate = setTimeout(() => writeRate(rate), 500);
+  saveOffline();
 });
 
 // ============ IMPORT / EXPORT ============
 function showExport() {
+  const people = [];
+  for (const [name, orders] of Object.entries(allOrders)) {
+    const nonZero = {};
+    for (const [sid, qty] of Object.entries(orders)) {
+      if (qty > 0) nonZero[sid] = qty;
+    }
+    if (Object.keys(nonZero).length > 0) people.push({name, orders: nonZero});
+  }
   document.getElementById('modalTitle').textContent = '导出数据';
-  document.getElementById('modalText').value = JSON.stringify(state, null, 2);
+  document.getElementById('modalText').value = JSON.stringify({rate, people}, null, 2);
   document.getElementById('modalOk').textContent = '复制到剪贴板';
   document.getElementById('modalOk').onclick = function() {
     navigator.clipboard.writeText(document.getElementById('modalText').value)
@@ -441,23 +675,36 @@ function showExport() {
 }
 
 function showImport() {
-  document.getElementById('modalTitle').textContent = '导入数据';
+  document.getElementById('modalTitle').textContent = '导入数据（批量迁移）';
   document.getElementById('modalText').value = '';
-  document.getElementById('modalOk').textContent = '导入';
-  document.getElementById('modalOk').onclick = function() {
+  document.getElementById('modalOk').textContent = '导入到云端';
+  document.getElementById('modalOk').onclick = async function() {
     try {
       const d = JSON.parse(document.getElementById('modalText').value);
-      if (d && Array.isArray(d.people)) {
-        state = d;
-        if (!state.rate) state.rate = 7.25;
-        document.getElementById('rateInput').value = state.rate;
-        render();
-        saveState();
-        closeModal();
-        alert('导入成功！共 ' + state.people.length + ' 人');
-      } else {
-        alert('数据格式不正确，需包含 people 数组');
+      if (!d || !Array.isArray(d.people)) { alert('数据格式不正确，需包含 people 数组'); return; }
+      if (!sb) { alert('未连接到服务器，无法导入'); return; }
+
+      const rows = [];
+      for (const p of d.people) {
+        for (const [sid, qty] of Object.entries(p.orders || {})) {
+          if (qty > 0) rows.push({name: p.name, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()});
+        }
       }
+      if (rows.length > 0) {
+        const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'});
+        if (error) { alert('导入失败: ' + error.message); return; }
+      }
+      if (d.rate) {
+        await sb.from('settings').update({value: String(d.rate), updated_at: new Date().toISOString()}).eq('key', 'rate');
+        rate = d.rate;
+        document.getElementById('rateInput').value = rate;
+      }
+      await loadAll();
+      renderTable();
+      recalculate();
+      saveOffline();
+      closeModal();
+      alert('导入成功！共 ' + d.people.length + ' 人，' + rows.length + ' 条订购记录');
     } catch(e) {
       alert('JSON解析失败: ' + e.message);
     }
@@ -470,8 +717,29 @@ function closeModal() {
 }
 
 // ============ INIT ============
-document.getElementById('rateInput').value = state.rate;
-render();
+(async function init() {
+  renderCards();
+
+  if (!myName) {
+    showNicknamePopup();
+    await new Promise(resolve => {
+      const check = setInterval(() => {
+        if (myName) { clearInterval(check); resolve(); }
+      }, 100);
+    });
+  }
+
+  updateNickDisplay();
+  document.getElementById('rateInput').value = rate;
+  // Show loading
+  document.getElementById('orderTable').innerHTML = '<tbody><tr><td style="text-align:center;padding:40px;color:#999" colspan="16">连接中...</td></tr></tbody>';
+
+  await initSupabase();
+
+  document.getElementById('rateInput').value = rate;
+  renderTable();
+  recalculate();
+})();
 </script>
 </body>
 </html>
