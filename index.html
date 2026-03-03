@@ -175,6 +175,17 @@ input[type="number"]{-moz-appearance:textfield}
 .notice-body li{margin:2px 0}
 .notice-divider{height:1px;background:var(--border);margin:14px 0}
 @media(max-width:768px){.notice{margin:0 14px;padding-top:14px}}
+
+/* === Submit bar === */
+.submit-bar{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#FDE8DC,#F5E1F0);border-top:2px solid var(--primary);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:500;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:0 -4px 20px rgba(0,0,0,.1)}
+.submit-bar.show{transform:translateY(0)}
+.submit-bar-info{font-size:13px;color:var(--text)}
+.submit-bar-info strong{color:var(--primary);font-size:15px}
+.submit-bar-btn{padding:10px 28px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.submit-bar-btn:hover{background:#D4623E;transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,113,74,.3)}
+.submit-bar-btn:active{transform:translateY(0)}
+.submit-bar-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.submit-bar-btn.success{background:var(--green)}
 </style>
 </head>
 <body>
@@ -281,6 +292,11 @@ input[type="number"]{-moz-appearance:textfield}
       <button class="btn btn-p" id="modalOk"></button>
     </div>
   </div>
+</div>
+
+<div class="submit-bar" id="submitBar">
+  <div class="submit-bar-info">你有 <strong id="submitCount">0</strong> 项修改未保存</div>
+  <button class="submit-bar-btn" id="submitBtn" onclick="submitCart()">保存</button>
 </div>
 
 <footer>Claude Code Sticker Group Buy Tool · Made with love by Sylux</footer>
@@ -392,6 +408,8 @@ async function loadAll() {
     if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
     if (row.sticker_id === '_team') {
       allTeams[row.name] = row.quantity;
+    } else if (row.sticker_id === '_pin') {
+      // Skip PIN records — not sticker data
     } else if (row.quantity > 0) {
       if (!allOrders[row.name]) allOrders[row.name] = {};
       allOrders[row.name][row.sticker_id] = row.quantity;
@@ -419,6 +437,7 @@ function subscribeRealtime() {
 function handleOrderEvent(payload) {
   const row = payload.new || payload.old;
   if (!row || row.name === myName) return; // skip my own echoes
+  if (row.sticker_id === '_pin') return; // skip PIN records
 
   // Track join order for new arrivals
   if (payload.new && payload.new.id) {
@@ -474,42 +493,92 @@ function scheduleRender() {
   }, 100);
 }
 
-let pendingWrites = {}; // {sid: qty} — pending data not yet written to Supabase
+let pendingChanges = {}; // {sid: qty} — local changes not yet submitted to Supabase
 
-function debouncedWrite(sid, qty) {
-  pendingWrites[sid] = qty;
-  clearTimeout(writeTimers[sid]);
-  writeTimers[sid] = setTimeout(() => doWrite(sid, qty), 500);
+function trackChange(sid, qty) {
+  pendingChanges[sid] = qty;
+  updateSubmitBar();
 }
 
-async function doWrite(sid, qty) {
-  if (!sb) return;
-  try {
-    const {error} = await sb.from('orders').upsert(
-      {name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()},
-      {onConflict: 'name,sticker_id'}
-    ).select();
-    if (error) throw error;
-    delete pendingWrites[sid];
-    updateStatus('已同步');
-  } catch(e) {
-    console.error('Write failed:', e);
-    updateStatus('同步失败');
+function updateSubmitBar() {
+  const count = Object.keys(pendingChanges).length;
+  const bar = document.getElementById('submitBar');
+  const countEl = document.getElementById('submitCount');
+  const btn = document.getElementById('submitBtn');
+  if (count > 0) {
+    bar.classList.add('show');
+    countEl.textContent = count;
+    btn.textContent = '保存';
+    btn.disabled = false;
+    btn.className = 'submit-bar-btn';
+  } else {
+    bar.classList.remove('show');
   }
 }
 
-function flushPendingWrites() {
-  for (const sid of Object.keys(pendingWrites)) {
-    clearTimeout(writeTimers[sid]);
-    doWrite(sid, pendingWrites[sid]);
+async function submitCart() {
+  if (!sb || !myName) return;
+  const entries = Object.entries(pendingChanges);
+  if (entries.length === 0) return;
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+
+  try {
+    const rows = entries.map(([sid, qty]) => ({
+      name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()
+    }));
+    const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'}).select();
+    if (error) throw error;
+
+    pendingChanges = {};
+    btn.textContent = '已保存 ✓';
+    btn.className = 'submit-bar-btn success';
+    updateStatus('已保存');
+    setTimeout(() => updateSubmitBar(), 1500);
+  } catch(e) {
+    console.error('Submit failed:', e);
+    btn.disabled = false;
+    btn.textContent = '保存失败，点击重试';
+    updateStatus('保存失败');
+  }
+}
+
+// Safety net: auto-save on page close/hide
+function flushPendingOnExit() {
+  if (!sb || !myName || Object.keys(pendingChanges).length === 0) return;
+  const rows = Object.entries(pendingChanges).map(([sid, qty]) => ({
+    name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()
+  }));
+  // Use sendBeacon for reliability on page close
+  const url = SUPA_URL + '/rest/v1/orders?on_conflict=name,sticker_id';
+  const blob = new Blob([JSON.stringify(rows)], {type: 'application/json'});
+  try {
+    const sent = navigator.sendBeacon(url + '&apikey=' + SUPA_KEY, blob);
+    if (sent) pendingChanges = {};
+  } catch(e) {
+    // Fallback: fire-and-forget fetch
+    fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'resolution=merge-duplicates'},
+      body: JSON.stringify(rows),
+      keepalive: true
+    }).catch(() => {});
   }
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) flushPendingWrites();
+  if (document.hidden) flushPendingOnExit();
 });
-window.addEventListener('beforeunload', flushPendingWrites);
-window.addEventListener('pagehide', flushPendingWrites);
+window.addEventListener('beforeunload', (e) => {
+  if (Object.keys(pendingChanges).length > 0) {
+    flushPendingOnExit();
+    e.preventDefault();
+    e.returnValue = '你有未保存的修改，确定要离开吗？';
+  }
+});
+window.addEventListener('pagehide', flushPendingOnExit);
 
 async function writeRate(r) {
   if (!sb) return;
@@ -1103,7 +1172,7 @@ document.getElementById('orderTable').addEventListener('input', function(e) {
       delete allOrders[myName][sid];
     }
     recalculate();
-    debouncedWrite(sid, v);
+    trackChange(sid, v);
     saveOffline();
   }
 });
@@ -1257,7 +1326,7 @@ function closeModal() {
     }
     recalculate();
     renderTable();
-    debouncedWrite(sid, next);
+    trackChange(sid, next);
     saveOffline();
   });
 
