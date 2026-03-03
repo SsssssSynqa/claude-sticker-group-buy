@@ -445,22 +445,42 @@ function scheduleRender() {
   }, 100);
 }
 
+let pendingWrites = {}; // {sid: qty} — pending data not yet written to Supabase
+
 function debouncedWrite(sid, qty) {
+  pendingWrites[sid] = qty;
   clearTimeout(writeTimers[sid]);
-  writeTimers[sid] = setTimeout(async () => {
-    if (!sb) return;
-    try {
-      await sb.from('orders').upsert(
-        {name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()},
-        {onConflict: 'name,sticker_id'}
-      );
-      updateStatus('已同步');
-    } catch(e) {
-      console.error('Write failed:', e);
-      updateStatus('同步失败');
-    }
-  }, 500);
+  writeTimers[sid] = setTimeout(() => doWrite(sid, qty), 500);
 }
+
+async function doWrite(sid, qty) {
+  if (!sb) return;
+  try {
+    const {error} = await sb.from('orders').upsert(
+      {name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()},
+      {onConflict: 'name,sticker_id'}
+    ).select();
+    if (error) throw error;
+    delete pendingWrites[sid];
+    updateStatus('已同步');
+  } catch(e) {
+    console.error('Write failed:', e);
+    updateStatus('同步失败');
+  }
+}
+
+function flushPendingWrites() {
+  for (const sid of Object.keys(pendingWrites)) {
+    clearTimeout(writeTimers[sid]);
+    doWrite(sid, pendingWrites[sid]);
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) flushPendingWrites();
+});
+window.addEventListener('beforeunload', flushPendingWrites);
+window.addEventListener('pagehide', flushPendingWrites);
 
 async function writeRate(r) {
   if (!sb) return;
