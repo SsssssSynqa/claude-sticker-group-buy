@@ -400,8 +400,18 @@ async function initSupabase() {
 }
 
 async function loadAll() {
-  const {data: orders, error: e1} = await sb.from('orders').select('*');
-  if (e1) throw e1;
+  // Paginate to get ALL rows (Supabase default limit is 1000)
+  let orders = [];
+  let from = 0;
+  const PAGE = 1000;
+  while (true) {
+    const {data, error} = await sb.from('orders').select('*').range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    orders = orders.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
   allOrders = {};
   allTeams = {};
   const joinOrd = {};
