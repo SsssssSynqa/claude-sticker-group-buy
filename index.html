@@ -1020,12 +1020,10 @@ function renderTable() {
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
   h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td></tr>';
 
-  // Compute global join-order sequence numbers
-  const allNamesFlat = [];
-  teamsData.forEach(g => { allNamesFlat.push(...g.names); });
-  const sortedByJoin = [...allNamesFlat].sort((a, b) => (allJoinOrder[a] || Infinity) - (allJoinOrder[b] || Infinity));
+  // Compute global join-order sequence numbers (stable: based on ALL registered users, not just visible ones)
+  const sortedByJoin = Object.entries(allJoinOrder).sort((a, b) => a[1] - b[1]);
   const seqMap = {};
-  sortedByJoin.forEach((name, i) => { seqMap[name] = i + 1; });
+  sortedByJoin.forEach(([name], i) => { seqMap[name] = i + 1; });
   globalSeqMap = seqMap;
 
   // Team sections
