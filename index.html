@@ -122,6 +122,14 @@ input[type="number"]{-moz-appearance:textfield}
 .nick-popup button{width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
 .nick-popup button:hover{background:#D4623E}
 .nick-popup button:disabled{opacity:.5;cursor:not-allowed}
+.nick-tabs{display:flex;gap:0;margin-bottom:16px;border:2px solid var(--border);border-radius:10px;overflow:hidden}
+.nick-popup .nick-tab{flex:1;padding:8px;border:none;background:var(--bg);color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;width:auto;border-radius:0}
+.nick-popup .nick-tab.active{background:var(--primary);color:#fff;font-weight:600}
+.nick-pin{width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;text-align:center;margin-bottom:14px;letter-spacing:6px}
+.nick-pin:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-lt)}
+.nick-hint{font-size:11px;color:var(--text2);margin:-8px 0 12px}
+.nick-err{font-size:12px;color:var(--danger);margin-bottom:8px;display:none}
+.nick-err.show{display:block}
 
 /* === NEW: Connection & nickname === */
 .conn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;margin-left:8px;vertical-align:middle;transition:background .3s}
@@ -174,15 +182,24 @@ input[type="number"]{-moz-appearance:textfield}
 <div class="nick-overlay" id="nickOverlay" style="display:none">
   <div class="nick-popup">
     <h3>Claude Code 贴纸拼团</h3>
-    <p>请输入你的昵称（群内昵称，方便大家认出你）</p>
-    <input type="text" id="nickInput" placeholder="你的昵称..." maxlength="20" autocomplete="off">
-    <p style="font-size:13px;color:var(--text2);margin-bottom:6px">选择你的分团</p>
-    <div class="team-select">
-      <label><input type="radio" name="team" value="1" checked> 团1</label>
-      <label><input type="radio" name="team" value="2"> 团2</label>
-      <label><input type="radio" name="team" value="3"> 团3</label>
+    <div class="nick-tabs">
+      <button class="nick-tab active" id="tabRegister" onclick="switchAuthTab('register')">新用户注册</button>
+      <button class="nick-tab" id="tabLogin" onclick="switchAuthTab('login')">已有账号</button>
     </div>
-    <button id="nickBtn" onclick="confirmNick()" disabled>加入拼团</button>
+    <p id="authHint">请输入你的昵称（群内昵称，方便大家认出你）</p>
+    <input type="text" id="nickInput" placeholder="你的昵称..." maxlength="20" autocomplete="off">
+    <input type="password" inputmode="numeric" class="nick-pin" id="pinInput" placeholder="设置密码" maxlength="6" autocomplete="off">
+    <p class="nick-hint" id="pinHint">4~6位数字，用于换设备时找回账号</p>
+    <p class="nick-err" id="authErr"></p>
+    <div id="teamSection">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:6px">选择你的分团</p>
+      <div class="team-select">
+        <label><input type="radio" name="team" value="1" checked> 团1</label>
+        <label><input type="radio" name="team" value="2"> 团2</label>
+        <label><input type="radio" name="team" value="3"> 团3</label>
+      </div>
+    </div>
+    <button id="nickBtn" onclick="submitAuth()" disabled>加入拼团</button>
   </div>
 </div>
 
@@ -191,6 +208,7 @@ input[type="number"]{-moz-appearance:textfield}
   <div class="settings">
     <span class="nick-tag" id="nickTag" onclick="changeNick()" title="点击修改昵称"></span>
     <span class="team-tag" id="teamTag" onclick="changeTeam()" title="点击切换分团"></span>
+    <span class="nick-tag" id="pinTag" onclick="changePin()" style="display:none;background:#E8F7EF;color:#2D8B5E" title="设置或修改密码">设密码</span>
     <label>汇率 1 USD = <input type="number" class="s-input" id="rateInput" step="0.01" min="0"> CNY</label>
     <span class="grand-total" id="grandTotal"></span>
     <span class="last-saved" id="lastSaved"></span>
@@ -333,15 +351,25 @@ let writeTimers = {};
 let renderTimer = null;
 
 // ============ SUPABASE ============
+function initSupabaseClient() {
+  if (typeof window.supabase === 'undefined') return false;
+  try {
+    sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+    return true;
+  } catch(e) {
+    console.error('Supabase client init failed:', e);
+    return false;
+  }
+}
+
 async function initSupabase() {
-  if (typeof window.supabase === 'undefined') {
+  if (!sb && !initSupabaseClient()) {
     setConnected(false);
     updateStatus('SDK加载失败，离线模式');
     loadOffline();
     return;
   }
   try {
-    sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
     await loadAll();
     subscribeRealtime();
     setConnected(true);
@@ -517,36 +545,153 @@ function updateStatus(msg) {
   if (el) el.textContent = msg + ' ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
 }
 
-// ============ NICKNAME ============
+// ============ AUTH (NICKNAME + PIN) ============
+let authMode = 'register'; // 'register' or 'login'
+
 function showNicknamePopup() {
   const overlay = document.getElementById('nickOverlay');
   overlay.style.display = 'flex';
-  const inp = document.getElementById('nickInput');
+  const nickInp = document.getElementById('nickInput');
+  const pinInp = document.getElementById('pinInput');
   const btn = document.getElementById('nickBtn');
-  inp.addEventListener('input', () => { btn.disabled = !inp.value.trim(); });
-  inp.addEventListener('keydown', e => { if (e.key === 'Enter' && inp.value.trim()) confirmNick(); });
-  inp.focus();
+  const checkReady = () => {
+    const nick = nickInp.value.trim();
+    const pin = pinInp.value;
+    btn.disabled = !nick || pin.length < 4;
+  };
+  nickInp.addEventListener('input', checkReady);
+  pinInp.addEventListener('input', () => {
+    pinInp.value = pinInp.value.replace(/\D/g, '').slice(0, 6);
+    checkReady();
+  });
+  nickInp.addEventListener('keydown', e => { if (e.key === 'Enter') pinInp.focus(); });
+  pinInp.addEventListener('keydown', e => { if (e.key === 'Enter' && !btn.disabled) submitAuth(); });
+  nickInp.focus();
 }
 
-function confirmNick() {
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.getElementById('tabRegister').className = 'nick-tab' + (mode === 'register' ? ' active' : '');
+  document.getElementById('tabLogin').className = 'nick-tab' + (mode === 'login' ? ' active' : '');
+  document.getElementById('teamSection').style.display = mode === 'register' ? '' : 'none';
+  document.getElementById('authHint').textContent = mode === 'register'
+    ? '请输入你的昵称（群内昵称，方便大家认出你）'
+    : '输入你注册时的昵称和密码';
+  document.getElementById('pinInput').placeholder = mode === 'register' ? '设置密码' : '输入密码';
+  document.getElementById('pinHint').textContent = mode === 'register'
+    ? '4~6位数字，用于换设备时找回账号'
+    : '输入你注册时设置的4~6位数字密码';
+  document.getElementById('nickBtn').textContent = mode === 'register' ? '加入拼团' : '登录';
+  hideAuthErr();
+}
+
+function showAuthErr(msg) {
+  const el = document.getElementById('authErr');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function hideAuthErr() {
+  document.getElementById('authErr').classList.remove('show');
+}
+
+async function submitAuth() {
   const name = document.getElementById('nickInput').value.trim();
-  if (!name) return;
+  const pin = document.getElementById('pinInput').value;
+  if (!name || pin.length < 4) return;
+  hideAuthErr();
+  const btn = document.getElementById('nickBtn');
+  btn.disabled = true;
+  btn.textContent = '处理中...';
+
+  try {
+    if (authMode === 'register') {
+      await doRegister(name, pin);
+    } else {
+      await doLogin(name, pin);
+    }
+  } catch(e) {
+    showAuthErr(e.message || '操作失败，请重试');
+    btn.disabled = false;
+    btn.textContent = authMode === 'register' ? '加入拼团' : '登录';
+  }
+}
+
+async function doRegister(name, pin) {
+  if (!sb) throw new Error('未连接到服务器，请刷新后重试');
+
+  // Check if nickname already exists (with PIN or with any orders)
+  const {data: pinCheck} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', '_pin');
+  if (pinCheck && pinCheck.length > 0) {
+    throw new Error('该昵称已被注册，请换一个昵称或切换到「已有账号」登录');
+  }
+  const {data: anyCheck} = await sb.from('orders').select('sticker_id').eq('name', name).limit(1);
+  if (anyCheck && anyCheck.length > 0) {
+    throw new Error('该昵称已有订单记录，请切换到「已有账号」登录（首次登录会自动设置密码）');
+  }
+
+  const team = parseInt(document.querySelector('input[name="team"]:checked')?.value) || 1;
+
+  // Save PIN and team to Supabase
+  const {error} = await sb.from('orders').upsert([
+    {name, sticker_id: '_pin', quantity: parseInt(pin), updated_at: new Date().toISOString()},
+    {name, sticker_id: '_team', quantity: team, updated_at: new Date().toISOString()}
+  ], {onConflict: 'name,sticker_id'}).select();
+  if (error) throw new Error('注册失败: ' + error.message);
+
+  // Success
   myName = name;
-  myTeam = parseInt(document.querySelector('input[name="team"]:checked')?.value) || 1;
+  myTeam = team;
   localStorage.setItem('gb_nickname', myName);
   localStorage.setItem('gb_team', myTeam);
   allTeams[myName] = myTeam;
   document.getElementById('nickOverlay').style.display = 'none';
   updateNickDisplay();
-  if (sb) {
-    sb.from('orders').upsert(
-      {name: myName, sticker_id: '_team', quantity: myTeam, updated_at: new Date().toISOString()},
-      {onConflict: 'name,sticker_id'}
-    ).select().then(r => { if (r.error) console.error('team save failed:', r.error); });
-  }
   renderTable();
   recalculate();
-  // Auto-scroll to table so mobile users can see it
+  setTimeout(() => {
+    const tbl = document.getElementById('orderTable');
+    if (tbl) tbl.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }, 300);
+}
+
+async function doLogin(name, pin) {
+  if (!sb) throw new Error('未连接到服务器，请刷新后重试');
+
+  // Verify PIN
+  const {data: pinRows} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', '_pin');
+  if (!pinRows || pinRows.length === 0) {
+    // Check if user exists but has no PIN (old user before login system)
+    const {data: anyRows} = await sb.from('orders').select('sticker_id').eq('name', name).limit(1);
+    if (anyRows && anyRows.length > 0) {
+      // Old user — set PIN for them and log in
+      const {error: pinErr} = await sb.from('orders').upsert(
+        {name, sticker_id: '_pin', quantity: parseInt(pin), updated_at: new Date().toISOString()},
+        {onConflict: 'name,sticker_id'}
+      ).select();
+      if (pinErr) throw new Error('密码设置失败: ' + pinErr.message);
+      // Continue to success flow below (skip PIN check)
+    } else {
+      throw new Error('该昵称不存在，请检查拼写或切换到「新用户注册」');
+    }
+  } else if (pinRows[0].quantity !== parseInt(pin)) {
+    throw new Error('密码错误，请重试');
+  }
+
+  // Success — load their data
+  myName = name;
+  localStorage.setItem('gb_nickname', myName);
+
+  // Get their team
+  const {data: teamRows} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', '_team');
+  if (teamRows && teamRows.length > 0) {
+    myTeam = teamRows[0].quantity;
+    localStorage.setItem('gb_team', myTeam);
+  }
+
+  document.getElementById('nickOverlay').style.display = 'none';
+  updateNickDisplay();
+  renderTable();
+  recalculate();
   setTimeout(() => {
     const tbl = document.getElementById('orderTable');
     if (tbl) tbl.scrollIntoView({behavior: 'smooth', block: 'start'});
@@ -602,6 +747,51 @@ function updateNickDisplay() {
   if (el) el.textContent = myName;
   const tEl = document.getElementById('teamTag');
   if (tEl) tEl.textContent = '团' + myTeam;
+  // Show/hide PIN tag
+  const pEl = document.getElementById('pinTag');
+  if (pEl && myName && sb) {
+    sb.from('orders').select('quantity').eq('name', myName).eq('sticker_id', '_pin').then(({data}) => {
+      if (data && data.length > 0) {
+        pEl.textContent = '改密码';
+        pEl.style.display = '';
+      } else {
+        pEl.textContent = '设密码';
+        pEl.style.display = '';
+      }
+    });
+  }
+}
+
+async function changePin() {
+  if (!sb || !myName) return;
+  const {data: existing} = await sb.from('orders').select('quantity').eq('name', myName).eq('sticker_id', '_pin');
+  const hasPin = existing && existing.length > 0;
+
+  if (hasPin) {
+    const oldPin = prompt('请输入当前密码:');
+    if (!oldPin) return;
+    if (existing[0].quantity !== parseInt(oldPin)) {
+      alert('当前密码不正确');
+      return;
+    }
+  }
+  const newPin = prompt(hasPin ? '请输入新的4~6位数字密码:' : '请设置4~6位数字密码（用于换设备时找回账号）:');
+  if (!newPin) return;
+  const cleaned = newPin.replace(/\D/g, '');
+  if (cleaned.length < 4 || cleaned.length > 6) {
+    alert('密码需要4~6位数字');
+    return;
+  }
+  const {error} = await sb.from('orders').upsert(
+    {name: myName, sticker_id: '_pin', quantity: parseInt(cleaned), updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    alert('密码设置失败: ' + error.message);
+  } else {
+    alert(hasPin ? '密码已修改！' : '密码设置成功！下次换设备时可以用这个密码登录。');
+    updateNickDisplay();
+  }
 }
 
 // ============ PRICING ============
@@ -1070,6 +1260,9 @@ function closeModal() {
     debouncedWrite(sid, next);
     saveOffline();
   });
+
+  // Create Supabase client early so auth popup can use it
+  initSupabaseClient();
 
   if (!myName) {
     showNicknamePopup();
