@@ -180,6 +180,7 @@ input[type="number"]{-moz-appearance:textfield}
     <div class="team-select">
       <label><input type="radio" name="team" value="1" checked> 团1</label>
       <label><input type="radio" name="team" value="2"> 团2</label>
+      <label><input type="radio" name="team" value="3"> 团3</label>
     </div>
     <button id="nickBtn" onclick="confirmNick()" disabled>加入拼团</button>
   </div>
@@ -201,9 +202,9 @@ input[type="number"]{-moz-appearance:textfield}
     <summary>开团须知 · 请先阅读</summary>
     <div class="notice-body">
       <h4>分团说明</h4>
-      <p>为了团长不会太累，本次拼团分为<strong>团1</strong>和<strong>团2</strong>，对应两个微信群</p>
+      <p>为了团长不会太累，本次拼团分为<strong>团1</strong>、<strong>团2</strong>和<strong>团3</strong>，对应三个微信群</p>
       <p><span class="tag tag-warn">重要</span> 你在哪个群就选哪个团，请大家<strong>不要乱选</strong>给团长增加工作量。到货后由各团团长分别发货</p>
-      <p>两个团统一下单购买（人越多越便宜），但收款和发货按团分开进行</p>
+      <p>三个团统一下单购买（人越多越便宜），但收款和发货按团分开进行</p>
 
       <h4>流程与时间</h4>
       <p><span class="tag tag-date">暂定3月6日</span> 截单 — 截单前可随时修改数量，截单后锁定不可更改</p>
@@ -225,7 +226,7 @@ input[type="number"]{-moz-appearance:textfield}
 
       <h4>网站使用说明</h4>
       <ol>
-        <li>首次打开网页会弹出昵称输入框，请<strong>务必填写你的群昵称</strong>（方便团长对账），并选择你所在的分团（团1或团2）</li>
+        <li>首次打开网页会弹出昵称输入框，请<strong>务必填写你的群昵称</strong>（方便团长对账），并选择你所在的分团（团1、团2或团3）</li>
         <li>填表后会获得一个序号（显示在表格 # 列），<strong>请在群昵称前加上你的序号</strong>，格式如：<code>01-昵称</code></li>
         <li>在下方统计表里找到你的行（标有 <small style="color:var(--primary)">(你)</small>），直接填写想要的贴纸数量</li>
         <li>数据自动保存并实时同步，所有人都能看到最新的汇总情况</li>
@@ -577,8 +578,11 @@ function changeNick() {
 }
 
 function changeTeam() {
-  const newTeam = myTeam === 1 ? 2 : 1;
-  if (!confirm('切换到团' + newTeam + '？')) return;
+  const options = [1, 2, 3].filter(t => t !== myTeam);
+  const choice = prompt('当前：团' + myTeam + '\n输入要切换到的团号（' + options.join(' 或 ') + '）：');
+  if (!choice) return;
+  const newTeam = parseInt(choice);
+  if (![1, 2, 3].includes(newTeam) || newTeam === myTeam) { alert('请输入有效的团号'); return; }
   myTeam = newTeam;
   localStorage.setItem('gb_team', myTeam);
   allTeams[myName] = myTeam;
@@ -689,7 +693,7 @@ function getTeamsData() {
   names.add(myName);
   const arr = [...names];
 
-  const groups = {1: [], 2: [], 0: []};
+  const groups = {1: [], 2: [], 3: [], 0: []};
   for (const n of arr) {
     const t = allTeams[n] || 1;
     if (!groups[t]) groups[t] = [];
@@ -704,10 +708,11 @@ function getTeamsData() {
   }
 
   const result = [];
-  // Put user's team first
-  const otherTeam = myTeam === 2 ? 1 : 2;
+  // Put user's team first, then others in order
   if (groups[myTeam] && groups[myTeam].length > 0) result.push({team: myTeam, names: groups[myTeam]});
-  if (groups[otherTeam] && groups[otherTeam].length > 0) result.push({team: otherTeam, names: groups[otherTeam]});
+  for (const t of [1, 2, 3]) {
+    if (t !== myTeam && groups[t] && groups[t].length > 0) result.push({team: t, names: groups[t]});
+  }
   if (groups[0] && groups[0].length > 0) result.push({team: 0, names: groups[0]});
   return result;
 }
