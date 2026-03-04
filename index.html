@@ -109,6 +109,11 @@ footer{text-align:center;padding:18px;font-size:11px;color:var(--text2)}
 input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 input[type="number"]{-moz-appearance:textfield}
 @media(max-width:768px){header{padding:14px}section{padding:14px}.sticker-grid{grid-template-columns:repeat(2,1fr);gap:10px}header h1{font-size:17px}}
+.qr-section{text-align:center;padding:28px 24px;margin:0 24px 18px;background:linear-gradient(135deg,#FFF5F0 0%,#FFF0F8 50%,#F5F0FF 100%);border-radius:16px;border:1px solid var(--border)}
+.qr-section h3{font-size:17px;font-weight:600;color:var(--primary);margin-bottom:6px}
+.qr-section p{font-size:13px;color:var(--text);margin-bottom:12px;line-height:1.7}
+.qr-section .qr-sub{font-size:12px;color:var(--text2);margin-top:10px}
+.qr-section img{width:180px;height:180px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.1)}
 
 .th-type{font-size:9px;font-weight:400;display:block;margin-top:2px}
 
@@ -272,6 +277,13 @@ input[type="number"]{-moz-appearance:textfield}
   <div class="sticker-grid" id="stickerGrid"></div>
 </section>
 
+<div class="qr-section">
+  <h3>🧡 加入小克交流群</h3>
+  <p>拼完贴纸，友谊不散场。<br>聊 Claude、聊 AI、聊一切有趣的事。以后 Anthropic 出了新周边，我们继续一起拼！</p>
+  <img src="qr-wechat-group.png" alt="小克交流群二维码">
+  <p class="qr-sub">微信扫码加入 · 群满或过期请联系团长</p>
+</div>
+
 <section>
   <div class="section-title">拼团统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
   <button class="btn-my-export" onclick="exportMyOrder()">导出我的订单</button>
@@ -361,7 +373,7 @@ let allOrders = {}; // {name: {stickerId: qty}}
 let allTeams = {}; // {name: teamNumber (1 or 2)}
 let allJoinOrder = {}; // {name: minRecordId} — for global join sequence
 let globalSeqMap = {}; // {name: globalSequenceNumber}
-let rate = 7.25;
+let rate = 6.90;
 let sb = null;
 let connected = false;
 let writeTimers = {};
@@ -429,7 +441,7 @@ async function loadAll() {
   allJoinOrder = joinOrd;
   const {data: settings, error: e2} = await sb.from('settings').select('*').eq('key', 'rate');
   if (e2) throw e2;
-  if (settings && settings[0]) rate = parseFloat(settings[0].value) || 7.25;
+  if (settings && settings[0]) rate = parseFloat(settings[0].value) || 6.90;
 }
 
 function subscribeRealtime() {
@@ -489,7 +501,7 @@ function handleOrderEvent(payload) {
 
 function handleSettingsEvent(payload) {
   if (payload.new && payload.new.key === 'rate') {
-    rate = parseFloat(payload.new.value) || 7.25;
+    rate = parseFloat(payload.new.value) || 6.90;
     document.getElementById('rateInput').value = rate;
     recalculate();
     saveOffline();
@@ -608,7 +620,7 @@ function saveOffline() {
 function loadOffline() {
   try {
     const d = JSON.parse(localStorage.getItem('gb_cache'));
-    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 7.25; }
+    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; }
   } catch(e) {}
 }
 
@@ -1239,7 +1251,7 @@ function clearMyOrders() {
 }
 
 document.getElementById('rateInput').addEventListener('input', function() {
-  rate = parseFloat(this.value) || 7.25;
+  rate = parseFloat(this.value) || 6.90;
   recalculate();
   clearTimeout(writeTimers._rate);
   writeTimers._rate = setTimeout(() => writeRate(rate), 500);
