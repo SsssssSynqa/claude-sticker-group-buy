@@ -161,6 +161,11 @@ input[type="number"]{-moz-appearance:textfield}
 .btn-my-export:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,113,74,.4)}
 .btn-my-export:active{transform:translateY(0)}
 .btn-admin{background:#f0ede8;color:#999;font-size:11px;border:1px dashed #ddd}.btn-admin:hover{background:#e8e4de;color:#666}
+.btn-lock{background:var(--danger);color:#fff;font-size:13px;font-weight:600;border:none;padding:8px 20px;border-radius:10px;cursor:pointer;transition:all .15s}.btn-lock:hover{background:#C0392B;transform:translateY(-1px)}.btn-lock.unlocked{background:var(--green)}.btn-lock.unlocked:hover{background:#5BA87D}
+.lock-banner{margin:0 24px;padding:14px 18px;background:linear-gradient(135deg,#FDEAEA,#FDE8E8);border:2px solid var(--danger);border-radius:12px;text-align:center;font-size:14px;font-weight:600;color:var(--danger);display:none;margin-top:14px}
+.lock-banner.show{display:block}
+.locked-input{opacity:.5;pointer-events:none}
+.lock-notice{font-size:12px;color:var(--danger);font-weight:500;margin-left:8px}
 
 /* === Notice banner === */
 .notice{margin:0 24px;padding-top:18px}
@@ -272,6 +277,8 @@ input[type="number"]{-moz-appearance:textfield}
   </details>
 </div>
 
+<div class="lock-banner" id="lockBanner">🔒 已锁单 — 所有贴纸数量已锁定，不可修改</div>
+
 <section>
   <div class="section-title">贴纸一览</div>
   <div class="sticker-grid" id="stickerGrid"></div>
@@ -288,6 +295,7 @@ input[type="number"]{-moz-appearance:textfield}
   <div class="section-title">拼团统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
   <button class="btn-my-export" onclick="exportMyOrder()">导出我的订单</button>
   <div class="table-controls">
+    <button class="btn btn-lock" id="lockBtn" onclick="toggleLock()" style="display:none">🔒 锁单</button>
     <button class="btn btn-admin" onclick="showExport()">团长导出全部</button>
     <button class="btn btn-admin" onclick="showImport()">团长导入</button>
   </div>
@@ -319,6 +327,7 @@ input[type="number"]{-moz-appearance:textfield}
 // ============ CONFIG ============
 const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
+const ADMIN_NAMES = ['鹅鹅'];
 
 // ============ STICKER DATA ============
 const S = [
@@ -376,6 +385,7 @@ let globalSeqMap = {}; // {name: globalSequenceNumber}
 let rate = 6.90;
 let sb = null;
 let connected = false;
+let isLocked = false;
 let writeTimers = {};
 let renderTimer = null;
 
@@ -439,9 +449,14 @@ async function loadAll() {
     }
   }
   allJoinOrder = joinOrd;
-  const {data: settings, error: e2} = await sb.from('settings').select('*').eq('key', 'rate');
+  const {data: settings, error: e2} = await sb.from('settings').select('*');
   if (e2) throw e2;
-  if (settings && settings[0]) rate = parseFloat(settings[0].value) || 6.90;
+  if (settings) {
+    for (const s of settings) {
+      if (s.key === 'rate') rate = parseFloat(s.value) || 6.90;
+      if (s.key === 'locked') isLocked = s.value === '1';
+    }
+  }
 }
 
 function subscribeRealtime() {
@@ -500,10 +515,16 @@ function handleOrderEvent(payload) {
 }
 
 function handleSettingsEvent(payload) {
-  if (payload.new && payload.new.key === 'rate') {
+  if (!payload.new) return;
+  if (payload.new.key === 'rate') {
     rate = parseFloat(payload.new.value) || 6.90;
     document.getElementById('rateInput').value = rate;
     recalculate();
+    saveOffline();
+  }
+  if (payload.new.key === 'locked') {
+    isLocked = payload.new.value === '1';
+    applyLockState();
     saveOffline();
   }
 }
@@ -540,6 +561,7 @@ function updateSubmitBar() {
 }
 
 async function submitCart() {
+  if (isLocked) { alert('已锁单，无法修改'); return; }
   if (!sb || !myName) return;
   const entries = Object.entries(pendingChanges);
   if (entries.length === 0) return;
@@ -612,15 +634,74 @@ async function writeRate(r) {
   }
 }
 
+// ============ LOCK ============
+async function toggleLock() {
+  if (!sb || !ADMIN_NAMES.includes(myName)) return;
+  const newVal = isLocked ? '0' : '1';
+  const lockBtn = document.getElementById('lockBtn');
+  if (lockBtn) { lockBtn.disabled = true; lockBtn.textContent = '处理中...'; }
+  try {
+    const {error} = await sb.from('settings').upsert(
+      {key: 'locked', value: newVal, updated_at: new Date().toISOString()},
+      {onConflict: 'key'}
+    ).select();
+    if (error) throw error;
+    isLocked = !isLocked;
+    applyLockState();
+    saveOffline();
+  } catch(e) {
+    console.error('Lock toggle failed:', e);
+    alert('锁单操作失败：' + e.message);
+  }
+  if (lockBtn) lockBtn.disabled = false;
+}
+
+function applyLockState() {
+  const banner = document.getElementById('lockBanner');
+  const lockBtn = document.getElementById('lockBtn');
+  if (banner) banner.classList.toggle('show', isLocked);
+  if (lockBtn) {
+    if (ADMIN_NAMES.includes(myName)) {
+      lockBtn.style.display = '';
+      if (isLocked) {
+        lockBtn.textContent = '🔓 解锁';
+        lockBtn.className = 'btn btn-lock unlocked';
+      } else {
+        lockBtn.textContent = '🔒 锁单';
+        lockBtn.className = 'btn btn-lock';
+      }
+    }
+  }
+  document.querySelectorAll('.qty-btn').forEach(b => {
+    b.disabled = isLocked;
+    b.style.opacity = isLocked ? '.4' : '';
+    b.style.pointerEvents = isLocked ? 'none' : '';
+  });
+  document.querySelectorAll('#orderTable input[type="number"]').forEach(inp => {
+    inp.disabled = isLocked;
+    inp.style.opacity = isLocked ? '.5' : '';
+  });
+  document.querySelectorAll('.del-btn').forEach(b => {
+    b.disabled = isLocked;
+    b.style.opacity = isLocked ? '.4' : '';
+    b.style.pointerEvents = isLocked ? 'none' : '';
+  });
+  if (isLocked) {
+    const bar = document.getElementById('submitBar');
+    if (bar) bar.classList.remove('show');
+    pendingChanges = {};
+  }
+}
+
 // ============ OFFLINE FALLBACK ============
 function saveOffline() {
-  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate})); } catch(e) {}
+  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked})); } catch(e) {}
 }
 
 function loadOffline() {
   try {
     const d = JSON.parse(localStorage.getItem('gb_cache'));
-    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; }
+    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; isLocked = !!d.isLocked; }
   } catch(e) {}
 }
 
@@ -1101,6 +1182,9 @@ function renderTable() {
       try { inp.setSelectionRange(focusPos, focusPos); } catch(e) {}
     }
   }
+
+  // Re-apply lock state to newly rendered inputs
+  applyLockState();
 }
 
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -1182,6 +1266,7 @@ function recalculate() {
 
 // ============ EVENT HANDLERS ============
 document.getElementById('orderTable').addEventListener('input', function(e) {
+  if (isLocked) return;
   const el = e.target;
   if (el.matches('input[type="number"]') && el.dataset.si) {
     const sid = el.dataset.si;
@@ -1234,6 +1319,7 @@ function exportMyOrder() {
 }
 
 function clearMyOrders() {
+  if (isLocked) { alert('已锁单，无法修改'); return; }
   if (!confirm('确定要清空你的所有订单吗？')) return;
   const sids = Object.keys(allOrders[myName] || {});
   delete allOrders[myName];
@@ -1334,6 +1420,7 @@ function closeModal() {
   document.getElementById('stickerGrid').addEventListener('click', function(e) {
     const btn = e.target.closest('.qty-btn');
     if (!btn || !myName) return;
+    if (isLocked) return;
     const sid = btn.dataset.sid;
     const dir = parseInt(btn.dataset.dir);
     if (!allOrders[myName]) allOrders[myName] = {};
