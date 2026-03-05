@@ -641,10 +641,9 @@ async function toggleLock() {
   const lockBtn = document.getElementById('lockBtn');
   if (lockBtn) { lockBtn.disabled = true; lockBtn.textContent = '处理中...'; }
   try {
-    const {error} = await sb.from('settings').upsert(
-      {key: 'locked', value: newVal, updated_at: new Date().toISOString()},
-      {onConflict: 'key'}
-    ).select();
+    const {error} = await sb.from('settings').update(
+      {value: newVal, updated_at: new Date().toISOString()}
+    ).eq('key', 'locked');
     if (error) throw error;
     isLocked = !isLocked;
     applyLockState();
