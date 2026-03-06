@@ -42,7 +42,6 @@ section{padding:18px 24px}
 .card-link{font-size:11px;color:var(--text2);text-decoration:none;display:inline-block;margin-top:4px}
 .card-link:hover{color:var(--primary)}
 
-/* === Card quantity selector === */
 .card-my{display:flex;align-items:center;justify-content:space-between;margin:8px 0 4px;padding:6px 0;border-top:1px dashed var(--border)}
 .card-my-label{font-size:11px;color:var(--text2)}
 .card-my-qty{font-size:14px;font-weight:700;color:var(--primary)}
@@ -117,7 +116,6 @@ input[type="number"]{-moz-appearance:textfield}
 
 .th-type{font-size:9px;font-weight:400;display:block;margin-top:2px}
 
-/* === NEW: Nickname overlay === */
 .nick-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center}
 .nick-popup{background:#fff;border-radius:16px;padding:28px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
 .nick-popup h3{color:var(--primary);font-size:18px;margin-bottom:8px}
@@ -136,7 +134,6 @@ input[type="number"]{-moz-appearance:textfield}
 .nick-err{font-size:12px;color:var(--danger);margin-bottom:8px;display:none}
 .nick-err.show{display:block}
 
-/* === NEW: Connection & nickname === */
 .conn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;margin-left:8px;vertical-align:middle;transition:background .3s}
 .conn-dot.on{background:#4CAF50}
 .conn-dot.off{background:#E74C3C}
@@ -146,7 +143,6 @@ input[type="number"]{-moz-appearance:textfield}
 .my-row:hover td{background:#FFF3E8 !important}
 .my-row td.col-name{font-weight:600;color:var(--primary)}
 
-/* === Team rows === */
 .team-header-row td{background:#F0EBF5 !important;color:#8B6EAE;font-weight:700;font-size:13px;padding:8px 6px;border-top:2px solid #D8CCE8}
 .team-header-row td.col-idx,.team-header-row td.col-name{background:#F0EBF5 !important}
 .team-subtotal td{background:#FDF6E3 !important;font-weight:600;font-size:11px;color:#B5960F;border-bottom:2px solid #E8DFC0}
@@ -157,9 +153,19 @@ input[type="number"]{-moz-appearance:textfield}
 .team-select input[type="radio"]{accent-color:var(--primary)}
 .team-tag{font-size:12px;color:#8B6EAE;cursor:pointer;padding:3px 8px;border-radius:6px;background:var(--purple-lt)}
 .team-tag:hover{background:#E0D6EC}
-.btn-my-export{display:block;width:100%;max-width:340px;margin:0 auto 16px;padding:13px 20px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3);transition:all .15s;letter-spacing:.5px}
+.pay-action-bar{display:flex;gap:8px;max-width:700px;margin:0 auto 16px;justify-content:center;flex-wrap:wrap}
+.btn-my-export{flex:1;min-width:0;padding:13px 16px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3);transition:all .15s;letter-spacing:.3px;white-space:nowrap}
 .btn-my-export:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,113,74,.4)}
 .btn-my-export:active{transform:translateY(0)}
+.btn-pay-qr{flex:1;min-width:0;padding:13px 16px;background:#fff;color:var(--primary);border:2px solid var(--primary);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-pay-qr:hover{background:var(--primary-lt);transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,113,74,.2)}
+.btn-pay-qr:active{transform:translateY(0)}
+.btn-pay-confirm{flex:1;min-width:0;padding:13px 16px;background:linear-gradient(135deg,#5BA87D,#4A9B6F);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(91,168,125,.3);transition:all .15s;white-space:nowrap}
+.btn-pay-confirm:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(91,168,125,.4)}
+.btn-pay-confirm:active{transform:translateY(0)}
+.btn-pay-confirm:disabled{opacity:.7;cursor:not-allowed;transform:none}
+.btn-pay-confirm.self-confirmed{background:linear-gradient(135deg,#E8714A,#D4623E)}
+.btn-pay-confirm.confirmed{background:linear-gradient(135deg,#2D8B5E,#247A50)}
 .btn-admin{background:#f0ede8;color:#999;font-size:11px;border:1px dashed #ddd}.btn-admin:hover{background:#e8e4de;color:#666}
 .btn-lock{background:var(--danger);color:#fff;font-size:13px;font-weight:600;border:none;padding:8px 20px;border-radius:10px;cursor:pointer;transition:all .15s}.btn-lock:hover{background:#C0392B;transform:translateY(-1px)}.btn-lock.unlocked{background:var(--green)}.btn-lock.unlocked:hover{background:#5BA87D}
 .lock-banner{margin:0 24px;padding:14px 18px;background:linear-gradient(135deg,#FDEAEA,#FDE8E8);border:2px solid var(--danger);border-radius:12px;text-align:center;font-size:14px;font-weight:600;color:var(--danger);display:none;margin-top:14px}
@@ -167,7 +173,35 @@ input[type="number"]{-moz-appearance:textfield}
 .locked-input{opacity:.5;pointer-events:none}
 .lock-notice{font-size:12px;color:var(--danger);font-weight:500;margin-left:8px}
 
-/* === Notice banner === */
+/* === Payment status === */
+.col-pay{min-width:90px;width:90px}
+.pay-badge{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:8px;white-space:nowrap}
+.pay-unpaid{background:#f0f0f0;color:#999}
+.pay-unpaid::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;border:2px solid #ccc;background:transparent}
+.pay-self{background:#FFF3E0;color:#E8714A}
+.pay-self::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:#E8714A}
+.pay-confirmed{background:#E8F7EF;color:#2D8B5E}
+.pay-confirmed::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:#2D8B5E}
+.pay-btn{border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer;font-size:11px;padding:3px 8px;transition:all .15s;white-space:nowrap}
+.pay-btn:hover{background:var(--primary-lt);color:var(--primary);border-color:var(--primary)}
+.pay-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.pay-btn.active:hover{background:#D4623E}
+.pay-btn-confirm{border-color:var(--green);color:var(--green);background:#f0faf4}
+.pay-btn-confirm:hover{background:var(--green);color:#fff}
+.pay-stats{font-size:11px;font-weight:500;margin-left:8px}
+.pay-stats-ok{color:#2D8B5E}
+.pay-stats-pending{color:var(--danger)}
+.pay-qr-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:none;align-items:center;justify-content:center}
+.pay-qr-overlay.on{display:flex}
+.pay-qr-popup{background:#fff;border-radius:16px;padding:28px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+.pay-qr-popup h3{color:var(--primary);font-size:18px;margin-bottom:4px}
+.pay-qr-popup .pay-qr-leader{font-size:13px;color:var(--text2);margin-bottom:16px}
+.pay-qr-popup img{width:240px;height:240px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.1);margin-bottom:16px;object-fit:contain;background:#f9f9f9}
+.pay-qr-popup .pay-qr-hint{font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.8;text-align:left;background:#FFF8F5;border-radius:8px;padding:10px 14px;border:1px solid #FFE0D0}
+.pay-qr-popup button{width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+.pay-qr-popup button:hover{background:#D4623E}
+.pay-qr-no-img{width:240px;height:120px;display:flex;align-items:center;justify-content:center;background:#f9f9f9;border-radius:12px;margin:0 auto 16px;color:var(--text2);font-size:13px;border:2px dashed var(--border)}
+
 .notice{margin:0 24px;padding-top:18px}
 .notice details{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden}
 .notice summary{padding:14px 18px;cursor:pointer;font-size:15px;font-weight:600;color:var(--primary);list-style:none;display:flex;align-items:center;gap:8px;user-select:none}
@@ -186,7 +220,6 @@ input[type="number"]{-moz-appearance:textfield}
 .notice-divider{height:1px;background:var(--border);margin:14px 0}
 @media(max-width:768px){.notice{margin:0 14px;padding-top:14px}}
 
-/* === Submit bar === */
 .submit-bar{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#FDE8DC,#F5E1F0);border-top:2px solid var(--primary);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:500;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:0 -4px 20px rgba(0,0,0,.1)}
 .submit-bar.show{transform:translateY(0)}
 .submit-bar-info{font-size:13px;color:var(--text)}
@@ -261,6 +294,15 @@ input[type="number"]{-moz-appearance:textfield}
       <p>付款方式会在截团时通知大家，请在收款截止日期前付清全款，并将付款截图发到群里</p>
       <p>买的人越多单价越低！每款贴纸的当前单价会实时显示在下方卡片上</p>
 
+      <h4>💰 锁单后付款流程</h4>
+      <p>1. 锁单后，点击「📱 查看付款码」查看你所在团的团长收款码</p>
+      <p>2. 点击「📋 导出我的订单」复制你的订单明细（包含实付金额）</p>
+      <p>3. 实付金额 = 你的人民币总额 + 0.1%转账手续费（微信/支付宝转银行卡会收取）</p>
+      <p>4. 向团长扫码转账实付金额</p>
+      <p>5. 将<strong>导出的订单详情</strong>和<strong>付款截图</strong>一起发到群里</p>
+      <p>6. 回到本页点击「💰 我已完成付款」标记付款状态</p>
+      <p>7. 团长核实到账后会将你的状态更新为 ✅ 已确认</p>
+
       <div class="notice-divider"></div>
 
       <h4>网站使用说明</h4>
@@ -293,7 +335,11 @@ input[type="number"]{-moz-appearance:textfield}
 
 <section>
   <div class="section-title">拼团统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
-  <button class="btn-my-export" onclick="exportMyOrder()">导出我的订单</button>
+  <div class="pay-action-bar">
+    <button class="btn-my-export" onclick="exportMyOrder()">📋 导出我的订单</button>
+    <button class="btn-pay-qr" id="btnPayQR" onclick="showPaymentQR()">📱 查看付款码</button>
+    <button class="btn-pay-confirm" id="btnPayConfirm" onclick="handlePayBtnClick()">💰 我已完成付款</button>
+  </div>
   <div class="table-controls">
     <button class="btn btn-lock" id="lockBtn" onclick="toggleLock()" style="display:none">🔒 锁单</button>
     <button class="btn btn-admin" onclick="showExport()">团长导出全部</button>
@@ -315,6 +361,16 @@ input[type="number"]{-moz-appearance:textfield}
   </div>
 </div>
 
+<div class="pay-qr-overlay" id="payQrOverlay" onclick="if(event.target===this)closePaymentQR()">
+  <div class="pay-qr-popup">
+    <h3 id="payQrTitle">付款二维码</h3>
+    <p class="pay-qr-leader" id="payQrLeader"></p>
+    <div id="payQrImgWrap"></div>
+    <p class="pay-qr-hint" id="payQrHint"></p>
+    <button onclick="closePaymentQR()">关闭</button>
+  </div>
+</div>
+
 <div class="submit-bar" id="submitBar">
   <div class="submit-bar-info">你有 <strong id="submitCount">0</strong> 项修改未保存</div>
   <button class="submit-bar-btn" id="submitBtn" onclick="submitCart()">保存</button>
@@ -328,6 +384,8 @@ input[type="number"]{-moz-appearance:textfield}
 const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
 const ADMIN_NAMES = ['鹅鹅'];
+const TEAM_LEADERS = {1: '无法上吊之物', 2: 'Keichi', 3: '鹅鹅'};
+const TEAM_QR = {1: 'qr-pay-1.jpg', 2: 'qr-pay-2.jpg', 3: 'qr-pay-3.png'};
 
 // ============ STICKER DATA ============
 const S = [
@@ -386,6 +444,8 @@ let rate = 6.90;
 let sb = null;
 let connected = false;
 let isLocked = false;
+let allPaySelf = {}; // {name: true} — self-confirmed payment
+let allPayLeader = {}; // {name: true} — leader-confirmed payment
 let writeTimers = {};
 let renderTimer = null;
 
@@ -436,13 +496,19 @@ async function loadAll() {
   }
   allOrders = {};
   allTeams = {};
+  allPaySelf = {};
+  allPayLeader = {};
   const joinOrd = {};
   for (const row of orders) {
     if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
     if (row.sticker_id === '_team') {
       allTeams[row.name] = row.quantity;
     } else if (row.sticker_id === '_pin') {
-      // Skip PIN records — not sticker data
+      // Skip PIN records
+    } else if (row.sticker_id === '_payment_self') {
+      if (row.quantity > 0) allPaySelf[row.name] = true;
+    } else if (row.sticker_id === '_payment_leader') {
+      if (row.quantity > 0) allPayLeader[row.name] = true;
     } else if (row.quantity > 0) {
       if (!allOrders[row.name]) allOrders[row.name] = {};
       allOrders[row.name][row.sticker_id] = row.quantity;
@@ -489,6 +555,28 @@ function handleOrderEvent(payload) {
       delete allTeams[row.name];
     } else {
       allTeams[payload.new.name] = payload.new.quantity;
+    }
+    scheduleRender();
+    saveOffline();
+    return;
+  }
+
+  // Handle payment status changes
+  if (row.sticker_id === '_payment_self') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
+      delete allPaySelf[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allPaySelf[payload.new.name] = true;
+    }
+    scheduleRender();
+    saveOffline();
+    return;
+  }
+  if (row.sticker_id === '_payment_leader') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
+      delete allPayLeader[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allPayLeader[payload.new.name] = true;
     }
     scheduleRender();
     saveOffline();
@@ -694,13 +782,13 @@ function applyLockState() {
 
 // ============ OFFLINE FALLBACK ============
 function saveOffline() {
-  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked})); } catch(e) {}
+  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader})); } catch(e) {}
 }
 
 function loadOffline() {
   try {
     const d = JSON.parse(localStorage.getItem('gb_cache'));
-    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; isLocked = !!d.isLocked; }
+    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; }
   } catch(e) {}
 }
 
@@ -966,6 +1054,219 @@ async function changePin() {
   }
 }
 
+// ============ PAYMENT ============
+function isAdmin(name) { return ADMIN_NAMES.includes(name); }
+function isLeaderOf(name, team) { return TEAM_LEADERS[team] === name || isAdmin(name); }
+function getMyLeaderTeams() {
+  // Returns array of team numbers this user is leader of
+  const teams = [];
+  for (const [t, leader] of Object.entries(TEAM_LEADERS)) {
+    if (leader === myName || isAdmin(myName)) teams.push(parseInt(t));
+  }
+  return teams;
+}
+
+function paymentStatusOf(name) {
+  if (allPayLeader[name]) return 'confirmed';
+  if (allPaySelf[name]) return 'self';
+  return 'unpaid';
+}
+
+function paymentBadgeHTML(name) {
+  const st = paymentStatusOf(name);
+  if (st === 'confirmed') return '<span class="pay-badge pay-confirmed">已确认</span>';
+  if (st === 'self') return '<span class="pay-badge pay-self">待核实</span>';
+  return '<span class="pay-badge pay-unpaid">未付</span>';
+}
+
+function paymentCellHTML(name, team) {
+  const st = paymentStatusOf(name);
+  const isMe = name === myName;
+  const iAmLeader = isLeaderOf(myName, team);
+  let html = paymentBadgeHTML(name);
+
+  // Payment action buttons only appear after locking (锁单后才能付款操作)
+  if (!isLocked) return html;
+
+  // Self-confirm button (only for current user, when not yet self-confirmed)
+  if (isMe && st === 'unpaid') {
+    html += ' <button class="pay-btn" onclick="confirmMyPayment()">我已付款</button>';
+  }
+  // Cancel self-confirm (only for current user, when self-confirmed but not leader-confirmed)
+  if (isMe && st === 'self') {
+    html += ' <button class="pay-btn active" onclick="cancelMyPayment()">撤销</button>';
+  }
+  // Leader confirm button (for leader/admin, when member self-confirmed but not yet leader-confirmed)
+  if (iAmLeader && !isMe && st === 'self') {
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmPayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
+  }
+  // Leader revoke (for leader/admin, when already leader-confirmed)
+  if (iAmLeader && !isMe && st === 'confirmed') {
+    html += ' <button class="pay-btn" onclick="leaderRevokePayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
+  }
+  // Admin can also confirm directly even if member hasn't self-confirmed
+  if (isAdmin(myName) && !isMe && st === 'unpaid') {
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmPayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
+  }
+
+  return html;
+}
+
+async function confirmMyPayment() {
+  if (!sb || !myName) return;
+  if (!isLocked) { alert('请等待团长锁单后再确认付款'); return; }
+  if (!confirm('确认你已完成付款？')) return;
+  allPaySelf[myName] = true;
+  renderTable();
+  recalculate();
+  saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: myName, sticker_id: '_payment_self', quantity: 1, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Payment confirm failed:', error);
+    delete allPaySelf[myName];
+    renderTable(); recalculate();
+    alert('付款确认失败：' + error.message);
+  } else {
+    updateStatus('已标记付款');
+  }
+}
+
+async function cancelMyPayment() {
+  if (!sb || !myName) return;
+  if (!isLocked) { alert('请等待团长锁单后再操作'); return; }
+  if (!confirm('确定要撤销付款确认吗？')) return;
+  delete allPaySelf[myName];
+  renderTable();
+  recalculate();
+  saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: myName, sticker_id: '_payment_self', quantity: 0, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Payment cancel failed:', error);
+    allPaySelf[myName] = true;
+    renderTable(); recalculate();
+    alert('撤销失败：' + error.message);
+  }
+}
+
+async function leaderConfirmPayment(memberName) {
+  if (!sb) return;
+  if (!isLocked) { alert('请等待锁单后再操作'); return; }
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  allPayLeader[memberName] = true;
+  if (!allPaySelf[memberName]) allPaySelf[memberName] = true; // auto-mark self too
+  renderTable();
+  recalculate();
+  saveOffline();
+  const rows = [
+    {name: memberName, sticker_id: '_payment_leader', quantity: 1, updated_at: new Date().toISOString()},
+    {name: memberName, sticker_id: '_payment_self', quantity: 1, updated_at: new Date().toISOString()}
+  ];
+  const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'}).select();
+  if (error) {
+    console.error('Leader confirm failed:', error);
+    delete allPayLeader[memberName];
+    renderTable(); recalculate();
+    alert('确认失败：' + error.message);
+  } else {
+    updateStatus('已确认 ' + memberName + ' 的付款');
+  }
+}
+
+async function leaderRevokePayment(memberName) {
+  if (!sb) return;
+  if (!isLocked) { alert('请等待锁单后再操作'); return; }
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  if (!confirm('确定要撤销对 ' + memberName + ' 的付款确认吗？')) return;
+  delete allPayLeader[memberName];
+  renderTable();
+  recalculate();
+  saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_payment_leader', quantity: 0, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Leader revoke failed:', error);
+    allPayLeader[memberName] = true;
+    renderTable(); recalculate();
+    alert('撤销失败：' + error.message);
+  }
+}
+
+function showPaymentQR() {
+  if (!isLocked) { alert('截单后才能查看付款码哦～请等待团长锁单'); return; }
+  const team = myTeam;
+  const leader = TEAM_LEADERS[team] || '未知';
+  const qrSrc = TEAM_QR[team];
+  document.getElementById('payQrTitle').textContent = '团' + team + ' 付款码';
+  document.getElementById('payQrLeader').textContent = '团长：' + leader;
+  const wrap = document.getElementById('payQrImgWrap');
+  if (qrSrc) {
+    wrap.innerHTML = '<img src="' + qrSrc + '" alt="团' + team + '付款码">';
+  } else {
+    wrap.innerHTML = '<div class="pay-qr-no-img">付款码准备中…<br>请联系团长获取</div>';
+  }
+  document.getElementById('payQrHint').innerHTML = '<strong>付款说明</strong><br>'
+    + '1. 转账金额 = 你的CNY总额 + 0.1%手续费（微信/支付宝转银行卡手续费）<br>'
+    + '2. 请点击上方「📋 导出我的订单」查看你的实付金额<br>'
+    + '3. 完成转账后，将<b>导出的订单详情</b>和<b>付款截图</b>一起发到群里<br>'
+    + '4. 回到本页点击「💰 我已完成付款」确认';
+  document.getElementById('payQrOverlay').classList.add('on');
+}
+
+function closePaymentQR() {
+  document.getElementById('payQrOverlay').classList.remove('on');
+}
+
+function handlePayBtnClick() {
+  if (!isLocked) { alert('截单后才能确认付款哦～请等待团长锁单'); return; }
+  const st = paymentStatusOf(myName);
+  if (st === 'confirmed') return;
+  if (st === 'self') cancelMyPayment();
+  else confirmMyPayment();
+}
+
+function updatePaymentBtns() {
+  const btn = document.getElementById('btnPayConfirm');
+  const qrBtn = document.getElementById('btnPayQR');
+  if (!btn) return;
+
+  // Before locking: show disabled state with hint
+  if (!isLocked) {
+    btn.textContent = '🔒 截单后付款';
+    btn.className = 'btn-pay-confirm';
+    btn.disabled = true;
+    if (qrBtn) { qrBtn.style.opacity = '0.5'; qrBtn.style.pointerEvents = 'none'; }
+    return;
+  }
+
+  // After locking: enable QR button
+  if (qrBtn) { qrBtn.style.opacity = '1'; qrBtn.style.pointerEvents = 'auto'; }
+
+  const st = paymentStatusOf(myName);
+  if (st === 'confirmed') {
+    btn.textContent = '✅ 团长已确认';
+    btn.className = 'btn-pay-confirm confirmed';
+    btn.disabled = true;
+  } else if (st === 'self') {
+    btn.textContent = '🟠 已付款(待确认)';
+    btn.className = 'btn-pay-confirm self-confirmed';
+    btn.disabled = false;
+  } else {
+    btn.textContent = '💰 我已完成付款';
+    btn.className = 'btn-pay-confirm';
+    btn.disabled = false;
+  }
+}
+
 // ============ PRICING ============
 function unitPrice(sticker, qty) {
   if (qty <= 0) return sticker.t[0][1] / sticker.t[0][0];
@@ -1096,21 +1397,21 @@ function renderTable() {
   S.forEach(s => {
     h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
   });
-  h += '<th>总件数</th><th>USD</th><th>CNY</th></tr></thead>';
+  h += '<th>总件数</th><th>USD</th><th>CNY</th><th>手续费</th><th class="col-pay">付款</th></tr></thead>';
 
   h += '<tbody>';
   // Combined summary rows (pricing uses combined totals across all teams)
   h += '<tr class="s-row r-qty"><td class="col-idx"></td><td class="col-name">总数量</td>';
   S.forEach(s => { h += '<td id="sq-' + s.id + '">0</td>'; });
-  h += '<td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-price"><td class="col-idx"></td><td class="col-name">单价(¥)</td>';
   S.forEach(s => { h += '<td id="sp-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-total"><td class="col-idx"></td><td class="col-name">该款总价</td>';
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td></tr>';
+  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td></td></tr>';
 
   // Compute global join-order sequence numbers (stable: based on ALL registered users, not just visible ones)
   const sortedByJoin = Object.entries(allJoinOrder).sort((a, b) => a[1] - b[1]);
@@ -1124,9 +1425,18 @@ function renderTable() {
     const teamLabel = g.team > 0 ? '团' + g.team : '未分组';
 
     // Team header row
+    // Payment stats for team header
+    let teamConfirmed = 0, teamSelfPaid = 0;
+    g.names.forEach(n => { const ps = paymentStatusOf(n); if (ps === 'confirmed') teamConfirmed++; else if (ps === 'self') teamSelfPaid++; });
+    const teamUnpaid = g.names.length - teamConfirmed - teamSelfPaid;
+    let payStats = '';
+    if (teamConfirmed > 0) payStats += '<span class="pay-stats pay-stats-ok">✅' + teamConfirmed + '</span> ';
+    if (teamSelfPaid > 0) payStats += '<span class="pay-stats" style="color:#E8714A">🟠' + teamSelfPaid + '</span> ';
+    if (teamUnpaid > 0) payStats += '<span class="pay-stats pay-stats-pending">⭕' + teamUnpaid + '</span>';
+
     h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + teamLabel + '（' + g.names.length + ' 人）</td>';
     S.forEach(() => { h += '<td></td>'; });
-    h += '<td></td><td></td><td></td></tr>';
+    h += '<td></td><td></td><td></td><td></td><td>' + payStats + '</td></tr>';
 
     // Person rows
     g.names.forEach(name => {
@@ -1146,6 +1456,8 @@ function renderTable() {
       h += '<td class="pt-items" id="pi-' + personIdx + '">0</td>';
       h += '<td class="pt-usd" id="pu-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-cny" id="pc-' + personIdx + '">\u2014</td>';
+      h += '<td class="pt-fee" id="pf-' + personIdx + '">\u2014</td>';
+      h += '<td>' + paymentCellHTML(name, g.team) + '</td>';
       h += '</tr>';
       personIdx++;
     });
@@ -1156,6 +1468,8 @@ function renderTable() {
     h += '<td id="tsi-' + g.team + '"></td>';
     h += '<td id="tsu-' + g.team + '"></td>';
     h += '<td id="tsc-' + g.team + '"></td>';
+    h += '<td id="tsf-' + g.team + '"></td>';
+    h += '<td></td>';
     h += '</tr>';
   });
 
@@ -1184,6 +1498,7 @@ function renderTable() {
 
   // Re-apply lock state to newly rendered inputs
   applyLockState();
+  updatePaymentBtns();
 }
 
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -1212,7 +1527,7 @@ function recalculate() {
   let personIdx = 0;
 
   teamsData.forEach(g => {
-    let teamItems = 0, teamUSD = 0;
+    let teamItems = 0, teamUSD = 0, teamFee = 0;
     const teamStickerQty = {};
     S.forEach(s => { teamStickerQty[s.id] = 0; });
 
@@ -1230,12 +1545,16 @@ function recalculate() {
       teamItems += items;
       teamUSD += usd;
 
+      const fee = cny * 0.001; // 0.1% bank transfer fee
+      teamFee += fee;
       const piEl = document.getElementById('pi-' + personIdx);
       const puEl = document.getElementById('pu-' + personIdx);
       const pcEl = document.getElementById('pc-' + personIdx);
+      const pfEl = document.getElementById('pf-' + personIdx);
       if (piEl) piEl.textContent = items;
       if (puEl) puEl.textContent = items > 0 ? '$' + usd.toFixed(2) : '\u2014';
       if (pcEl) pcEl.textContent = items > 0 ? '\u00A5' + cny.toFixed(2) : '\u2014';
+      if (pfEl) pfEl.textContent = items > 0 ? '\u00A5' + fee.toFixed(2) : '\u2014';
       personIdx++;
     });
 
@@ -1248,17 +1567,22 @@ function recalculate() {
     const tsiEl = document.getElementById('tsi-' + g.team);
     const tsuEl = document.getElementById('tsu-' + g.team);
     const tscEl = document.getElementById('tsc-' + g.team);
+    const tsfEl = document.getElementById('tsf-' + g.team);
     if (tsiEl) tsiEl.textContent = teamItems;
     if (tsuEl) tsuEl.textContent = teamItems > 0 ? '$' + teamUSD.toFixed(2) : '\u2014';
     if (tscEl) tscEl.textContent = teamItems > 0 ? '\u00A5' + teamCNY.toFixed(2) : '\u2014';
+    if (tsfEl) tsfEl.textContent = teamItems > 0 ? '\u00A5' + teamFee.toFixed(2) : '\u2014';
   });
 
   const grandCNY = grandUSD * rate;
-  document.getElementById('grandTotal').textContent = '总金额 $' + grandUSD.toFixed(2) + ' / \u00A5' + grandCNY.toFixed(2);
+  const grandFee = grandCNY * 0.001;
+  document.getElementById('grandTotal').textContent = '总金额 $' + grandUSD.toFixed(2) + ' / \u00A5' + (grandCNY + grandFee).toFixed(2) + '(含手续费)';
   const sgU = document.getElementById('st-grand-usd');
   const sgC = document.getElementById('st-grand-cny');
+  const sgF = document.getElementById('st-grand-fee');
   if (sgU) sgU.textContent = '$' + grandUSD.toFixed(2);
   if (sgC) sgC.textContent = '\u00A5' + grandCNY.toFixed(2);
+  if (sgF) sgF.textContent = '\u00A5' + grandFee.toFixed(2);
 
   updateCards(data);
 }
@@ -1310,7 +1634,9 @@ function exportMyOrder() {
   } else {
     lines.push(...details);
   }
-  lines.push('', '总件数：' + totalItems, '总金额：$' + totalUSD.toFixed(2) + ' / \u00A5' + (totalUSD * rate).toFixed(2));
+  const totalCNY = totalUSD * rate;
+  const fee = totalCNY * 0.001;
+  lines.push('', '总件数：' + totalItems, '总金额(USD)：$' + totalUSD.toFixed(2), '总金额(CNY)：¥' + totalCNY.toFixed(2), '转账手续费(0.1%)：¥' + fee.toFixed(2), '实付金额：¥' + (totalCNY + fee).toFixed(2));
   const text = lines.join('\n');
   navigator.clipboard.writeText(text)
     .then(() => alert('已复制到剪贴板，可以直接粘贴到群里！'))
