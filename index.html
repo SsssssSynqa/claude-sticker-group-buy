@@ -19,6 +19,11 @@ header h1{font-size:21px;font-weight:700;color:var(--primary);margin-bottom:6px}
 .settings label{display:flex;align-items:center;gap:5px}
 .s-input{width:65px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:center;background:var(--card)}
 .s-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-lt)}
+.s-input:disabled{background:#f0f0f0;color:var(--text2);cursor:not-allowed}
+.btn-rate-save{display:none;padding:3px 10px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-rate-save:hover{background:#D4623E;transform:scale(1.03)}
+.btn-rate-save.unsaved{display:inline-block;animation:rate-pulse .8s ease-in-out infinite alternate}
+@keyframes rate-pulse{from{box-shadow:0 0 0 0 rgba(232,113,74,.4)}to{box-shadow:0 0 0 4px rgba(232,113,74,0)}}
 .grand-total{font-weight:600;color:var(--primary)}
 .last-saved{font-size:11px;color:#bbb;margin-left:auto}
 
@@ -263,7 +268,7 @@ input[type="number"]{-moz-appearance:textfield}
     <span class="nick-tag" id="nickTag" onclick="changeNick()" title="点击修改昵称"></span>
     <span class="team-tag" id="teamTag" onclick="changeTeam()" title="点击切换分团"></span>
     <span class="nick-tag" id="pinTag" onclick="changePin()" style="display:none;background:#E8F7EF;color:#2D8B5E" title="设置或修改密码">设密码</span>
-    <label>汇率 1 USD = <input type="number" class="s-input" id="rateInput" step="0.01" min="0"> CNY</label>
+    <label id="rateLabel">汇率 1 USD = <input type="number" class="s-input" id="rateInput" step="0.01" min="0"> CNY</label><button class="btn-rate-save" id="btnRateSave" onclick="saveRate()">💾 保存</button>
     <span class="grand-total" id="grandTotal"></span>
     <span class="last-saved" id="lastSaved"></span>
   </div>
@@ -713,12 +718,29 @@ window.addEventListener('beforeunload', (e) => {
 });
 window.addEventListener('pagehide', flushPendingOnExit);
 
-async function writeRate(r) {
-  if (!sb) return;
+async function saveRate() {
+  if (!sb || !isAdmin(myName)) {
+    alert('只有管理员可以修改汇率');
+    return;
+  }
+  const newRate = parseFloat(document.getElementById('rateInput').value) || 6.90;
+  if (newRate <= 0 || newRate > 100) {
+    alert('汇率数值不太对哦，请检查一下');
+    return;
+  }
+  const saveBtn = document.getElementById('btnRateSave');
+  if (saveBtn) { saveBtn.textContent = '保存中...'; saveBtn.style.pointerEvents = 'none'; }
   try {
-    await sb.from('settings').update({value: String(r), updated_at: new Date().toISOString()}).eq('key', 'rate');
+    await sb.from('settings').update({value: String(newRate), updated_at: new Date().toISOString()}).eq('key', 'rate');
+    rate = newRate;
+    recalculate();
+    saveOffline();
+    if (saveBtn) { saveBtn.classList.remove('unsaved'); saveBtn.textContent = '✅ 已保存'; }
+    setTimeout(() => { if (saveBtn) saveBtn.textContent = '💾 保存'; saveBtn.style.pointerEvents = ''; }, 1500);
   } catch(e) {
-    console.error('Rate write failed:', e);
+    console.error('Rate save failed:', e);
+    alert('汇率保存失败：' + e.message);
+    if (saveBtn) { saveBtn.textContent = '💾 保存'; saveBtn.style.pointerEvents = ''; }
   }
 }
 
@@ -1020,6 +1042,17 @@ function updateNickDisplay() {
       }
     });
   }
+  // Rate input: admin-only editing
+  applyRatePermission();
+}
+
+function applyRatePermission() {
+  const rateInp = document.getElementById('rateInput');
+  const saveBtn = document.getElementById('btnRateSave');
+  if (!rateInp) return;
+  const canEdit = isAdmin(myName);
+  rateInp.disabled = !canEdit;
+  if (!canEdit && saveBtn) saveBtn.classList.remove('unsaved');
 }
 
 async function changePin() {
@@ -1688,11 +1721,13 @@ function clearMyOrders() {
 }
 
 document.getElementById('rateInput').addEventListener('input', function() {
-  rate = parseFloat(this.value) || 6.90;
+  if (!isAdmin(myName)) return;
+  const newRate = parseFloat(this.value) || 6.90;
+  rate = newRate;
   recalculate();
-  clearTimeout(writeTimers._rate);
-  writeTimers._rate = setTimeout(() => writeRate(rate), 500);
-  saveOffline();
+  // Show save button instead of auto-writing
+  const saveBtn = document.getElementById('btnRateSave');
+  if (saveBtn) saveBtn.classList.add('unsaved');
 });
 
 // ============ IMPORT / EXPORT ============
@@ -1741,7 +1776,7 @@ function showImport() {
         const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'});
         if (error) { alert('导入失败: ' + error.message); return; }
       }
-      if (d.rate) {
+      if (d.rate && isAdmin(myName)) {
         await sb.from('settings').update({value: String(d.rate), updated_at: new Date().toISOString()}).eq('key', 'rate');
         rate = d.rate;
         document.getElementById('rateInput').value = rate;
