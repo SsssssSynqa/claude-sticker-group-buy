@@ -731,7 +731,7 @@ async function saveRate() {
   const saveBtn = document.getElementById('btnRateSave');
   if (saveBtn) { saveBtn.textContent = '保存中...'; saveBtn.style.pointerEvents = 'none'; }
   try {
-    await sb.from('settings').update({value: String(newRate), updated_at: new Date().toISOString()}).eq('key', 'rate');
+    await sb.from('settings').upsert({key: 'rate', value: String(newRate), updated_at: new Date().toISOString()}, {onConflict: 'key'});
     rate = newRate;
     recalculate();
     saveOffline();
