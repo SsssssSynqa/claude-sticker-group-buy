@@ -1247,11 +1247,11 @@ function showPaymentQR() {
     let totalQty = 0;
     for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
     const q = orders[s.id] || 0;
-    if (q > 0) myUSD += q * unitPrice(s, totalQty);
+    if (q > 0) myUSD += r2(q * unitPrice(s, totalQty));
   });
-  const myCNY = myUSD * rate;
-  const myFee = myCNY * 0.001;
-  const myTotal = myCNY + myFee;
+  const myCNY = r2(myUSD * rate);
+  const myFee = r2(myCNY * 0.001);
+  const myTotal = r2(myCNY + myFee);
 
   document.getElementById('payQrTitle').textContent = '团' + team + ' 付款码';
   document.getElementById('payQrLeader').textContent = '团长：' + leader;
@@ -1327,6 +1327,9 @@ function updatePaymentBtns() {
 }
 
 // ============ PRICING ============
+// Round to N decimal places (avoids floating-point drift)
+function r2(n) { return Math.round(n * 100) / 100; }
+
 function unitPrice(sticker, qty) {
   if (qty <= 0) return sticker.t[0][1] / sticker.t[0][0];
   let tier = sticker.t[0];
@@ -1596,15 +1599,15 @@ function recalculate() {
       S.forEach(s => {
         const q = orders[s.id] || 0;
         items += q;
-        usd += q * data[s.id].unitPrice;
+        usd += r2(q * data[s.id].unitPrice);
         teamStickerQty[s.id] += q;
       });
-      const cny = usd * rate;
+      const cny = r2(usd * rate);
       grandUSD += usd;
       teamItems += items;
       teamUSD += usd;
 
-      const fee = cny * 0.001; // 0.1% bank transfer fee
+      const fee = r2(cny * 0.001); // 0.1% bank transfer fee
       teamFee += fee;
       const piEl = document.getElementById('pi-' + personIdx);
       const puEl = document.getElementById('pu-' + personIdx);
@@ -1633,8 +1636,8 @@ function recalculate() {
     if (tsfEl) tsfEl.textContent = teamItems > 0 ? '\u00A5' + teamFee.toFixed(2) : '\u2014';
   });
 
-  const grandCNY = grandUSD * rate;
-  const grandFee = grandCNY * 0.001;
+  const grandCNY = r2(grandUSD * rate);
+  const grandFee = r2(grandCNY * 0.001);
   document.getElementById('grandTotal').textContent = '总金额 $' + grandUSD.toFixed(2) + ' / \u00A5' + (grandCNY + grandFee).toFixed(2) + '(含手续费)';
   const sgU = document.getElementById('st-grand-usd');
   const sgC = document.getElementById('st-grand-cny');
@@ -1682,7 +1685,7 @@ function exportMyOrder() {
     const q = orders[s.id] || 0;
     if (q > 0) {
       const up = data[s.id].unitPrice;
-      const sub = q * up;
+      const sub = r2(q * up);
       details.push(s.name + '(' + TYPE_LABEL[s.type] + ') x' + q + ' = $' + sub.toFixed(2));
       totalItems += q;
       totalUSD += sub;
@@ -1693,9 +1696,10 @@ function exportMyOrder() {
   } else {
     lines.push(...details);
   }
-  const totalCNY = totalUSD * rate;
-  const fee = totalCNY * 0.001;
-  lines.push('', '总件数：' + totalItems, '总金额(USD)：$' + totalUSD.toFixed(2), '总金额(CNY)：¥' + totalCNY.toFixed(2), '转账手续费(0.1%)：¥' + fee.toFixed(2), '实付金额：¥' + (totalCNY + fee).toFixed(2));
+  const totalCNY = r2(totalUSD * rate);
+  const fee = r2(totalCNY * 0.001);
+  const totalPay = r2(totalCNY + fee);
+  lines.push('', '总件数：' + totalItems, '总金额(USD)：$' + totalUSD.toFixed(2), '总金额(CNY)：¥' + totalCNY.toFixed(2), '转账手续费(0.1%)：¥' + fee.toFixed(2), '实付金额：¥' + totalPay.toFixed(2));
   const text = lines.join('\n');
   navigator.clipboard.writeText(text)
     .then(() => alert('已复制到剪贴板，可以直接粘贴到群里！'))
