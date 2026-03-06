@@ -1130,15 +1130,15 @@ function paymentCellHTML(name, team) {
     html += ' <button class="pay-btn active" onclick="cancelMyPayment()">撤销</button>';
   }
   // Leader confirm button (for leader/admin, when member self-confirmed but not yet leader-confirmed)
-  if (iAmLeader && !isMe && st === 'self') {
+  if (iAmLeader && st === 'self') {
     html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmPayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
   }
   // Leader revoke (for leader/admin, when already leader-confirmed)
-  if (iAmLeader && !isMe && st === 'confirmed') {
+  if (iAmLeader && st === 'confirmed') {
     html += ' <button class="pay-btn" onclick="leaderRevokePayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
   }
   // Admin can also confirm directly even if member hasn't self-confirmed
-  if (isAdmin(myName) && !isMe && st === 'unpaid') {
+  if (isAdmin(myName) && st === 'unpaid' && !isMe) {
     html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmPayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
   }
 
