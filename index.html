@@ -1206,6 +1206,20 @@ function showPaymentQR() {
   const team = myTeam;
   const leader = TEAM_LEADERS[team] || '未知';
   const qrSrc = TEAM_QR[team];
+
+  // Calculate my total payment amount
+  let myUSD = 0;
+  const orders = allOrders[myName] || {};
+  S.forEach(s => {
+    let totalQty = 0;
+    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
+    const q = orders[s.id] || 0;
+    if (q > 0) myUSD += q * unitPrice(s, totalQty);
+  });
+  const myCNY = myUSD * rate;
+  const myFee = myCNY * 0.001;
+  const myTotal = myCNY + myFee;
+
   document.getElementById('payQrTitle').textContent = '团' + team + ' 付款码';
   document.getElementById('payQrLeader').textContent = '团长：' + leader;
   const wrap = document.getElementById('payQrImgWrap');
@@ -1214,11 +1228,23 @@ function showPaymentQR() {
   } else {
     wrap.innerHTML = '<div class="pay-qr-no-img">付款码准备中…<br>请联系团长获取</div>';
   }
-  document.getElementById('payQrHint').innerHTML = '<strong>付款说明</strong><br>'
-    + '1. 转账金额 = 你的CNY总额 + 0.1%手续费（微信/支付宝转银行卡手续费）<br>'
-    + '2. 请点击上方「📋 导出我的订单」查看你的实付金额<br>'
-    + '3. 完成转账后，将<b>导出的订单详情</b>和<b>付款截图</b>一起发到群里<br>'
-    + '4. 回到本页点击「💰 我已完成付款」确认';
+
+  // Build amount display + instructions
+  let amountHTML = '';
+  if (myUSD > 0) {
+    amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
+      + '你需要转账：<span style="font-size:20px">¥' + myTotal.toFixed(2) + '</span>'
+      + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">商品 ¥' + myCNY.toFixed(2) + ' + 手续费 ¥' + myFee.toFixed(2) + '</div>'
+      + '</div>';
+  } else {
+    amountHTML = '<div style="background:#f5f5f5;border-radius:10px;padding:12px;margin:10px 0;color:#999;font-size:13px">你还没有选购贴纸</div>';
+  }
+
+  document.getElementById('payQrHint').innerHTML = amountHTML
+    + '<strong>付款说明</strong><br>'
+    + '1. 请按上方金额向团长转账<br>'
+    + '2. 完成转账后，将<b>导出的订单详情</b>和<b>付款截图</b>一起发到群里<br>'
+    + '3. 回到本页点击「💰 我已完成付款」确认';
   document.getElementById('payQrOverlay').classList.add('on');
 }
 
