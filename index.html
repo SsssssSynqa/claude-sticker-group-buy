@@ -1568,7 +1568,7 @@ function renderTable() {
   S.forEach(s => {
     h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
   });
-  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（实际应付）</th><th>CNY（预估）</th><th>手续费</th><th>实付</th><th class="col-pay">付款</th></tr></thead>';
+  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（预估）</th><th>手续费</th><th>CNY（实际应付）</th><th>实付</th><th class="col-pay">付款</th></tr></thead>';
 
   h += '<tbody>';
   // Combined summary rows (pricing uses combined totals across all teams)
@@ -1582,12 +1582,12 @@ function renderTable() {
 
   h += '<tr class="s-row r-total"><td class="col-idx"></td><td class="col-name">该款总价</td>';
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-actual"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td></td><td></td></tr>';
+  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-actual"></td><td></td><td></td></tr>';
 
   // 三团汇总 row (grand totals across all teams)
   h += '<tr class="team-subtotal" style="background:#FFF8F0;font-weight:700"><td class="col-idx"></td><td class="col-name">三团汇总</td>';
   S.forEach(s => { h += '<td id="gtsq-' + s.id + '"></td>'; });
-  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-actual"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-ap"></td><td></td></tr>';
+  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-actual"></td><td id="gt-ap"></td><td></td></tr>';
 
   // Compute global join-order sequence numbers (stable: based on ALL registered users, not just visible ones)
   const sortedByJoin = Object.entries(allJoinOrder).sort((a, b) => a[1] - b[1]);
@@ -1631,9 +1631,9 @@ function renderTable() {
       });
       h += '<td class="pt-items" id="pi-' + personIdx + '">0</td>';
       h += '<td class="pt-usd" id="pu-' + personIdx + '">\u2014</td>';
-      h += '<td class="pt-actual" id="pa-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-cny" id="pc-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-fee" id="pf-' + personIdx + '">\u2014</td>';
+      h += '<td class="pt-actual" id="pa-' + personIdx + '">\u2014</td>';
       // Actual paid column — editable by team leader / admin only
       const apVal = allActualPaid[name];
       const canEditAP = isLeaderOf(myName, g.team);
@@ -1652,9 +1652,9 @@ function renderTable() {
     S.forEach(s => { h += '<td id="tsq-' + g.team + '-' + s.id + '"></td>'; });
     h += '<td id="tsi-' + g.team + '"></td>';
     h += '<td id="tsu-' + g.team + '"></td>';
-    h += '<td id="tsa-' + g.team + '"></td>';
     h += '<td id="tsc-' + g.team + '"></td>';
     h += '<td id="tsf-' + g.team + '"></td>';
+    h += '<td id="tsa-' + g.team + '"></td>';
     h += '<td id="tsap-' + g.team + '"></td>';
     h += '<td></td>';
     h += '</tr>';
