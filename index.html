@@ -454,6 +454,7 @@ let isLocked = false;
 let allPaySelf = {}; // {name: true} — self-confirmed payment
 let allPayLeader = {}; // {name: true} — leader-confirmed payment
 let allActualPaid = {}; // {name: cny_amount} — actual paid amount set by team leader
+let allRefunded = {}; // {name: cny_amount} — already refunded amount set by team leader
 let writeTimers = {};
 let renderTimer = null;
 
@@ -520,6 +521,8 @@ async function loadAll() {
       if (row.quantity > 0) allPayLeader[row.name] = true;
     } else if (row.sticker_id === '_actual_paid') {
       if (row.quantity > 0) allActualPaid[row.name] = row.quantity / 100;
+    } else if (row.sticker_id === '_refunded') {
+      if (row.quantity > 0) allRefunded[row.name] = row.quantity / 100;
     } else if (row.quantity > 0) {
       if (!allOrders[row.name]) allOrders[row.name] = {};
       allOrders[row.name][row.sticker_id] = row.quantity;
@@ -599,6 +602,16 @@ function handleOrderEvent(payload) {
       delete allActualPaid[row.name];
     } else if (payload.new && payload.new.quantity > 0) {
       allActualPaid[payload.new.name] = payload.new.quantity / 100;
+    }
+    scheduleRender();
+    saveOffline();
+    return;
+  }
+  if (row.sticker_id === '_refunded') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity <= 0)) {
+      delete allRefunded[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allRefunded[payload.new.name] = payload.new.quantity / 100;
     }
     scheduleRender();
     saveOffline();
@@ -832,7 +845,7 @@ function applyLockState() {
     b.style.pointerEvents = isLocked ? 'none' : '';
   });
   document.querySelectorAll('#orderTable input[type="number"]').forEach(inp => {
-    if (inp.dataset.ap) return; // actual-paid inputs stay editable after lock
+    if (inp.dataset.ap || inp.dataset.rf) return; // actual-paid & refunded inputs stay editable after lock
     inp.disabled = isLocked;
     inp.style.opacity = isLocked ? '.5' : '';
   });
@@ -1312,6 +1325,21 @@ async function saveActualPaid(memberName, amount) {
   }
 }
 
+async function saveRefunded(memberName, amount) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  const cents = Math.round(amount * 100);
+  if (cents > 0) { allRefunded[memberName] = amount; } else { delete allRefunded[memberName]; }
+  recalculate(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_refunded', quantity: cents, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) { console.error('Save refunded failed:', error); alert('保存已退金额失败：' + error.message); }
+  else { updateStatus('已更新 ' + memberName + ' 的已退金额'); }
+}
+
 function showPaymentQR() {
   if (!isLocked) { alert('截单后才能查看付款码哦～请等待团长锁单'); return; }
   const team = myTeam;
@@ -1569,26 +1597,26 @@ function renderTable() {
   S.forEach(s => {
     h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
   });
-  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（预估）</th><th>手续费</th><th>CNY（实际应付）</th><th>实付</th><th>应退</th><th class="col-pay">付款</th></tr></thead>';
+  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（预估）</th><th>手续费</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应退</th><th class="col-pay">付款</th></tr></thead>';
 
   h += '<tbody>';
   // Combined summary rows (pricing uses combined totals across all teams)
   h += '<tr class="s-row r-qty"><td class="col-idx"></td><td class="col-name">总数量</td>';
   S.forEach(s => { h += '<td id="sq-' + s.id + '">0</td>'; });
-  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-price"><td class="col-idx"></td><td class="col-name">单价(¥)</td>';
   S.forEach(s => { h += '<td id="sp-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-total"><td class="col-idx"></td><td class="col-name">该款总价</td>';
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-actual"></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-actual"></td><td></td><td></td><td></td><td></td></tr>';
 
   // 三团汇总 row (grand totals across all teams)
   h += '<tr class="team-subtotal" style="background:#FFF8F0;font-weight:700"><td class="col-idx"></td><td class="col-name">三团汇总</td>';
   S.forEach(s => { h += '<td id="gtsq-' + s.id + '"></td>'; });
-  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refund"></td><td></td></tr>';
+  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refunded"></td><td id="gt-refund"></td><td></td></tr>';
 
   // Compute global join-order sequence numbers (stable: based on ALL registered users, not just visible ones)
   const sortedByJoin = Object.entries(allJoinOrder).sort((a, b) => a[1] - b[1]);
@@ -1639,9 +1667,16 @@ function renderTable() {
       const apVal = allActualPaid[name];
       const canEditAP = isLeaderOf(myName, g.team);
       if (canEditAP) {
-        h += '<td class="pt-ap"><input type="number" min="0" step="0.01" value="' + (apVal !== undefined ? apVal.toFixed(2) : '') + '" data-ap="' + esc(name) + '" placeholder="\u2014" style="width:78px"></td>';
+        h += '<td class="pt-ap"><input type="number" min="0" step="0.01" value="' + (apVal !== undefined ? apVal.toFixed(2) : '') + '" data-ap="' + esc(name) + '" placeholder="\u2014" style="width:78px;color:#E8714A"></td>';
       } else {
-        h += '<td class="pt-ap">' + (apVal !== undefined ? '\u00A5' + apVal.toFixed(2) : '\u2014') + '</td>';
+        h += '<td class="pt-ap">' + (apVal !== undefined ? '<span style="color:#E8714A">\u00A5' + apVal.toFixed(2) + '</span>' : '\u2014') + '</td>';
+      }
+      // Refunded column — editable by team leader / admin only
+      const rfVal = allRefunded[name];
+      if (canEditAP) {
+        h += '<td class="pt-rfd"><input type="number" min="0" step="0.01" value="' + (rfVal !== undefined ? rfVal.toFixed(2) : '') + '" data-rf="' + esc(name) + '" placeholder="\u2014" style="width:78px;color:#7BC9A0"></td>';
+      } else {
+        h += '<td class="pt-rfd">' + (rfVal !== undefined ? '<span style="color:#7BC9A0">\u00A5' + rfVal.toFixed(2) + '</span>' : '\u2014') + '</td>';
       }
       h += '<td class="pt-refund" id="pr-' + personIdx + '">\u2014</td>';
       h += '<td>' + paymentCellHTML(name, g.team) + '</td>';
@@ -1658,6 +1693,7 @@ function renderTable() {
     h += '<td id="tsf-' + g.team + '"></td>';
     h += '<td id="tsa-' + g.team + '"></td>';
     h += '<td id="tsap-' + g.team + '"></td>';
+    h += '<td id="tsrf-' + g.team + '"></td>';
     h += '<td id="tsr-' + g.team + '"></td>';
     h += '<td></td>';
     h += '</tr>';
@@ -1667,14 +1703,12 @@ function renderTable() {
 
   // Save focus state (sticker inputs and actual-paid inputs)
   const focused = document.activeElement;
-  let focusSid = null, focusAp = null, focusVal = null, focusPos = null;
+  let focusSid = null, focusAp = null, focusRf = null, focusVal = null, focusPos = null;
   if (focused && focused.dataset) {
-    if (focused.dataset.si) {
-      focusSid = focused.dataset.si;
-    } else if (focused.dataset.ap) {
-      focusAp = focused.dataset.ap;
-    }
-    if (focusSid || focusAp) {
+    if (focused.dataset.si) { focusSid = focused.dataset.si; }
+    else if (focused.dataset.ap) { focusAp = focused.dataset.ap; }
+    else if (focused.dataset.rf) { focusRf = focused.dataset.rf; }
+    if (focusSid || focusAp || focusRf) {
       focusVal = focused.value;
       focusPos = focused.selectionStart;
     }
@@ -1683,20 +1717,14 @@ function renderTable() {
   tbl.innerHTML = h;
 
   // Restore focus
-  if (focusSid) {
-    const inp = tbl.querySelector('input[data-si="' + focusSid + '"]');
-    if (inp) {
-      inp.value = focusVal;
-      inp.focus();
-      try { inp.setSelectionRange(focusPos, focusPos); } catch(e) {}
-    }
-  } else if (focusAp) {
-    const inp = tbl.querySelector('input[data-ap="' + CSS.escape(focusAp) + '"]');
-    if (inp) {
-      inp.value = focusVal;
-      inp.focus();
-      try { inp.setSelectionRange(focusPos, focusPos); } catch(e) {}
-    }
+  let restoreInp = null;
+  if (focusSid) restoreInp = tbl.querySelector('input[data-si="' + focusSid + '"]');
+  else if (focusAp) restoreInp = tbl.querySelector('input[data-ap="' + CSS.escape(focusAp) + '"]');
+  else if (focusRf) restoreInp = tbl.querySelector('input[data-rf="' + CSS.escape(focusRf) + '"]');
+  if (restoreInp) {
+    restoreInp.value = focusVal;
+    restoreInp.focus();
+    try { restoreInp.setSelectionRange(focusPos, focusPos); } catch(e) {}
   }
 
   // Re-apply lock state to newly rendered inputs
@@ -1734,12 +1762,12 @@ function recalculate() {
 
   // Per-person totals and per-team subtotals
   let personIdx = 0;
-  let gtItems = 0, gtUSD = 0, gtActual = 0, gtCNY = 0, gtFee = 0, gtAP = 0, gtRefund = 0;
+  let gtItems = 0, gtUSD = 0, gtActual = 0, gtCNY = 0, gtFee = 0, gtAP = 0, gtRefunded = 0, gtRefund = 0;
   const gtStickerQty = {};
   S.forEach(s => { gtStickerQty[s.id] = 0; });
 
   teamsData.forEach(g => {
-    let teamItems = 0, teamUSD = 0, teamFee = 0, teamActualPaid = 0, teamActualCNY = 0, teamRefund = 0;
+    let teamItems = 0, teamUSD = 0, teamFee = 0, teamActualPaid = 0, teamActualCNY = 0, teamRefunded = 0, teamRefund = 0;
     const teamStickerQty = {};
     S.forEach(s => { teamStickerQty[s.id] = 0; });
 
@@ -1760,6 +1788,7 @@ function recalculate() {
       const fee = r2(cny * 0.001); // 0.1% bank transfer fee
       teamFee += fee;
       if (allActualPaid[name] !== undefined) teamActualPaid += allActualPaid[name];
+      if (allRefunded[name] !== undefined) teamRefunded += allRefunded[name];
       let personRefund = 0;
 
       // CNY（实际应付）= proportional share of actual SM total × rate, plus fee
@@ -1781,12 +1810,13 @@ function recalculate() {
       if (paEl) paEl.textContent = (discountRatio > 0 && items > 0) ? '\u00A5' + personActual.toFixed(2) : '\u2014';
       if (pcEl) pcEl.textContent = items > 0 ? '\u00A5' + cny.toFixed(2) : '\u2014';
       if (pfEl) pfEl.textContent = items > 0 ? '\u00A5' + fee.toFixed(2) : '\u2014';
-      // 应退 = 实付 - 实际应付 (only when both values exist and paid > owed)
+      // 应退 = 实付 - 已退
       const prEl = document.getElementById('pr-' + personIdx);
       if (prEl) {
-        const paid = allActualPaid[name];
-        if (paid !== undefined && paid > 0 && personActual > 0) {
-          personRefund = r2(paid - personActual);
+        const paid = allActualPaid[name] || 0;
+        const refunded = allRefunded[name] || 0;
+        if (paid > 0) {
+          personRefund = r2(paid - refunded);
           prEl.textContent = personRefund > 0 ? '\u00A5' + personRefund.toFixed(2) : '\u2014';
           if (personRefund > 0) prEl.style.color = '#E74C3C';
           else prEl.style.color = '';
@@ -1813,13 +1843,17 @@ function recalculate() {
     if (tscEl) tscEl.textContent = teamItems > 0 ? '\u00A5' + teamCNY.toFixed(2) : '\u2014';
     if (tsfEl) tsfEl.textContent = teamItems > 0 ? '\u00A5' + teamFee.toFixed(2) : '\u2014';
     const tsapEl = document.getElementById('tsap-' + g.team);
-    if (tsapEl) tsapEl.textContent = teamActualPaid > 0 ? '\u00A5' + teamActualPaid.toFixed(2) : '\u2014';
+    if (tsapEl && teamActualPaid > 0) tsapEl.innerHTML = '<span style="color:#E8714A">\u00A5' + teamActualPaid.toFixed(2) + '</span>';
+    else if (tsapEl) tsapEl.textContent = '\u2014';
+    const tsrfEl = document.getElementById('tsrf-' + g.team);
+    if (tsrfEl && teamRefunded > 0) tsrfEl.innerHTML = '<span style="color:#7BC9A0">\u00A5' + teamRefunded.toFixed(2) + '</span>';
+    else if (tsrfEl) tsrfEl.textContent = '\u2014';
     const tsrEl = document.getElementById('tsr-' + g.team);
     if (tsrEl) tsrEl.textContent = teamRefund > 0 ? '\u00A5' + teamRefund.toFixed(2) : '\u2014';
 
     // Accumulate grand totals
     gtItems += teamItems; gtUSD += teamUSD; gtActual += teamActualCNY;
-    gtCNY += teamCNY; gtFee += teamFee; gtAP += teamActualPaid; gtRefund += teamRefund;
+    gtCNY += teamCNY; gtFee += teamFee; gtAP += teamActualPaid; gtRefunded += teamRefunded; gtRefund += teamRefund;
   });
 
   const grandCNY = r2(grandUSD * rate);
@@ -1851,7 +1885,11 @@ function recalculate() {
   if (gtaEl) gtaEl.textContent = gtActual > 0 ? '\u00A5' + gtActual.toFixed(2) : '\u2014';
   if (gtcEl) gtcEl.textContent = gtItems > 0 ? '\u00A5' + gtCNY.toFixed(2) : '\u2014';
   if (gtfEl) gtfEl.textContent = gtItems > 0 ? '\u00A5' + gtFee.toFixed(2) : '\u2014';
-  if (gtapEl) gtapEl.textContent = gtAP > 0 ? '\u00A5' + gtAP.toFixed(2) : '\u2014';
+  if (gtapEl && gtAP > 0) gtapEl.innerHTML = '<span style="color:#E8714A">\u00A5' + gtAP.toFixed(2) + '</span>';
+  else if (gtapEl) gtapEl.textContent = '\u2014';
+  const gtrfEl = document.getElementById('gt-refunded');
+  if (gtrfEl && gtRefunded > 0) gtrfEl.innerHTML = '<span style="color:#7BC9A0">\u00A5' + gtRefunded.toFixed(2) + '</span>';
+  else if (gtrfEl) gtrfEl.textContent = '\u2014';
   const gtrEl = document.getElementById('gt-refund');
   if (gtrEl) gtrEl.textContent = gtRefund > 0 ? '\u00A5' + gtRefund.toFixed(2) : '\u2014';
 
@@ -1877,13 +1915,18 @@ document.getElementById('orderTable').addEventListener('input', function(e) {
   }
 });
 
-// Actual paid inputs — team leader edits, saved on blur/change
+// Actual paid & refunded inputs — team leader edits, saved on change
 document.getElementById('orderTable').addEventListener('change', function(e) {
   const el = e.target;
   if (el.matches('input[type="number"]') && el.dataset.ap) {
     const memberName = el.dataset.ap;
     const amount = Math.max(0, parseFloat(el.value) || 0);
     saveActualPaid(memberName, amount);
+  }
+  if (el.matches('input[type="number"]') && el.dataset.rf) {
+    const memberName = el.dataset.rf;
+    const amount = Math.max(0, parseFloat(el.value) || 0);
+    saveRefunded(memberName, amount);
   }
 });
 
@@ -2080,7 +2123,7 @@ function closeModal() {
 
   updateNickDisplay();
   document.getElementById('rateInput').value = rate;
-  document.getElementById('orderTable').innerHTML = '<tbody><tr><td style="text-align:center;padding:40px;color:#999" colspan="23">连接中...</td></tr></tbody>';
+  document.getElementById('orderTable').innerHTML = '<tbody><tr><td style="text-align:center;padding:40px;color:#999" colspan="24">连接中...</td></tr></tbody>';
 
   await initSupabase();
 
