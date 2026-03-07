@@ -451,6 +451,7 @@ let connected = false;
 let isLocked = false;
 let allPaySelf = {}; // {name: true} — self-confirmed payment
 let allPayLeader = {}; // {name: true} — leader-confirmed payment
+let allActualPaid = {}; // {name: cny_amount} — actual paid amount set by team leader
 let writeTimers = {};
 let renderTimer = null;
 
@@ -503,6 +504,7 @@ async function loadAll() {
   allTeams = {};
   allPaySelf = {};
   allPayLeader = {};
+  allActualPaid = {};
   const joinOrd = {};
   for (const row of orders) {
     if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
@@ -514,6 +516,8 @@ async function loadAll() {
       if (row.quantity > 0) allPaySelf[row.name] = true;
     } else if (row.sticker_id === '_payment_leader') {
       if (row.quantity > 0) allPayLeader[row.name] = true;
+    } else if (row.sticker_id === '_actual_paid') {
+      if (row.quantity > 0) allActualPaid[row.name] = row.quantity / 100;
     } else if (row.quantity > 0) {
       if (!allOrders[row.name]) allOrders[row.name] = {};
       allOrders[row.name][row.sticker_id] = row.quantity;
@@ -582,6 +586,16 @@ function handleOrderEvent(payload) {
       delete allPayLeader[row.name];
     } else if (payload.new && payload.new.quantity > 0) {
       allPayLeader[payload.new.name] = true;
+    }
+    scheduleRender();
+    saveOffline();
+    return;
+  }
+  if (row.sticker_id === '_actual_paid') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity <= 0)) {
+      delete allActualPaid[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allActualPaid[payload.new.name] = payload.new.quantity / 100;
     }
     scheduleRender();
     saveOffline();
@@ -804,13 +818,13 @@ function applyLockState() {
 
 // ============ OFFLINE FALLBACK ============
 function saveOffline() {
-  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader})); } catch(e) {}
+  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader, allActualPaid})); } catch(e) {}
 }
 
 function loadOffline() {
   try {
     const d = JSON.parse(localStorage.getItem('gb_cache'));
-    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; }
+    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; allActualPaid = d.allActualPaid || {}; }
   } catch(e) {}
 }
 
@@ -1234,6 +1248,31 @@ async function leaderRevokePayment(memberName) {
   }
 }
 
+// ============ ACTUAL PAID ============
+async function saveActualPaid(memberName, amount) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  const cents = Math.round(amount * 100);
+  if (cents > 0) {
+    allActualPaid[memberName] = amount;
+  } else {
+    delete allActualPaid[memberName];
+  }
+  recalculate();
+  saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_actual_paid', quantity: cents, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Save actual paid failed:', error);
+    alert('保存实付金额失败：' + error.message);
+  } else {
+    updateStatus('已更新 ' + memberName + ' 的实付金额');
+  }
+}
+
 function showPaymentQR() {
   if (!isLocked) { alert('截单后才能查看付款码哦～请等待团长锁单'); return; }
   const team = myTeam;
@@ -1468,21 +1507,21 @@ function renderTable() {
   S.forEach(s => {
     h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
   });
-  h += '<th>总件数</th><th>USD</th><th>CNY</th><th>手续费</th><th class="col-pay">付款</th></tr></thead>';
+  h += '<th>总件数</th><th>USD</th><th>CNY</th><th>手续费</th><th>实付</th><th class="col-pay">付款</th></tr></thead>';
 
   h += '<tbody>';
   // Combined summary rows (pricing uses combined totals across all teams)
   h += '<tr class="s-row r-qty"><td class="col-idx"></td><td class="col-name">总数量</td>';
   S.forEach(s => { h += '<td id="sq-' + s.id + '">0</td>'; });
-  h += '<td></td><td></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-price"><td class="col-idx"></td><td class="col-name">单价(¥)</td>';
   S.forEach(s => { h += '<td id="sp-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-total"><td class="col-idx"></td><td class="col-name">该款总价</td>';
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td></td></tr>';
+  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td></td><td></td></tr>';
 
   // Compute global join-order sequence numbers (stable: based on ALL registered users, not just visible ones)
   const sortedByJoin = Object.entries(allJoinOrder).sort((a, b) => a[1] - b[1]);
@@ -1507,7 +1546,7 @@ function renderTable() {
 
     h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + teamLabel + '（' + g.names.length + ' 人）</td>';
     S.forEach(() => { h += '<td></td>'; });
-    h += '<td></td><td></td><td></td><td></td><td>' + payStats + '</td></tr>';
+    h += '<td></td><td></td><td></td><td></td><td></td><td>' + payStats + '</td></tr>';
 
     // Person rows
     g.names.forEach(name => {
@@ -1528,6 +1567,14 @@ function renderTable() {
       h += '<td class="pt-usd" id="pu-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-cny" id="pc-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-fee" id="pf-' + personIdx + '">\u2014</td>';
+      // Actual paid column — editable by team leader / admin only
+      const apVal = allActualPaid[name];
+      const canEditAP = isLeaderOf(myName, g.team);
+      if (canEditAP) {
+        h += '<td class="pt-ap"><input type="number" min="0" step="0.01" value="' + (apVal !== undefined ? apVal.toFixed(2) : '') + '" data-ap="' + esc(name) + '" placeholder="\u2014" style="width:78px"></td>';
+      } else {
+        h += '<td class="pt-ap">' + (apVal !== undefined ? '\u00A5' + apVal.toFixed(2) : '\u2014') + '</td>';
+      }
       h += '<td>' + paymentCellHTML(name, g.team) + '</td>';
       h += '</tr>';
       personIdx++;
@@ -1540,19 +1587,26 @@ function renderTable() {
     h += '<td id="tsu-' + g.team + '"></td>';
     h += '<td id="tsc-' + g.team + '"></td>';
     h += '<td id="tsf-' + g.team + '"></td>';
+    h += '<td id="tsap-' + g.team + '"></td>';
     h += '<td></td>';
     h += '</tr>';
   });
 
   h += '</tbody>';
 
-  // Save focus state
+  // Save focus state (sticker inputs and actual-paid inputs)
   const focused = document.activeElement;
-  let focusSid = null, focusVal = null, focusPos = null;
-  if (focused && focused.dataset && focused.dataset.si) {
-    focusSid = focused.dataset.si;
-    focusVal = focused.value;
-    focusPos = focused.selectionStart;
+  let focusSid = null, focusAp = null, focusVal = null, focusPos = null;
+  if (focused && focused.dataset) {
+    if (focused.dataset.si) {
+      focusSid = focused.dataset.si;
+    } else if (focused.dataset.ap) {
+      focusAp = focused.dataset.ap;
+    }
+    if (focusSid || focusAp) {
+      focusVal = focused.value;
+      focusPos = focused.selectionStart;
+    }
   }
 
   tbl.innerHTML = h;
@@ -1560,6 +1614,13 @@ function renderTable() {
   // Restore focus
   if (focusSid) {
     const inp = tbl.querySelector('input[data-si="' + focusSid + '"]');
+    if (inp) {
+      inp.value = focusVal;
+      inp.focus();
+      try { inp.setSelectionRange(focusPos, focusPos); } catch(e) {}
+    }
+  } else if (focusAp) {
+    const inp = tbl.querySelector('input[data-ap="' + CSS.escape(focusAp) + '"]');
     if (inp) {
       inp.value = focusVal;
       inp.focus();
@@ -1598,7 +1659,7 @@ function recalculate() {
   let personIdx = 0;
 
   teamsData.forEach(g => {
-    let teamItems = 0, teamUSD = 0, teamFee = 0;
+    let teamItems = 0, teamUSD = 0, teamFee = 0, teamActualPaid = 0;
     const teamStickerQty = {};
     S.forEach(s => { teamStickerQty[s.id] = 0; });
 
@@ -1618,6 +1679,7 @@ function recalculate() {
 
       const fee = r2(cny * 0.001); // 0.1% bank transfer fee
       teamFee += fee;
+      if (allActualPaid[name] !== undefined) teamActualPaid += allActualPaid[name];
       const piEl = document.getElementById('pi-' + personIdx);
       const puEl = document.getElementById('pu-' + personIdx);
       const pcEl = document.getElementById('pc-' + personIdx);
@@ -1643,6 +1705,8 @@ function recalculate() {
     if (tsuEl) tsuEl.textContent = teamItems > 0 ? '$' + teamUSD.toFixed(2) : '\u2014';
     if (tscEl) tscEl.textContent = teamItems > 0 ? '\u00A5' + teamCNY.toFixed(2) : '\u2014';
     if (tsfEl) tsfEl.textContent = teamItems > 0 ? '\u00A5' + teamFee.toFixed(2) : '\u2014';
+    const tsapEl = document.getElementById('tsap-' + g.team);
+    if (tsapEl) tsapEl.textContent = teamActualPaid > 0 ? '\u00A5' + teamActualPaid.toFixed(2) : '\u2014';
   });
 
   const grandCNY = r2(grandUSD * rate);
@@ -1674,6 +1738,16 @@ document.getElementById('orderTable').addEventListener('input', function(e) {
     recalculate();
     trackChange(sid, v);
     saveOffline();
+  }
+});
+
+// Actual paid inputs — team leader edits, saved on blur/change
+document.getElementById('orderTable').addEventListener('change', function(e) {
+  const el = e.target;
+  if (el.matches('input[type="number"]') && el.dataset.ap) {
+    const memberName = el.dataset.ap;
+    const amount = Math.max(0, parseFloat(el.value) || 0);
+    saveActualPaid(memberName, amount);
   }
 });
 
