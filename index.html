@@ -1823,13 +1823,13 @@ function recalculate() {
       if (paEl) paEl.textContent = (discountRatio > 0 && items > 0) ? '\u00A5' + personActual.toFixed(2) : '\u2014';
       if (pcEl) pcEl.textContent = items > 0 ? '\u00A5' + cny.toFixed(2) : '\u2014';
       if (pfEl) pfEl.textContent = items > 0 ? '\u00A5' + fee.toFixed(2) : '\u2014';
-      // 应退 = 实付 - 已退
+      // 应退 = 实付 - 实际应付 - 已退
       const prEl = document.getElementById('pr-' + personIdx);
       if (prEl) {
         const paid = allActualPaid[name] || 0;
         const refunded = allRefunded[name] || 0;
-        if (paid > 0) {
-          personRefund = r2(paid - refunded);
+        if (paid > 0 && personActual > 0) {
+          personRefund = r2(paid - personActual - refunded);
           prEl.textContent = personRefund > 0 ? '\u00A5' + personRefund.toFixed(2) : '\u2014';
           if (personRefund > 0) prEl.style.color = '#E74C3C';
           else prEl.style.color = '';
