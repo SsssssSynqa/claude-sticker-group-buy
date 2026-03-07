@@ -832,6 +832,7 @@ function applyLockState() {
     b.style.pointerEvents = isLocked ? 'none' : '';
   });
   document.querySelectorAll('#orderTable input[type="number"]').forEach(inp => {
+    if (inp.dataset.ap) return; // actual-paid inputs stay editable after lock
     inp.disabled = isLocked;
     inp.style.opacity = isLocked ? '.5' : '';
   });
@@ -1568,26 +1569,26 @@ function renderTable() {
   S.forEach(s => {
     h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
   });
-  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（预估）</th><th>手续费</th><th>CNY（实际应付）</th><th>实付</th><th class="col-pay">付款</th></tr></thead>';
+  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（预估）</th><th>手续费</th><th>CNY（实际应付）</th><th>实付</th><th>应退</th><th class="col-pay">付款</th></tr></thead>';
 
   h += '<tbody>';
   // Combined summary rows (pricing uses combined totals across all teams)
   h += '<tr class="s-row r-qty"><td class="col-idx"></td><td class="col-name">总数量</td>';
   S.forEach(s => { h += '<td id="sq-' + s.id + '">0</td>'; });
-  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-price"><td class="col-idx"></td><td class="col-name">单价(¥)</td>';
   S.forEach(s => { h += '<td id="sp-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-total"><td class="col-idx"></td><td class="col-name">该款总价</td>';
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-actual"></td><td></td><td></td></tr>';
+  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-actual"></td><td></td><td></td><td></td></tr>';
 
   // 三团汇总 row (grand totals across all teams)
   h += '<tr class="team-subtotal" style="background:#FFF8F0;font-weight:700"><td class="col-idx"></td><td class="col-name">三团汇总</td>';
   S.forEach(s => { h += '<td id="gtsq-' + s.id + '"></td>'; });
-  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-actual"></td><td id="gt-ap"></td><td></td></tr>';
+  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refund"></td><td></td></tr>';
 
   // Compute global join-order sequence numbers (stable: based on ALL registered users, not just visible ones)
   const sortedByJoin = Object.entries(allJoinOrder).sort((a, b) => a[1] - b[1]);
@@ -1642,6 +1643,7 @@ function renderTable() {
       } else {
         h += '<td class="pt-ap">' + (apVal !== undefined ? '\u00A5' + apVal.toFixed(2) : '\u2014') + '</td>';
       }
+      h += '<td class="pt-refund" id="pr-' + personIdx + '">\u2014</td>';
       h += '<td>' + paymentCellHTML(name, g.team) + '</td>';
       h += '</tr>';
       personIdx++;
@@ -1656,6 +1658,7 @@ function renderTable() {
     h += '<td id="tsf-' + g.team + '"></td>';
     h += '<td id="tsa-' + g.team + '"></td>';
     h += '<td id="tsap-' + g.team + '"></td>';
+    h += '<td id="tsr-' + g.team + '"></td>';
     h += '<td></td>';
     h += '</tr>';
   });
@@ -1731,12 +1734,12 @@ function recalculate() {
 
   // Per-person totals and per-team subtotals
   let personIdx = 0;
-  let gtItems = 0, gtUSD = 0, gtActual = 0, gtCNY = 0, gtFee = 0, gtAP = 0;
+  let gtItems = 0, gtUSD = 0, gtActual = 0, gtCNY = 0, gtFee = 0, gtAP = 0, gtRefund = 0;
   const gtStickerQty = {};
   S.forEach(s => { gtStickerQty[s.id] = 0; });
 
   teamsData.forEach(g => {
-    let teamItems = 0, teamUSD = 0, teamFee = 0, teamActualPaid = 0, teamActualCNY = 0;
+    let teamItems = 0, teamUSD = 0, teamFee = 0, teamActualPaid = 0, teamActualCNY = 0, teamRefund = 0;
     const teamStickerQty = {};
     S.forEach(s => { teamStickerQty[s.id] = 0; });
 
@@ -1757,6 +1760,7 @@ function recalculate() {
       const fee = r2(cny * 0.001); // 0.1% bank transfer fee
       teamFee += fee;
       if (allActualPaid[name] !== undefined) teamActualPaid += allActualPaid[name];
+      let personRefund = 0;
 
       // CNY（实际应付）= proportional share of actual SM total × rate, plus fee
       let personActual = 0;
@@ -1777,6 +1781,18 @@ function recalculate() {
       if (paEl) paEl.textContent = (discountRatio > 0 && items > 0) ? '\u00A5' + personActual.toFixed(2) : '\u2014';
       if (pcEl) pcEl.textContent = items > 0 ? '\u00A5' + cny.toFixed(2) : '\u2014';
       if (pfEl) pfEl.textContent = items > 0 ? '\u00A5' + fee.toFixed(2) : '\u2014';
+      // 应退 = 实付 - 实际应付 (only when both values exist and paid > owed)
+      const prEl = document.getElementById('pr-' + personIdx);
+      if (prEl) {
+        const paid = allActualPaid[name];
+        if (paid !== undefined && paid > 0 && personActual > 0) {
+          personRefund = r2(paid - personActual);
+          prEl.textContent = personRefund > 0 ? '\u00A5' + personRefund.toFixed(2) : '\u2014';
+          if (personRefund > 0) prEl.style.color = '#E74C3C';
+          else prEl.style.color = '';
+        } else { prEl.textContent = '\u2014'; prEl.style.color = ''; }
+        teamRefund += Math.max(0, personRefund);
+      }
       personIdx++;
     });
 
@@ -1798,10 +1814,12 @@ function recalculate() {
     if (tsfEl) tsfEl.textContent = teamItems > 0 ? '\u00A5' + teamFee.toFixed(2) : '\u2014';
     const tsapEl = document.getElementById('tsap-' + g.team);
     if (tsapEl) tsapEl.textContent = teamActualPaid > 0 ? '\u00A5' + teamActualPaid.toFixed(2) : '\u2014';
+    const tsrEl = document.getElementById('tsr-' + g.team);
+    if (tsrEl) tsrEl.textContent = teamRefund > 0 ? '\u00A5' + teamRefund.toFixed(2) : '\u2014';
 
     // Accumulate grand totals
     gtItems += teamItems; gtUSD += teamUSD; gtActual += teamActualCNY;
-    gtCNY += teamCNY; gtFee += teamFee; gtAP += teamActualPaid;
+    gtCNY += teamCNY; gtFee += teamFee; gtAP += teamActualPaid; gtRefund += teamRefund;
   });
 
   const grandCNY = r2(grandUSD * rate);
@@ -1834,6 +1852,8 @@ function recalculate() {
   if (gtcEl) gtcEl.textContent = gtItems > 0 ? '\u00A5' + gtCNY.toFixed(2) : '\u2014';
   if (gtfEl) gtfEl.textContent = gtItems > 0 ? '\u00A5' + gtFee.toFixed(2) : '\u2014';
   if (gtapEl) gtapEl.textContent = gtAP > 0 ? '\u00A5' + gtAP.toFixed(2) : '\u2014';
+  const gtrEl = document.getElementById('gt-refund');
+  if (gtrEl) gtrEl.textContent = gtRefund > 0 ? '\u00A5' + gtRefund.toFixed(2) : '\u2014';
 
   updateCards(data);
 }
@@ -2060,7 +2080,7 @@ function closeModal() {
 
   updateNickDisplay();
   document.getElementById('rateInput').value = rate;
-  document.getElementById('orderTable').innerHTML = '<tbody><tr><td style="text-align:center;padding:40px;color:#999" colspan="16">连接中...</td></tr></tbody>';
+  document.getElementById('orderTable').innerHTML = '<tbody><tr><td style="text-align:center;padding:40px;color:#999" colspan="23">连接中...</td></tr></tbody>';
 
   await initSupabase();
 
