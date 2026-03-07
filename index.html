@@ -269,7 +269,7 @@ input[type="number"]{-moz-appearance:textfield}
     <span class="team-tag" id="teamTag" onclick="changeTeam()" title="点击切换分团"></span>
     <span class="nick-tag" id="pinTag" onclick="changePin()" style="display:none;background:#E8F7EF;color:#2D8B5E" title="设置或修改密码">设密码</span>
     <label id="rateLabel">汇率 1 USD = <input type="number" class="s-input" id="rateInput" step="0.01" min="0"> CNY</label><button class="btn-rate-save" id="btnRateSave" onclick="saveRate()">💾 保存</button>
-    <label id="actualUsdLabel" style="display:none;margin-left:10px">实际USD = <input type="number" class="s-input" id="actualUsdInput" step="0.01" min="0" placeholder="SM购物车总价" style="width:110px"></label><button class="btn-rate-save" id="btnActualUsdSave" onclick="saveActualUSD()" style="display:none">💾 保存</button>
+    <span id="actualUsdWrap" style="display:none;margin-left:4px;background:#FDF6E3;border:1px solid #E8C84A;border-radius:8px;padding:3px 10px;align-items:center;gap:5px"><label style="font-size:13px">实际USD = <input type="number" class="s-input" id="actualUsdInput" step="0.01" min="0" placeholder="SM总价" style="width:100px"></label><button id="btnActualUsdSave" onclick="saveActualUSD()" style="display:none;padding:3px 10px;background:#E8C84A;color:#3D3D3D;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:4px">💾 保存</button></span>
     <span class="grand-total" id="grandTotal"></span>
     <span class="last-saved" id="lastSaved"></span>
   </div>
@@ -1099,10 +1099,10 @@ function applyRatePermission() {
   rateInp.disabled = !canEdit;
   if (!canEdit && saveBtn) saveBtn.classList.remove('unsaved');
   // Show actual USD input for admin
-  const auLabel = document.getElementById('actualUsdLabel');
+  const auWrap = document.getElementById('actualUsdWrap');
   const auBtn = document.getElementById('btnActualUsdSave');
-  if (auLabel) auLabel.style.display = canEdit ? '' : 'none';
-  if (auBtn) auBtn.style.display = canEdit ? '' : 'none';
+  if (auWrap) auWrap.style.display = canEdit ? 'inline-flex' : 'none';
+  if (auBtn) auBtn.style.display = canEdit ? 'inline-block' : 'none';
   const auInput = document.getElementById('actualUsdInput');
   if (auInput && actualUSD > 0) auInput.value = actualUSD;
 }
