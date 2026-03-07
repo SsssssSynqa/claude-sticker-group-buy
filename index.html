@@ -1190,8 +1190,8 @@ function paymentCellHTML(name, team) {
   if (iAmLeader && st === 'confirmed') {
     html += ' <button class="pay-btn" onclick="leaderRevokePayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
   }
-  // Admin can also confirm directly even if member hasn't self-confirmed
-  if (isAdmin(myName) && st === 'unpaid' && !isMe) {
+  // Leader/admin can also confirm directly even if member hasn't self-confirmed
+  if (iAmLeader && st === 'unpaid' && !isMe) {
     html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmPayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
   }
 
