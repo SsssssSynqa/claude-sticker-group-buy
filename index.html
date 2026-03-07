@@ -1319,16 +1319,29 @@ function showPaymentQR() {
 
   // Calculate my total payment amount
   let myUSD = 0;
+  let grandUSD = 0;
   const orders = allOrders[myName] || {};
   S.forEach(s => {
     let totalQty = 0;
     for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
+    const up = unitPrice(s, totalQty);
     const q = orders[s.id] || 0;
-    if (q > 0) myUSD += r2(q * unitPrice(s, totalQty));
+    if (q > 0) myUSD += r2(q * up);
+    // accumulate grand total for discount ratio
+    for (const n in allOrders) grandUSD += r2((allOrders[n][s.id] || 0) * up);
   });
+  // Estimated amounts (no discount)
   const myCNY = r2(myUSD * rate);
   const myFee = r2(myCNY * 0.001);
-  const myTotal = r2(myCNY + myFee);
+  const myEstTotal = r2(myCNY + myFee);
+  // Actual amounts (with SM multi-design discount)
+  const discountRatio = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
+  let myActualTotal = 0;
+  if (discountRatio > 0 && myUSD > 0) {
+    const actualBase = r2(myUSD * discountRatio * rate);
+    const actualFee = r2(actualBase * 0.001);
+    myActualTotal = r2(actualBase + actualFee);
+  }
 
   document.getElementById('payQrTitle').textContent = '团' + team + ' 付款码';
   document.getElementById('payQrLeader').textContent = '团长：' + leader;
@@ -1342,10 +1355,20 @@ function showPaymentQR() {
   // Build amount display + instructions
   let amountHTML = '';
   if (myUSD > 0) {
-    amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
-      + '你需要转账：<span style="font-size:20px">¥' + myTotal.toFixed(2) + '</span>'
-      + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">商品 ¥' + myCNY.toFixed(2) + ' + 手续费 ¥' + myFee.toFixed(2) + '</div>'
-      + '</div>';
+    if (myActualTotal > 0) {
+      // Show actual amount (primary) + estimate (reference)
+      amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
+        + '你需要转账：<span style="font-size:20px">¥' + myActualTotal.toFixed(2) + '</span>'
+        + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付（含0.1%手续费），已折算SM多款折扣</div>'
+        + '<div style="font-size:11px;font-weight:400;color:#bbb;margin-top:2px">原预估 ¥' + myEstTotal.toFixed(2) + '，节省 ¥' + r2(myEstTotal - myActualTotal).toFixed(2) + '</div>'
+        + '</div>';
+    } else {
+      // No actual USD set yet, show estimate
+      amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
+        + '预估转账金额：<span style="font-size:20px">¥' + myEstTotal.toFixed(2) + '</span>'
+        + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">预估金额（含0.1%手续费），实际金额待团长确认</div>'
+        + '</div>';
+    }
   } else {
     amountHTML = '<div style="background:#f5f5f5;border-radius:10px;padding:12px;margin:10px 0;color:#999;font-size:13px">你还没有选购贴纸</div>';
   }
@@ -1872,10 +1895,29 @@ function exportMyOrder() {
   } else {
     lines.push(...details);
   }
-  const totalCNY = r2(totalUSD * rate);
-  const fee = r2(totalCNY * 0.001);
-  const totalPay = r2(totalCNY + fee);
-  lines.push('', '总件数：' + totalItems, '总金额(USD)：$' + totalUSD.toFixed(2), '总金额(CNY)：¥' + totalCNY.toFixed(2), '转账手续费(0.1%)：¥' + fee.toFixed(2), '实付金额：¥' + totalPay.toFixed(2));
+  const estCNY = r2(totalUSD * rate);
+  const estFee = r2(estCNY * 0.001);
+  const estTotal = r2(estCNY + estFee);
+  // Calculate actual amount with SM multi-design discount
+  let grandUSD = 0;
+  S.forEach(s => {
+    let totalQty = 0;
+    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
+    for (const n in allOrders) grandUSD += r2((allOrders[n][s.id] || 0) * data[s.id].unitPrice);
+  });
+  const dr = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
+  lines.push('', '总件数：' + totalItems, 'USD（预估）：$' + totalUSD.toFixed(2));
+  if (dr > 0 && totalUSD > 0) {
+    const actBase = r2(totalUSD * dr * rate);
+    const actFee = r2(actBase * 0.001);
+    const actTotal = r2(actBase + actFee);
+    lines.push('CNY（实际应付）：¥' + actTotal.toFixed(2) + '（含0.1%手续费）');
+    lines.push('CNY（预估）：¥' + estTotal.toFixed(2) + '（含0.1%手续费）');
+    lines.push('节省：¥' + r2(estTotal - actTotal).toFixed(2) + '（SM多款折扣）');
+  } else {
+    lines.push('CNY（预估）：¥' + estTotal.toFixed(2) + '（含0.1%手续费）');
+    lines.push('（实际金额待团长确认SM购物车总价后更新）');
+  }
   const text = lines.join('\n');
   navigator.clipboard.writeText(text)
     .then(() => alert('已复制到剪贴板，可以直接粘贴到群里！'))
