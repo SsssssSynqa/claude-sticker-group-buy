@@ -350,6 +350,7 @@ input[type="number"]{-moz-appearance:textfield}
     <button class="btn btn-lock" id="lockBtn" onclick="toggleLock()" style="display:none">🔒 锁单</button>
     <button class="btn btn-admin" onclick="showExport()">团长导出全部</button>
     <button class="btn btn-admin" onclick="showImport()">团长导入</button>
+    <button class="btn" id="btnHideEmpty" onclick="toggleHideEmpty()" style="background:#F0F4FF;color:#6B7FA3;border:1px dashed #B8C9E0;font-size:11px">👁 隐藏空订单</button>
   </div>
   <div class="table-wrap">
     <table id="orderTable"></table>
@@ -455,6 +456,7 @@ let allPaySelf = {}; // {name: true} — self-confirmed payment
 let allPayLeader = {}; // {name: true} — leader-confirmed payment
 let allActualPaid = {}; // {name: cny_amount} — actual paid amount set by team leader
 let allRefunded = {}; // {name: cny_amount} — already refunded amount set by team leader
+let hideEmptyOrders = false; // toggle: hide people with zero orders
 let writeTimers = {};
 let renderTimer = null;
 
@@ -1628,23 +1630,26 @@ function renderTable() {
   let personIdx = 0;
   teamsData.forEach(g => {
     const teamLabel = g.team > 0 ? '团' + g.team : '未分组';
+    const visibleNames = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
+    if (visibleNames.length === 0) return; // skip empty teams when filtering
 
     // Team header row
     // Payment stats for team header
     let teamConfirmed = 0, teamSelfPaid = 0;
-    g.names.forEach(n => { const ps = paymentStatusOf(n); if (ps === 'confirmed') teamConfirmed++; else if (ps === 'self') teamSelfPaid++; });
-    const teamUnpaid = g.names.length - teamConfirmed - teamSelfPaid;
+    visibleNames.forEach(n => { const ps = paymentStatusOf(n); if (ps === 'confirmed') teamConfirmed++; else if (ps === 'self') teamSelfPaid++; });
+    const teamUnpaid = visibleNames.length - teamConfirmed - teamSelfPaid;
     let payStats = '';
     if (teamConfirmed > 0) payStats += '<span class="pay-stats pay-stats-ok">✅' + teamConfirmed + '</span> ';
     if (teamSelfPaid > 0) payStats += '<span class="pay-stats" style="color:#E8714A">🟠' + teamSelfPaid + '</span> ';
     if (teamUnpaid > 0) payStats += '<span class="pay-stats pay-stats-pending">⭕' + teamUnpaid + '</span>';
 
-    h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + teamLabel + '（' + g.names.length + ' 人）</td>';
+    const headerCount = hideEmptyOrders ? visibleNames.length + '/' + g.names.length : '' + g.names.length;
+    h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + teamLabel + '（' + headerCount + ' 人）</td>';
     S.forEach(() => { h += '<td></td>'; });
-    h += '<td></td><td></td><td></td><td></td><td></td><td></td><td>' + payStats + '</td></tr>';
+    h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>' + payStats + '</td></tr>';
 
     // Person rows
-    g.names.forEach(name => {
+    visibleNames.forEach(name => {
       const isMe = name === myName;
       const orders = allOrders[name] || {};
       h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-name="' + esc(name) + '">';
@@ -1730,9 +1735,14 @@ function renderTable() {
   // Re-apply lock state to newly rendered inputs
   applyLockState();
   updatePaymentBtns();
+  // Update hide-empty toggle button text
+  const btnHE = document.getElementById('btnHideEmpty');
+  if (btnHE) btnHE.textContent = hideEmptyOrders ? '👁 显示全部' : '👁 隐藏空订单';
 }
 
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function hasOrders(name) { const o = allOrders[name]; return o && Object.values(o).some(q => q > 0); }
+function toggleHideEmpty() { hideEmptyOrders = !hideEmptyOrders; renderTable(); recalculate(); }
 
 // ============ RECALCULATE ============
 function recalculate() {
@@ -1771,7 +1781,10 @@ function recalculate() {
     const teamStickerQty = {};
     S.forEach(s => { teamStickerQty[s.id] = 0; });
 
-    g.names.forEach(name => {
+    const visibleNames = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
+    if (visibleNames.length === 0) return;
+
+    visibleNames.forEach(name => {
       const orders = allOrders[name] || {};
       let items = 0, usd = 0;
       S.forEach(s => {
