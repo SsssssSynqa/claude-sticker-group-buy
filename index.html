@@ -1387,16 +1387,40 @@ function showPaymentQR() {
   let amountHTML = '';
   if (myUSD > 0) {
     if (myActualTotal > 0) {
-      // Show actual amount (primary) + estimate (reference)
-      amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
-        + '你需要转账：<span style="font-size:20px">¥' + myActualTotal.toFixed(2) + '</span>'
-        + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付（含0.1%手续费），已折算SM多款折扣</div>'
-        + '<div style="font-size:11px;font-weight:400;color:#bbb;margin-top:2px">原预估 ¥' + myEstTotal.toFixed(2) + '，节省 ¥' + r2(myEstTotal - myActualTotal).toFixed(2) + '</div>'
-        + '</div>';
+      const myPaid = allActualPaid[myName] || 0;
+      const myRefunded = allRefunded[myName] || 0;
+      const myDiff = r2(myPaid - myActualTotal - myRefunded);
+      if (myPaid > 0 && myDiff < 0) {
+        // Already paid but owes more — show 应收 amount
+        const oweAmt = r2(-myDiff);
+        amountHTML = '<div style="background:linear-gradient(135deg,#FFF8E1,#FFE0B2);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#E67E22;border:1px solid #FFD0B5">'
+          + '你需要补交：<span style="font-size:20px">\u00A5' + oweAmt.toFixed(2) + '</span>'
+          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付 \u00A5' + myActualTotal.toFixed(2) + '，已付 \u00A5' + myPaid.toFixed(2) + (myRefunded > 0 ? '，已退 \u00A5' + myRefunded.toFixed(2) : '') + '</div>'
+          + '</div>';
+      } else if (myPaid > 0 && myDiff > 0) {
+        // Overpaid — show 应退
+        amountHTML = '<div style="background:linear-gradient(135deg,#E8F5E9,#C8E6C9);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#2E7D32;border:1px solid #A5D6A7">'
+          + '你已多付 \u00A5' + myDiff.toFixed(2) + '，无需补款'
+          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付 \u00A5' + myActualTotal.toFixed(2) + '，已付 \u00A5' + myPaid.toFixed(2) + (myRefunded > 0 ? '，已退 \u00A5' + myRefunded.toFixed(2) : '') + '，差额会退还</div>'
+          + '</div>';
+      } else if (myPaid > 0 && myDiff === 0) {
+        // Exactly right
+        amountHTML = '<div style="background:linear-gradient(135deg,#E8F5E9,#C8E6C9);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#2E7D32;border:1px solid #A5D6A7">'
+          + '你已付清，无需补款 \u2714'
+          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付 \u00A5' + myActualTotal.toFixed(2) + '，已付 \u00A5' + myPaid.toFixed(2) + '</div>'
+          + '</div>';
+      } else {
+        // Not paid yet — show full actual amount
+        amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
+          + '你需要转账：<span style="font-size:20px">\u00A5' + myActualTotal.toFixed(2) + '</span>'
+          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付（含0.1%手续费），已折算SM多款折扣</div>'
+          + '<div style="font-size:11px;font-weight:400;color:#bbb;margin-top:2px">原预估 \u00A5' + myEstTotal.toFixed(2) + '，节省 \u00A5' + r2(myEstTotal - myActualTotal).toFixed(2) + '</div>'
+          + '</div>';
+      }
     } else {
       // No actual USD set yet, show estimate
       amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
-        + '预估转账金额：<span style="font-size:20px">¥' + myEstTotal.toFixed(2) + '</span>'
+        + '预估转账金额：<span style="font-size:20px">\u00A5' + myEstTotal.toFixed(2) + '</span>'
         + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">预估金额（含0.1%手续费），实际金额待团长确认</div>'
         + '</div>';
     }
