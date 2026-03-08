@@ -1358,8 +1358,8 @@ function showPaymentQR() {
     const up = unitPrice(s, totalQty);
     const q = orders[s.id] || 0;
     if (q > 0) myUSD += r2(q * up);
-    // accumulate grand total for discount ratio
-    for (const n in allOrders) grandUSD += r2((allOrders[n][s.id] || 0) * up);
+    // accumulate grand total based on per-sticker totals (stable across transfers)
+    grandUSD += r2(totalQty * up);
   });
   // Estimated amounts (no discount)
   const myCNY = r2(myUSD * rate);
@@ -1763,11 +1763,10 @@ function recalculate() {
     if (stEl) stEl.textContent = totalQty > 0 ? '$' + (totalQty * up).toFixed(2) : '\u2014';
   });
 
-  // Pre-compute grand total USD (needed for actual-pay proportional calculation)
+  // Pre-compute grand total USD — based on per-sticker totals (not per-person)
+  // so that transferring orders between people doesn't change grandUSD
   let grandUSD = 0;
-  for (const name in allOrders) {
-    S.forEach(s => { grandUSD += r2((allOrders[name][s.id] || 0) * data[s.id].unitPrice); });
-  }
+  S.forEach(s => { grandUSD += r2(data[s.id].totalQty * data[s.id].unitPrice); });
   const discountRatio = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
 
   // Per-person totals and per-team subtotals
@@ -1974,12 +1973,12 @@ function exportMyOrder() {
   const estCNY = r2(totalUSD * rate);
   const estFee = r2(estCNY * 0.001);
   const estTotal = r2(estCNY + estFee);
-  // Calculate actual amount with SM multi-design discount
+  // Calculate actual amount with SM multi-design discount (per-sticker totals, stable across transfers)
   let grandUSD = 0;
   S.forEach(s => {
     let totalQty = 0;
     for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
-    for (const n in allOrders) grandUSD += r2((allOrders[n][s.id] || 0) * data[s.id].unitPrice);
+    grandUSD += r2(totalQty * data[s.id].unitPrice);
   });
   const dr = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
   lines.push('', '总件数：' + totalItems, 'USD（预估）：$' + totalUSD.toFixed(2));
