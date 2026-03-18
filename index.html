@@ -1908,11 +1908,26 @@ function renderTable() {
     if (teamConfirmed > 0) payStats += '<span class="pay-stats pay-stats-ok">✅' + teamConfirmed + '</span> ';
     if (teamSelfPaid > 0) payStats += '<span class="pay-stats" style="color:#E8714A">🟠' + teamSelfPaid + '</span> ';
     if (teamUnpaid > 0) payStats += '<span class="pay-stats pay-stats-pending">⭕' + teamUnpaid + '</span>';
+    // Shipping fee stats
+    let sfConfirmed = 0, sfSelf = 0;
+    visibleNames.forEach(n => { const ss = shipFeeStatusOf(n); if (ss === 'confirmed') sfConfirmed++; else if (ss === 'self') sfSelf++; });
+    const sfUnpaid = visibleNames.length - sfConfirmed - sfSelf;
+    let sfStats = '';
+    if (sfConfirmed > 0) sfStats += '<span class="pay-stats pay-stats-ok">✅' + sfConfirmed + '</span> ';
+    if (sfSelf > 0) sfStats += '<span class="pay-stats" style="color:#E8714A">🟠' + sfSelf + '</span> ';
+    if (sfUnpaid > 0) sfStats += '<span class="pay-stats pay-stats-pending">⭕' + sfUnpaid + '</span>';
+    // Shipped stats
+    let shippedCount = 0;
+    visibleNames.forEach(n => { if (allShipped[n]) shippedCount++; });
+    const notShipped = visibleNames.length - shippedCount;
+    let shipStats = '';
+    if (shippedCount > 0) shipStats += '<span class="pay-stats" style="color:#2E7D32">📦' + shippedCount + '</span> ';
+    if (notShipped > 0) shipStats += '<span class="pay-stats pay-stats-pending">⭕' + notShipped + '</span>';
 
     const headerCount = hideEmptyOrders ? visibleNames.length + '/' + g.names.length : '' + g.names.length;
     h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + teamLabel + '（' + headerCount + ' 人）</td>';
     S.forEach(() => { h += '<td></td>'; });
-    h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>' + payStats + '</td></tr>';
+    h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>' + payStats + '</td><td>' + sfStats + '</td><td>' + shipStats + '</td></tr>';
 
     // Person rows
     visibleNames.forEach(name => {
