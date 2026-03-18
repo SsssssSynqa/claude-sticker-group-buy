@@ -2089,18 +2089,27 @@ function exportMyOrder() {
   });
   const dr = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
   const myTax = (taxCNY > 0 && grandUSD > 0 && totalUSD > 0) ? r2(totalUSD / grandUSD * taxCNY) : 0;
-  lines.push('', '总件数：' + totalItems, 'USD（预估）：$' + totalUSD.toFixed(2));
+  lines.push('', '总件数：' + totalItems);
   if (dr > 0 && totalUSD > 0) {
     const actBase = r2(totalUSD * dr * rate);
     const actFee = r2(actBase * 0.001);
     const actTotal = r2(actBase + actFee + myTax);
     lines.push('CNY（实际应付）：¥' + actTotal.toFixed(2) + '（含0.1%手续费' + (myTax > 0 ? ' + 关税¥' + myTax.toFixed(2) : '') + '）');
-    lines.push('CNY（预估）：¥' + estTotal.toFixed(2) + '（含0.1%手续费，不含关税）');
-    lines.push('节省：¥' + r2(estTotal + myTax - actTotal).toFixed(2) + '（SM多款折扣）');
+    // 应收/应退
+    const paid = allActualPaid[myName] || 0;
+    const refunded = allRefunded[myName] || 0;
+    if (paid > 0) {
+      const diff = r2(paid - actTotal - refunded);
+      if (diff < 0) {
+        lines.push('应补缴：¥' + r2(-diff).toFixed(2));
+      } else if (diff > 0) {
+        lines.push('可抵扣国内运费：¥' + diff.toFixed(2));
+      } else {
+        lines.push('无需补缴');
+      }
+    }
   } else {
-    const estWithTax = myTax > 0 ? r2(estTotal + myTax) : estTotal;
-    lines.push('CNY（预估）：¥' + estWithTax.toFixed(2) + '（含0.1%手续费' + (myTax > 0 ? ' + 关税¥' + myTax.toFixed(2) : '') + '）');
-    if (myTax === 0) lines.push('（实际金额待团长确认SM购物车总价后更新）');
+    lines.push('（实际金额待团长确认后更新）');
   }
   const text = lines.join('\n');
   navigator.clipboard.writeText(text)
