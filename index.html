@@ -458,6 +458,9 @@ let allPaySelf = {}; // {name: true} — self-confirmed payment
 let allPayLeader = {}; // {name: true} — leader-confirmed payment
 let allActualPaid = {}; // {name: cny_amount} — actual paid amount set by team leader
 let allRefunded = {}; // {name: cny_amount} — already refunded amount set by team leader
+let allShipFeeSelf = {}; // {name: true} — self-confirmed shipping fee paid
+let allShipFeeLeader = {}; // {name: true} — leader-confirmed shipping fee paid
+let allShipped = {}; // {name: true} — leader-confirmed shipped
 let hideEmptyOrders = false; // toggle: hide people with zero orders
 let writeTimers = {};
 let renderTimer = null;
@@ -527,6 +530,12 @@ async function loadAll() {
       if (row.quantity > 0) allActualPaid[row.name] = row.quantity / 100;
     } else if (row.sticker_id === '_refunded') {
       if (row.quantity > 0) allRefunded[row.name] = row.quantity / 100;
+    } else if (row.sticker_id === '_shipfee_self') {
+      if (row.quantity > 0) allShipFeeSelf[row.name] = true;
+    } else if (row.sticker_id === '_shipfee_leader') {
+      if (row.quantity > 0) allShipFeeLeader[row.name] = true;
+    } else if (row.sticker_id === '_shipped') {
+      if (row.quantity > 0) allShipped[row.name] = true;
     } else if (row.quantity > 0) {
       if (!allOrders[row.name]) allOrders[row.name] = {};
       allOrders[row.name][row.sticker_id] = row.quantity;
@@ -621,6 +630,30 @@ function handleOrderEvent(payload) {
     scheduleRender();
     saveOffline();
     return;
+  }
+  if (row.sticker_id === '_shipfee_self') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
+      delete allShipFeeSelf[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allShipFeeSelf[payload.new.name] = true;
+    }
+    scheduleRender(); saveOffline(); return;
+  }
+  if (row.sticker_id === '_shipfee_leader') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
+      delete allShipFeeLeader[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allShipFeeLeader[payload.new.name] = true;
+    }
+    scheduleRender(); saveOffline(); return;
+  }
+  if (row.sticker_id === '_shipped') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
+      delete allShipped[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allShipped[payload.new.name] = true;
+    }
+    scheduleRender(); saveOffline(); return;
   }
 
   if (payload.eventType === 'DELETE') {
@@ -896,13 +929,13 @@ function applyLockState() {
 
 // ============ OFFLINE FALLBACK ============
 function saveOffline() {
-  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader, allActualPaid, actualUSD, taxCNY})); } catch(e) {}
+  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader, allActualPaid, actualUSD, taxCNY, allShipFeeSelf, allShipFeeLeader, allShipped})); } catch(e) {}
 }
 
 function loadOffline() {
   try {
     const d = JSON.parse(localStorage.getItem('gb_cache'));
-    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; allActualPaid = d.allActualPaid || {}; actualUSD = d.actualUSD || 0; taxCNY = d.taxCNY || 0; }
+    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; allActualPaid = d.allActualPaid || {}; actualUSD = d.actualUSD || 0; taxCNY = d.taxCNY || 0; allShipFeeSelf = d.allShipFeeSelf || {}; allShipFeeLeader = d.allShipFeeLeader || {}; allShipped = d.allShipped || {}; }
   } catch(e) {}
 }
 
@@ -1340,6 +1373,174 @@ async function leaderRevokePayment(memberName) {
   }
 }
 
+// ============ SHIPPING FEE STATUS ============
+function shipFeeStatusOf(name) {
+  if (allShipFeeLeader[name]) return 'confirmed';
+  if (allShipFeeSelf[name]) return 'self';
+  return 'unpaid';
+}
+
+function shipFeeBadgeHTML(name) {
+  const st = shipFeeStatusOf(name);
+  if (st === 'confirmed') return '<span class="pay-badge pay-confirmed">已确认</span>';
+  if (st === 'self') return '<span class="pay-badge pay-self">待核实</span>';
+  return '<span class="pay-badge pay-unpaid">未付</span>';
+}
+
+function shipFeeCellHTML(name, team) {
+  const st = shipFeeStatusOf(name);
+  const isMe = name === myName;
+  const iAmLeader = isLeaderOf(myName, team);
+  let html = shipFeeBadgeHTML(name);
+  if (!isLocked) return html;
+  if (isMe && st === 'unpaid') {
+    html += ' <button class="pay-btn" onclick="confirmMyShipFee()">已付运费</button>';
+  }
+  if (isMe && st === 'self') {
+    html += ' <button class="pay-btn active" onclick="cancelMyShipFee()">撤销</button>';
+  }
+  if (iAmLeader && st === 'self') {
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmShipFee(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
+  }
+  if (iAmLeader && st === 'confirmed') {
+    html += ' <button class="pay-btn" onclick="leaderRevokeShipFee(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
+  }
+  if (iAmLeader && st === 'unpaid' && !isMe) {
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmShipFee(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
+  }
+  return html;
+}
+
+async function confirmMyShipFee() {
+  if (!sb || !myName) return;
+  if (!isLocked) { alert('请等待团长锁单后再操作'); return; }
+  if (!confirm('确认你已付运费？')) return;
+  allShipFeeSelf[myName] = true;
+  renderTable(); recalculate(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: myName, sticker_id: '_shipfee_self', quantity: 1, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('ShipFee confirm failed:', error);
+    delete allShipFeeSelf[myName];
+    renderTable(); recalculate();
+    alert('确认失败：' + error.message);
+  } else { updateStatus('已标记付运费'); }
+}
+
+async function cancelMyShipFee() {
+  if (!sb || !myName) return;
+  if (!confirm('确定要撤销运费确认吗？')) return;
+  delete allShipFeeSelf[myName];
+  renderTable(); recalculate(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: myName, sticker_id: '_shipfee_self', quantity: 0, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('ShipFee cancel failed:', error);
+    allShipFeeSelf[myName] = true;
+    renderTable(); recalculate();
+    alert('撤销失败：' + error.message);
+  }
+}
+
+async function leaderConfirmShipFee(memberName) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  allShipFeeLeader[memberName] = true;
+  if (!allShipFeeSelf[memberName]) allShipFeeSelf[memberName] = true;
+  renderTable(); recalculate(); saveOffline();
+  const rows = [
+    {name: memberName, sticker_id: '_shipfee_leader', quantity: 1, updated_at: new Date().toISOString()},
+    {name: memberName, sticker_id: '_shipfee_self', quantity: 1, updated_at: new Date().toISOString()}
+  ];
+  const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'}).select();
+  if (error) {
+    console.error('Leader shipfee confirm failed:', error);
+    delete allShipFeeLeader[memberName];
+    renderTable(); recalculate();
+    alert('确认失败：' + error.message);
+  } else { updateStatus('已确认 ' + memberName + ' 的运费'); }
+}
+
+async function leaderRevokeShipFee(memberName) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  if (!confirm('确定要撤销对 ' + memberName + ' 的运费确认吗？')) return;
+  delete allShipFeeLeader[memberName];
+  renderTable(); recalculate(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_shipfee_leader', quantity: 0, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Leader shipfee revoke failed:', error);
+    allShipFeeLeader[memberName] = true;
+    renderTable(); recalculate();
+    alert('撤销失败：' + error.message);
+  }
+}
+
+// ============ SHIPPED STATUS ============
+function shippedCellHTML(name, team) {
+  const shipped = allShipped[name];
+  const iAmLeader = isLeaderOf(myName, team);
+  if (shipped) {
+    let html = '<span class="pay-badge" style="background:#E8F5E9;color:#2E7D32">已发货</span>';
+    if (iAmLeader) {
+      html += ' <button class="pay-btn" onclick="leaderUnmarkShipped(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
+    }
+    return html;
+  } else {
+    let html = '<span class="pay-badge pay-unpaid">未发</span>';
+    if (iAmLeader) {
+      html += ' <button class="pay-btn" style="background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7" onclick="leaderMarkShipped(\'' + esc(name).replace(/'/g, "\\'") + '\')">📦 发货</button>';
+    }
+    return html;
+  }
+}
+
+async function leaderMarkShipped(memberName) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  allShipped[memberName] = true;
+  renderTable(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_shipped', quantity: 1, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Mark shipped failed:', error);
+    delete allShipped[memberName];
+    renderTable();
+    alert('标记发货失败：' + error.message);
+  } else { updateStatus('已标记 ' + memberName + ' 发货'); }
+}
+
+async function leaderUnmarkShipped(memberName) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  if (!confirm('确定要撤销 ' + memberName + ' 的发货标记吗？')) return;
+  delete allShipped[memberName];
+  renderTable(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_shipped', quantity: 0, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Unmark shipped failed:', error);
+    allShipped[memberName] = true;
+    renderTable();
+    alert('撤销失败：' + error.message);
+  }
+}
+
 // ============ ACTUAL PAID ============
 async function saveActualPaid(memberName, amount) {
   if (!sb) return;
@@ -1664,7 +1865,7 @@ function renderTable() {
   S.forEach(s => {
     h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
   });
-  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（预估）</th><th>手续费</th><th>关税</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应收</th><th>应退</th><th class="col-pay">付款</th></tr></thead>';
+  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（预估）</th><th>手续费</th><th>关税</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应收</th><th>应退</th><th class="col-pay">付款</th><th class="col-pay">运费</th><th class="col-pay">发货</th></tr></thead>';
 
   h += '<tbody>';
   // Combined summary rows (pricing uses combined totals across all teams)
@@ -1683,7 +1884,7 @@ function renderTable() {
   // 三团汇总 row (grand totals across all teams)
   h += '<tr class="team-subtotal" style="background:#FFF8F0;font-weight:700"><td class="col-idx"></td><td class="col-name">三团汇总</td>';
   S.forEach(s => { h += '<td id="gtsq-' + s.id + '"></td>'; });
-  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-tax"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refunded"></td><td id="gt-owe"></td><td id="gt-refund"></td><td></td></tr>';
+  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-tax"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refunded"></td><td id="gt-owe"></td><td id="gt-refund"></td><td></td><td></td><td></td></tr>';
 
   // Compute global join-order sequence numbers (stable: based on ALL registered users, not just visible ones)
   const sortedByJoin = Object.entries(allJoinOrder).sort((a, b) => a[1] - b[1]);
@@ -1752,6 +1953,8 @@ function renderTable() {
       h += '<td class="pt-owe" id="po-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-refund" id="pr-' + personIdx + '">\u2014</td>';
       h += '<td>' + paymentCellHTML(name, g.team) + '</td>';
+      h += '<td>' + shipFeeCellHTML(name, g.team) + '</td>';
+      h += '<td>' + shippedCellHTML(name, g.team) + '</td>';
       h += '</tr>';
       personIdx++;
     });
@@ -1769,7 +1972,7 @@ function renderTable() {
     h += '<td id="tsrf-' + g.team + '"></td>';
     h += '<td id="tsow-' + g.team + '"></td>';
     h += '<td id="tsr-' + g.team + '"></td>';
-    h += '<td></td>';
+    h += '<td></td><td></td><td></td>';
     h += '</tr>';
   });
 
