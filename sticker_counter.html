@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Clawd 贴纸分团计数器</title>
+<style>
+:root { --primary: #E8714A; --bg: #FFF9F5; --card: #fff; --border: #F0E0D6; --green: #2E7D32; --red: #C62828; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: #333; padding: 12px; padding-bottom: 80px; }
+h1 { text-align: center; font-size: 18px; color: var(--primary); margin: 8px 0 4px; }
+.subtitle { text-align: center; font-size: 12px; color: #999; margin-bottom: 12px; }
+.progress-bar { background: #f0e0d6; border-radius: 8px; height: 24px; margin-bottom: 16px; position: relative; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #E8714A, #F4A261); border-radius: 8px; transition: width 0.3s; }
+.progress-text { position: absolute; top: 0; left: 0; right: 0; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+.team-tabs { display: flex; gap: 6px; margin-bottom: 12px; position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 4px 0; }
+.team-tab { flex: 1; padding: 10px; text-align: center; border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer; border: 2px solid var(--border); background: var(--card); transition: all 0.15s; }
+.team-tab.active { border-color: var(--primary); background: var(--primary); color: #fff; }
+.team-tab .tab-count { font-size: 11px; font-weight: 400; opacity: 0.8; display: block; }
+.sticker-card { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 10px; transition: all 0.15s; }
+.sticker-card.done { border-color: #A5D6A7; background: #F1F8E9; }
+.sticker-card.over { border-color: #EF9A9A; background: #FFEBEE; }
+.sticker-img { width: 48px; height: 48px; border-radius: 8px; object-fit: contain; background: #f8f0eb; flex-shrink: 0; }
+.sticker-info { flex: 1; min-width: 0; }
+.sticker-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sticker-type { font-size: 11px; color: #999; }
+.sticker-progress { font-size: 12px; margin-top: 2px; }
+.sticker-progress .current { font-size: 18px; font-weight: 700; }
+.sticker-progress .target { color: #999; }
+.sticker-progress .done-mark { color: var(--green); font-weight: 600; }
+.sticker-progress .over-mark { color: var(--red); font-weight: 600; }
+.counter-btns { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.btn-count { width: 56px; height: 40px; border: none; border-radius: 10px; font-size: 18px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.1s; }
+.btn-count:active { transform: scale(0.92); }
+.btn-plus { background: var(--primary); color: #fff; }
+.btn-minus { background: #f0e0d6; color: #999; font-size: 14px; }
+.btn-minus:active { background: #e0d0c6; }
+.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); border-top: 1px solid var(--border); padding: 10px 16px; display: flex; gap: 8px; z-index: 20; }
+.btn-action { flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-reset { background: #f0e0d6; color: #999; }
+.btn-reset:active { background: #e0c0a6; }
+.flash { animation: flash 0.3s; }
+@keyframes flash { 0% { transform: scale(1); } 50% { transform: scale(1.02); background: #FFF3E0; } 100% { transform: scale(1); } }
+.team-summary { font-size: 12px; color: #666; text-align: center; margin-bottom: 8px; padding: 6px; background: #FFF3E0; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<h1>🦀 Clawd 贴纸分团计数器</h1>
+<p class="subtitle">点 + 数一张，点 - 退一张，自动保存</p>
+
+<div class="progress-bar">
+  <div class="progress-fill" id="progressFill"></div>
+  <div class="progress-text" id="progressText">0 / 0</div>
+</div>
+
+<div class="team-tabs" id="teamTabs"></div>
+<div class="team-summary" id="teamSummary"></div>
+<div id="stickerList"></div>
+
+<div class="bottom-bar">
+  <button class="btn-action btn-reset" onclick="resetCurrent()">🔄 清空当前团</button>
+  <button class="btn-action btn-reset" onclick="resetAll()">🗑️ 全部清零</button>
+</div>
+
+<script>
+/* Note: All data is hardcoded from Supabase query results. Images are from Sticker Mule CDN.
+   innerHTML is used only with trusted, hardcoded content - no user input is rendered as HTML. */
+
+const STICKERS = [
+  {id:'clawd', name:'Clawd', type:'模切', targets:[532,514,374], img:'https://storage.googleapis.com/sm-artworks/5719926a-04ae-4afb-9925-f1f4521d38ce/large.png?cacheFor=b1c948c6194db63359b0f8564d4a7eed'},
+  {id:'ultrathink', name:'ultrathink', type:'模切', targets:[190,172,138], img:'https://storage.googleapis.com/sm-artworks/0006ba04-0f46-4c86-930b-1b41a9480f14/large.png?cacheFor=f7003b57a2fc7bafc920f3ed2acb368a'},
+  {id:'clawd-happy', name:'Clawd happy', type:'模切', targets:[639,598,423], img:'https://storage.googleapis.com/sm-artworks/be75b541-e429-4b61-a058-6a04bc35f712/large.png?cacheFor=26b5d38b95c02b9de101edd57a5846a9'},
+  {id:'vibing-dc', name:'Vibing', type:'模切', targets:[165,151,104], img:'https://storage.googleapis.com/sm-artworks/c6e41ee6-4500-403f-a36c-3e6e72596e3a/large.png?cacheFor=e67ba358b1881dbc5ebedc5943e67dcb'},
+  {id:'clawd-shiny', name:'Clawd shiny', type:'全息', targets:[496,492,312], img:'https://storage.googleapis.com/sm-artworks/1c69d7fd-a6de-42a8-99be-3edc7b32c8f1/large.png?cacheFor=31a4293c9f5cc540655eb3642dd66c15'},
+  {id:'claudecode', name:'claudecode', type:'模切', targets:[185,158,127], img:'https://storage.googleapis.com/sm-artworks/1a18c149-6820-437c-83a3-4053259f28d5/large.png?cacheFor=5d8dcc208c6c3caee71731b8daf13233'},
+  {id:'vibing-holo', name:'Vibing', type:'全息', targets:[199,238,133], img:'https://storage.googleapis.com/sm-artworks/d85490fc-cd48-4248-b208-0bda8dad0e59/large.png?cacheFor=7ba69e81720e19d7d1fbb48a8163cbd9'},
+  {id:'reticulating', name:'reticulating', type:'模切', targets:[119,100,81], img:'https://storage.googleapis.com/sm-artworks/3133e32f-64d5-48ee-9215-be6453365d8b/large.png?cacheFor=666df05e24c335393669a33fa071c47c'},
+  {id:'shipping', name:'Shipping', type:'模切', targets:[113,103,64], img:'https://storage.googleapis.com/sm-artworks/4296af64-9d1c-4e87-889f-e5397b680e4a/large.png?cacheFor=ed5d463f001823bf25db91888595a687'},
+  {id:'manifesting-holo', name:'Manifesting', type:'全息', targets:[164,192,104], img:'https://storage.googleapis.com/sm-artworks/7c5cd395-b662-440f-a668-bf9052c8aafc/large.png?cacheFor=1f302fa314f6fee5ed260ed773250db6'},
+  {id:'baking', name:'Baking', type:'模切', targets:[161,153,96], img:'https://storage.googleapis.com/sm-artworks/32774d7b-adab-48ca-8fc4-18fb0b0ec1c2/large.png?cacheFor=3bd97a513abf6349abb718b2cbdc00a7'},
+  {id:'clawd-wave', name:'Clawd wave', type:'模切', targets:[153,183,64], img:'https://storage.googleapis.com/sm-artworks/f1ec9028-203f-4d6f-a360-5eea91e9723e/large.png?cacheFor=73d7616389ce26a3ea44a9d279ca3ed9'},
+  {id:'manifesting-glt', name:'Manifesting', type:'闪粉', targets:[119,129,72], img:'https://storage.googleapis.com/sm-artworks/15c2280e-7a5f-46d8-ba05-86073c9d0b09/large.png?cacheFor=1fa9c7949a091c06af06347102479bea'}
+];
+
+let currentTeam = 0;
+let counts = loadCounts();
+
+function loadCounts() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('sticker_counter'));
+    if (saved && saved.length === 3) return saved;
+  } catch(e) {}
+  return [{}, {}, {}];
+}
+
+function saveCounts() {
+  localStorage.setItem('sticker_counter', JSON.stringify(counts));
+}
+
+function getCount(team, stickerId) {
+  return counts[team][stickerId] || 0;
+}
+
+function setCount(team, stickerId, val) {
+  if (val <= 0) delete counts[team][stickerId];
+  else counts[team][stickerId] = val;
+  saveCounts();
+}
+
+function add(stickerId) {
+  const cur = getCount(currentTeam, stickerId);
+  const target = STICKERS.find(function(s) { return s.id === stickerId; }).targets[currentTeam];
+  setCount(currentTeam, stickerId, cur + 1);
+  render();
+  var card = document.getElementById('card-' + stickerId);
+  if (card) { card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash'); }
+  if (cur + 1 === target && navigator.vibrate) navigator.vibrate(200);
+}
+
+function sub(stickerId) {
+  const cur = getCount(currentTeam, stickerId);
+  if (cur <= 0) return;
+  setCount(currentTeam, stickerId, cur - 1);
+  render();
+}
+
+function switchTeam(t) {
+  currentTeam = t;
+  render();
+}
+
+function resetCurrent() {
+  if (!confirm('确定清空团' + (currentTeam + 1) + '的计数？')) return;
+  counts[currentTeam] = {};
+  saveCounts();
+  render();
+}
+
+function resetAll() {
+  if (!confirm('确定清空所有团的计数？这不可恢复！')) return;
+  counts = [{}, {}, {}];
+  saveCounts();
+  render();
+}
+
+function esc(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function render() {
+  // Team tabs
+  var tabsEl = document.getElementById('teamTabs');
+  var tabsH = '';
+  for (var t = 0; t < 3; t++) {
+    var teamTotal = 0, teamTarget = 0;
+    STICKERS.forEach(function(s) { teamTotal += getCount(t, s.id); teamTarget += s.targets[t]; });
+    var active = t === currentTeam ? ' active' : '';
+    tabsH += '<div class="team-tab' + active + '" onclick="switchTeam(' + t + ')">'
+      + '团' + (t + 1)
+      + '<span class="tab-count">' + teamTotal + ' / ' + teamTarget + '</span></div>';
+  }
+  tabsEl.innerHTML = tabsH;
+
+  // Team summary
+  var curTotal = 0, curTarget = 0, curDone = 0;
+  STICKERS.forEach(function(s) {
+    var c = getCount(currentTeam, s.id);
+    var tgt = s.targets[currentTeam];
+    curTotal += c;
+    curTarget += tgt;
+    if (c >= tgt) curDone++;
+  });
+  document.getElementById('teamSummary').textContent =
+    '团' + (currentTeam + 1) + '：已数 ' + curTotal + ' 张，' + curDone + '/' + STICKERS.length + ' 款完成';
+
+  // Progress bar (all teams)
+  var allTotal = 0, allTarget = 0;
+  for (var t2 = 0; t2 < 3; t2++) {
+    STICKERS.forEach(function(s) { allTotal += getCount(t2, s.id); allTarget += s.targets[t2]; });
+  }
+  var pct = allTarget > 0 ? Math.min(100, allTotal / allTarget * 100) : 0;
+  document.getElementById('progressFill').style.width = pct.toFixed(1) + '%';
+  document.getElementById('progressText').textContent = allTotal + ' / ' + allTarget + '（' + pct.toFixed(1) + '%）';
+
+  // Sticker list
+  var listEl = document.getElementById('stickerList');
+  var h = '';
+  STICKERS.forEach(function(s) {
+    var cur = getCount(currentTeam, s.id);
+    var tgt = s.targets[currentTeam];
+    var done = cur >= tgt;
+    var over = cur > tgt;
+    var cls = over ? 'over' : (done ? 'done' : '');
+    var statusHTML = '';
+    if (over) statusHTML = ' <span class="over-mark">+' + (cur - tgt) + ' 超出!</span>';
+    else if (done) statusHTML = ' <span class="done-mark">✓</span>';
+
+    h += '<div class="sticker-card ' + cls + '" id="card-' + esc(s.id) + '">'
+      + '<img class="sticker-img" src="' + esc(s.img) + '" alt="' + esc(s.name) + '" loading="lazy">'
+      + '<div class="sticker-info">'
+      + '<div class="sticker-name">' + esc(s.name) + '</div>'
+      + '<div class="sticker-type">' + esc(s.type) + '</div>'
+      + '<div class="sticker-progress"><span class="current">' + cur + '</span> <span class="target">/ ' + tgt + '</span>' + statusHTML + '</div>'
+      + '</div>'
+      + '<div class="counter-btns">'
+      + '<button class="btn-count btn-plus" onclick="add(\'' + esc(s.id) + '\')">+</button>'
+      + '<button class="btn-count btn-minus" onclick="sub(\'' + esc(s.id) + '\')">−</button>'
+      + '</div>'
+      + '</div>';
+  });
+  listEl.innerHTML = h;
+}
+
+render();
+</script>
+</body>
+</html>
