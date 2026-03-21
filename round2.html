@@ -477,7 +477,7 @@ async function loadAll() {
   let from = 0;
   const PAGE = 1000;
   while (true) {
-    const {data, error} = await sb.from('orders').select('*').order('id').range(from, from + PAGE - 1);
+    const {data, error} = await sb.from('orders').select('*').like('sticker_id', 'r2_%').order('id').range(from, from + PAGE - 1);
     if (error) throw error;
     if (!data || data.length === 0) break;
     orders = orders.concat(data);
@@ -1005,7 +1005,7 @@ async function doRegister(name, pin) {
   if (pinCheck && pinCheck.length > 0) {
     throw new Error('该昵称已被注册，请换一个昵称或切换到「已有账号」登录');
   }
-  const {data: anyCheck} = await sb.from('orders').select('sticker_id').eq('name', name).limit(1);
+  const {data: anyCheck} = await sb.from('orders').select('sticker_id').eq('name', name).like('sticker_id', 'r2_%').limit(1);
   if (anyCheck && anyCheck.length > 0) {
     throw new Error('该昵称已有订单记录，请切换到「已有账号」登录（首次登录会自动设置密码）');
   }
@@ -1042,7 +1042,7 @@ async function doLogin(name, pin) {
   const {data: pinRows} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r2__pin');
   if (!pinRows || pinRows.length === 0) {
     // Check if user exists but has no PIN (old user before login system)
-    const {data: anyRows} = await sb.from('orders').select('sticker_id').eq('name', name).limit(1);
+    const {data: anyRows} = await sb.from('orders').select('sticker_id').eq('name', name).like('sticker_id', 'r2_%').limit(1);
     if (anyRows && anyRows.length > 0) {
       // Old user — set PIN for them and log in
       const {error: pinErr} = await sb.from('orders').upsert(
