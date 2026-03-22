@@ -190,6 +190,9 @@ input[type="number"]{-moz-appearance:textfield}
 .btn-pay-confirm:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(91,168,125,.4)}
 .btn-pay-confirm:active{transform:translateY(0)}
 .btn-pay-confirm:disabled{opacity:.7;cursor:not-allowed;transform:none}
+.btn-clear-orders{flex:1;min-width:0;padding:13px 16px;background:#FDEAEA;color:#D94040;border:2px solid #F0C0C0;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-clear-orders:hover{background:#F8D0D0;transform:translateY(-1px);box-shadow:0 4px 12px rgba(217,64,64,.2)}
+.btn-clear-orders:active{transform:translateY(0)}
 .btn-pay-confirm.self-confirmed{background:linear-gradient(135deg,#E8714A,#D4623E)}
 .btn-pay-confirm.confirmed{background:linear-gradient(135deg,#2D8B5E,#247A50)}
 .btn-admin{background:#f0ede8;color:#999;font-size:11px;border:1px dashed #ddd}.btn-admin:hover{background:#e8e4de;color:#666}
@@ -365,7 +368,7 @@ input[type="number"]{-moz-appearance:textfield}
   <div class="section-title">拼团统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
   <div class="pay-action-bar">
     <button class="btn-my-export" onclick="exportMyOrder()">📋 导出我的订单</button>
-    <button class="btn" onclick="clearMyOrders()" style="background:#FDEAEA;color:#D94040;border:1px solid #F0C0C0;font-size:12px">🗑 清空我的订单</button>
+    <button class="btn-clear-orders" onclick="clearMyOrders()">🗑 清空我的订单</button>
     <button class="btn-pay-qr" id="btnPayQR" onclick="showPaymentQR()">📱 查看付款码</button>
     <button class="btn-pay-confirm" id="btnPayConfirm" onclick="handlePayBtnClick()">💰 我已完成付款</button>
   </div>
