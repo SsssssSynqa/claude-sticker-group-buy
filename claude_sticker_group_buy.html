@@ -368,7 +368,7 @@ input[type="number"]{-moz-appearance:textfield}
   <div class="section-title">拼团统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
   <div class="pay-action-bar">
     <button class="btn-my-export" onclick="exportMyOrder()">📋 导出我的订单</button>
-    <button class="btn-clear-orders" onclick="clearMyOrders()">🗑 清空我的订单</button>
+    <button class="btn-clear-orders" id="btnClearOrders" onclick="clearMyOrders()">🗑 清空我的订单</button>
     <button class="btn-pay-qr" id="btnPayQR" onclick="showPaymentQR()">📱 查看付款码</button>
     <button class="btn-pay-confirm" id="btnPayConfirm" onclick="handlePayBtnClick()">💰 我已完成付款</button>
   </div>
@@ -951,6 +951,8 @@ function applyLockState() {
     inp.disabled = isLocked;
     inp.style.opacity = isLocked ? '.5' : '';
   });
+  const clearBtn = document.getElementById('btnClearOrders');
+  if (clearBtn) { clearBtn.disabled = isLocked; clearBtn.style.opacity = isLocked ? '.4' : ''; clearBtn.style.pointerEvents = isLocked ? 'none' : ''; }
   document.querySelectorAll('.del-btn').forEach(b => {
     b.disabled = isLocked;
     b.style.opacity = isLocked ? '.4' : '';
