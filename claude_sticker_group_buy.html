@@ -517,7 +517,14 @@ async function loadAll() {
   allPayLeader = {};
   allActualPaid = {};
   const joinOrd = {};
+  // Collect Round 2 users (have r2__team record) to exclude from Round 1 display
+  const r2Users = new Set();
   for (const row of orders) {
+    if (row.sticker_id === 'r2__team') r2Users.add(row.name);
+  }
+  for (const row of orders) {
+    if (r2Users.has(row.name)) continue; // Skip Round 2 users entirely
+    if (row.sticker_id.startsWith('r2_')) continue; // Skip any r2_ prefixed records
     if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
     if (row.sticker_id === '_team') {
       allTeams[row.name] = row.quantity;
