@@ -2375,22 +2375,24 @@ function showOrderDetail(name) {
   });
   const dr = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
   const myTax = (taxCNY > 0 && grandUSD > 0 && totalUSD > 0) ? r2(totalUSD / grandUSD * taxCNY) : 0;
-  let footerHTML = '<div class="od-total main"><span>总件数</span><span>' + totalItems + ' 件</span></div>';
+  let footerHTML = '<div class="od-total"><span>总件数</span><span>' + totalItems + ' 件</span></div>';
   if (dr > 0 && totalUSD > 0) {
     const actBase = r2(totalUSD * dr * rate);
     const actFee = r2(actBase * 0.001);
     const actTotal = r2(actBase + actFee + myTax);
-    footerHTML += '<div class="od-total main"><span>CNY（实际应付）</span><span>¥' + actTotal.toFixed(2) + '</span></div>';
+    footerHTML += '<div class="od-total main"><span>实际应付</span><span>\u00a5' + actTotal.toFixed(2) + '</span></div>';
     const paid = allActualPaid[name] || 0;
     const refunded = allRefunded[name] || 0;
+    footerHTML += '<div class="od-total"><span>已付</span><span>' + (paid > 0 ? '\u00a5' + paid.toFixed(2) : '\u2014') + '</span></div>';
     if (paid > 0) {
-      footerHTML += '<div class="od-total"><span>已付</span><span>¥' + paid.toFixed(2) + '</span></div>';
+      if (refunded > 0) footerHTML += '<div class="od-total"><span>已退</span><span>\u00a5' + refunded.toFixed(2) + '</span></div>';
       const diff = r2(paid - actTotal - refunded);
-      if (diff < 0) footerHTML += '<div class="od-total" style="color:#D94040"><span>应补缴</span><span>¥' + r2(-diff).toFixed(2) + '</span></div>';
-      else if (diff > 0) footerHTML += '<div class="od-total" style="color:#3DA06B"><span>可抵扣运费</span><span>¥' + diff.toFixed(2) + '</span></div>';
+      if (diff < -0.005) footerHTML += '<div class="od-total" style="color:#D94040;font-weight:700"><span>应补缴</span><span>\u00a5' + r2(-diff).toFixed(2) + '</span></div>';
+      else if (diff > 0.005) footerHTML += '<div class="od-total" style="color:#3DA06B;font-weight:700"><span>应退</span><span>\u00a5' + diff.toFixed(2) + '</span></div>';
+      else footerHTML += '<div class="od-total" style="color:#3DA06B"><span>已结清</span><span>\u2714</span></div>';
     }
   } else {
-    footerHTML += '<div class="od-total"><span>CNY（预估）</span><span>¥' + r2(estCNY + estFee).toFixed(2) + '</span></div>';
+    footerHTML += '<div class="od-total"><span>CNY（预估）</span><span>\u00a5' + r2(estCNY + estFee).toFixed(2) + '</span></div>';
   }
   // Note: all data comes from local state (allOrders, allTeams etc), not external input
   const overlay = document.createElement('div');
