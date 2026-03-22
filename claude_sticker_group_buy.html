@@ -144,6 +144,27 @@ input[type="number"]{-moz-appearance:textfield}
 .conn-dot.on{background:#4CAF50}
 .conn-dot.off{background:#E74C3C}
 .nick-tag{font-size:12px;color:var(--text2);cursor:pointer;padding:3px 8px;border-radius:6px;background:var(--primary-lt)}
+.order-detail-btn{background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;opacity:.5;transition:opacity .15s}
+.order-detail-btn:hover{opacity:1}
+.od-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px}
+.od-card{background:#fff;border-radius:16px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.od-header{padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center}
+.od-header h3{margin:0;font-size:16px;color:var(--text)}
+.od-close{background:none;border:none;font-size:20px;cursor:pointer;color:#999;padding:4px 8px}
+.od-close:hover{color:#333}
+.od-body{padding:12px 20px}
+.od-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5}
+.od-item:last-child{border-bottom:none}
+.od-item-name{font-size:14px;color:var(--text)}
+.od-item-type{font-size:11px;padding:2px 6px;border-radius:4px;margin-left:6px}
+.od-item-right{text-align:right;white-space:nowrap}
+.od-item-qty{font-size:14px;font-weight:600;color:var(--primary)}
+.od-item-price{font-size:12px;color:#999;margin-top:2px}
+.od-footer{padding:12px 20px;border-top:2px solid #f0f0f0;background:#FAFAFA;border-radius:0 0 16px 16px}
+.od-total{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+.od-total.main{font-size:15px;font-weight:700;color:var(--primary);padding:8px 0 4px}
+.od-copy{width:100%;margin-top:10px;padding:8px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+.od-copy:hover{background:#D4623E}
 .nick-tag:hover{background:#FDDDD0}
 .my-row td{background:#FFF8F0 !important}
 .my-row:hover td{background:#FFF3E8 !important}
@@ -345,6 +366,7 @@ input[type="number"]{-moz-appearance:textfield}
   <div class="section-title">拼团统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
   <div class="pay-action-bar">
     <button class="btn-my-export" onclick="exportMyOrder()">📋 导出我的订单</button>
+    <button class="btn" onclick="clearMyOrders()" style="background:#FDEAEA;color:#D94040;border:1px solid #F0C0C0;font-size:12px">🗑 清空我的订单</button>
     <button class="btn-pay-qr" id="btnPayQR" onclick="showPaymentQR()">📱 查看付款码</button>
     <button class="btn-pay-confirm" id="btnPayConfirm" onclick="handlePayBtnClick()">💰 我已完成付款</button>
   </div>
@@ -1920,7 +1942,7 @@ function renderTable() {
       const orders = allOrders[name] || {};
       h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-name="' + esc(name) + '">';
       h += '<td class="col-idx">' + (seqMap[name] || '') + '</td>';
-      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small> <button class="del-btn" onclick="clearMyOrders()" title="清空我的订单">清空</button>' : '') + '</td>';
+      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(\'' + esc(name).replace(/'/g, "\\'") + '\')" title="查看订单详情">📋</button></td>';
       S.forEach(s => {
         const v = orders[s.id] || 0;
         if (isMe) {
@@ -2318,6 +2340,66 @@ function exportMyOrder() {
   navigator.clipboard.writeText(text)
     .then(() => alert('已复制到剪贴板，可以直接粘贴到群里！'))
     .catch(() => { prompt('请手动复制：', text); });
+}
+
+function showOrderDetail(name) {
+  const seq = globalSeqMap[name] || '?';
+  const teamNum = allTeams[name] || '?';
+  const orders = allOrders[name] || {};
+  const priceData = {};
+  S.forEach(s => {
+    let totalQty = 0;
+    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
+    priceData[s.id] = unitPrice(s, totalQty);
+  });
+  let items = '';
+  let totalItems = 0, totalUSD = 0;
+  S.forEach(s => {
+    const q = orders[s.id] || 0;
+    if (q > 0) {
+      const up = priceData[s.id];
+      const sub = r2(q * up);
+      totalItems += q;
+      totalUSD += sub;
+      const typeCls = TYPE_CLS[s.type] || '';
+      items += '<div class="od-item"><div><span class="od-item-name">' + esc(s.name) + '</span><span class="od-item-type ' + typeCls + '">' + TYPE_LABEL[s.type] + '</span></div><div class="od-item-right"><div class="od-item-qty">x' + q + '</div><div class="od-item-price">$' + sub.toFixed(2) + '</div></div></div>';
+    }
+  });
+  if (!items) items = '<div style="padding:20px;text-align:center;color:#999">暂无订购</div>';
+  const estCNY = r2(totalUSD * rate);
+  const estFee = r2(estCNY * 0.001);
+  let grandUSD = 0;
+  S.forEach(s => {
+    let totalQty = 0;
+    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
+    grandUSD += r2(totalQty * priceData[s.id]);
+  });
+  const dr = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
+  const myTax = (taxCNY > 0 && grandUSD > 0 && totalUSD > 0) ? r2(totalUSD / grandUSD * taxCNY) : 0;
+  let footerHTML = '<div class="od-total"><span>总件数</span><span>' + totalItems + '</span></div>';
+  footerHTML += '<div class="od-total"><span>USD（预估）</span><span>$' + totalUSD.toFixed(2) + '</span></div>';
+  if (dr > 0 && totalUSD > 0) {
+    const actBase = r2(totalUSD * dr * rate);
+    const actFee = r2(actBase * 0.001);
+    const actTotal = r2(actBase + actFee + myTax);
+    footerHTML += '<div class="od-total main"><span>CNY（实际应付）</span><span>¥' + actTotal.toFixed(2) + '</span></div>';
+    const paid = allActualPaid[name] || 0;
+    const refunded = allRefunded[name] || 0;
+    if (paid > 0) {
+      footerHTML += '<div class="od-total"><span>已付</span><span>¥' + paid.toFixed(2) + '</span></div>';
+      const diff = r2(paid - actTotal - refunded);
+      if (diff < 0) footerHTML += '<div class="od-total" style="color:#D94040"><span>应补缴</span><span>¥' + r2(-diff).toFixed(2) + '</span></div>';
+      else if (diff > 0) footerHTML += '<div class="od-total" style="color:#3DA06B"><span>可抵扣运费</span><span>¥' + diff.toFixed(2) + '</span></div>';
+    }
+  } else {
+    footerHTML += '<div class="od-total"><span>CNY（预估）</span><span>¥' + r2(estCNY + estFee).toFixed(2) + '</span></div>';
+  }
+  // Note: all data comes from local state (allOrders, allTeams etc), not external input
+  const overlay = document.createElement('div');
+  overlay.className = 'od-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = '<div class="od-card"><div class="od-header"><h3>#' + seq + ' ' + esc(name) + ' \u00b7 团' + teamNum + '</h3><button class="od-close" onclick="this.closest(\'.od-overlay\').remove()">\u2715</button></div><div class="od-body">' + items + '</div><div class="od-footer">' + footerHTML + '</div></div>';
+  document.body.appendChild(overlay);
 }
 
 function clearMyOrders() {
