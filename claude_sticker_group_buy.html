@@ -1,0 +1,2480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code 贴纸拼团统计</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#FFF8F0;--card:#FFF;--primary:#E8714A;--primary-lt:#FDEEE8;
+  --purple:#B8A9C9;--purple-lt:#F0EBF5;--green:#7BC9A0;--green-lt:#E8F7EF;
+  --gold:#E8C84A;--gold-lt:#FDF6E3;--text:#3D3D3D;--text2:#999;
+  --border:#E8E0D8;--danger:#E74C3C;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+header{background:linear-gradient(135deg,#FDE8DC 0%,#F5E1F0 50%,#E0E8F5 100%);padding:18px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+header h1{font-size:21px;font-weight:700;color:var(--primary);margin-bottom:6px}
+.settings{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:13px}
+.settings label{display:flex;align-items:center;gap:5px}
+.s-input{width:65px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:center;background:var(--card)}
+.s-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-lt)}
+.s-input:disabled{background:#f0f0f0;color:var(--text2);cursor:not-allowed}
+.btn-rate-save{display:none;padding:3px 10px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-rate-save:hover{background:#D4623E;transform:scale(1.03)}
+.btn-rate-save.unsaved{display:inline-block;animation:rate-pulse .8s ease-in-out infinite alternate}
+@keyframes rate-pulse{from{box-shadow:0 0 0 0 rgba(232,113,74,.4)}to{box-shadow:0 0 0 4px rgba(232,113,74,0)}}
+.grand-total{font-weight:600;color:var(--primary)}
+.last-saved{font-size:11px;color:#bbb;margin-left:auto}
+
+section{padding:18px 24px}
+.section-title{font-size:17px;font-weight:600;margin-bottom:14px}
+.sticker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px}
+.sticker-card{background:var(--card);border-radius:12px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);border:1px solid var(--border);transition:transform .2s,box-shadow .2s}
+.sticker-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.1)}
+.sticker-card img{width:100%;height:90px;object-fit:contain;border-radius:6px;background:#f9f9f9;margin-bottom:8px}
+.card-name{font-weight:600;font-size:13px;margin-bottom:3px}
+.card-size{font-size:11px;color:var(--text2);margin-bottom:6px}
+.type-badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:500;margin-right:4px}
+.badge-dc{background:var(--primary-lt);color:var(--primary)}
+.badge-holo{background:var(--purple-lt);color:#8B6EAE}
+.badge-glt{background:var(--gold-lt);color:#B5960F}
+.card-qty{font-size:20px;font-weight:700;margin:4px 0 2px}
+.card-price{font-size:13px;font-weight:600;color:var(--primary);margin-bottom:2px}
+.card-price-cny{font-size:12px;color:var(--purple)}
+.card-tier{font-size:11px;color:var(--green);margin-top:3px}
+.card-tier.warn{color:var(--danger)}
+.card-link{font-size:11px;color:var(--text2);text-decoration:none;display:inline-block;margin-top:4px}
+.card-link:hover{color:var(--primary)}
+
+.card-my{display:flex;align-items:center;justify-content:space-between;margin:8px 0 4px;padding:6px 0;border-top:1px dashed var(--border)}
+.card-my-label{font-size:11px;color:var(--text2)}
+.card-my-qty{font-size:14px;font-weight:700;color:var(--primary)}
+.qty-ctrl{display:flex;align-items:center;gap:0;border:2px solid var(--border);border-radius:10px;overflow:hidden;margin-top:6px}
+.qty-btn{width:34px;height:34px;border:none;background:var(--bg);color:var(--text);font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;user-select:none;line-height:1}
+.qty-btn:hover{background:var(--primary-lt);color:var(--primary)}
+.qty-btn:active{background:var(--primary);color:#fff}
+.qty-btn.minus{border-right:1px solid var(--border)}
+.qty-btn.plus{border-left:1px solid var(--border)}
+.qty-val{flex:1;text-align:center;font-size:15px;font-weight:600;min-width:36px;padding:0 4px;background:var(--card);color:var(--text)}
+.qty-val.has-qty{color:var(--primary)}
+.card-total-row{display:flex;align-items:baseline;gap:6px;margin-bottom:2px}
+.card-total-label{font-size:11px;color:var(--text2)}
+
+.table-controls{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.btn{padding:7px 14px;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:#D4623E}
+.btn-g{background:var(--green-lt);color:#3DA06B}.btn-g:hover{background:#D0EDD9}
+.btn-v{background:var(--purple-lt);color:#8B6EAE}.btn-v:hover{background:#E0D6EC}
+.btn-d{background:#FDEAEA;color:var(--danger)}.btn-d:hover{background:#F8D0D0}
+
+.table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border);background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+table{border-collapse:collapse;width:max-content;min-width:100%;font-size:12px}
+th,td{padding:5px 6px;border:1px solid #EEEAE5;text-align:center;white-space:nowrap}
+thead th{background:var(--primary-lt);color:var(--primary);font-weight:600;font-size:11px;position:sticky;top:0;z-index:20}
+.col-idx{position:sticky;left:0;z-index:21;width:32px;min-width:32px}
+.col-name{position:sticky;left:32px;z-index:21;width:88px;min-width:88px;text-align:left}
+thead .col-idx,thead .col-name{background:var(--primary-lt);z-index:25}
+
+.s-row td{font-weight:600;font-size:11px}
+.s-row td.col-idx,.s-row td.col-name{z-index:22}
+.s-row.r-qty td{background:#FFF5EE;color:var(--text)}
+.s-row.r-price td{background:#FFF0E8;color:var(--primary)}
+.s-row.r-total td{background:#F5F0FA;color:#8B6EAE}
+.s-row.r-qty td.col-idx,.s-row.r-qty td.col-name{background:#FFF5EE}
+.s-row.r-price td.col-idx,.s-row.r-price td.col-name{background:#FFF0E8}
+.s-row.r-total td.col-idx,.s-row.r-total td.col-name{background:#F5F0FA}
+
+tbody .col-idx,tbody .col-name{background:var(--card)}
+.p-row:hover td{background:#FFFAF6}
+.p-row:hover td.col-idx,.p-row:hover td.col-name{background:#FFFAF6}
+.p-row td.col-idx{color:var(--text2);font-size:11px}
+
+td input[type="number"]{width:42px;padding:2px 3px;border:1px solid transparent;border-radius:4px;text-align:center;font-size:12px;background:transparent;transition:all .15s}
+td input[type="number"]:hover{border-color:var(--border);background:var(--bg)}
+td input[type="number"]:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 2px var(--primary-lt)}
+.name-input{width:78px;padding:2px 4px;border:1px solid transparent;border-radius:4px;font-size:12px;text-align:left;background:transparent}
+.name-input:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 2px var(--primary-lt)}
+.del-btn{border:1px solid #e0d6d6;border-radius:6px;background:#faf5f5;color:#c49;cursor:pointer;font-size:11px;padding:2px 8px;margin-left:6px;transition:all .15s;vertical-align:middle}
+.del-btn:hover{background:#FDEAEA;color:#fff;background:var(--danger);border-color:var(--danger)}
+.pt-items{font-weight:600;font-size:11px}
+.pt-usd{font-weight:600;font-size:11px;color:var(--primary)}
+.pt-cny{font-weight:600;font-size:11px;color:#8B6EAE}
+
+.modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.35);z-index:1000;align-items:center;justify-content:center}
+.modal-bg.on{display:flex}
+.modal{background:#fff;border-radius:14px;padding:22px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,.18)}
+.modal h3{margin-bottom:10px;color:var(--primary);font-size:15px}
+.modal textarea{width:100%;height:180px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:11px;resize:vertical;margin-bottom:10px}
+.modal textarea:focus{outline:none;border-color:var(--primary)}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end}
+
+footer{text-align:center;padding:18px;font-size:11px;color:var(--text2)}
+input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type="number"]{-moz-appearance:textfield}
+@media(max-width:768px){header{padding:14px}section{padding:14px}.sticker-grid{grid-template-columns:repeat(2,1fr);gap:10px}header h1{font-size:17px}}
+.qr-section{text-align:center;padding:28px 24px;margin:0 24px 18px;background:linear-gradient(135deg,#FFF5F0 0%,#FFF0F8 50%,#F5F0FF 100%);border-radius:16px;border:1px solid var(--border)}
+.qr-section h3{font-size:17px;font-weight:600;color:var(--primary);margin-bottom:6px}
+.qr-section p{font-size:13px;color:var(--text);margin-bottom:12px;line-height:1.7}
+.qr-section .qr-sub{font-size:12px;color:var(--text2);margin-top:10px}
+.qr-section img{width:180px;height:180px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.1)}
+
+.th-type{font-size:9px;font-weight:400;display:block;margin-top:2px}
+
+.nick-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center}
+.nick-popup{background:#fff;border-radius:16px;padding:28px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+.nick-popup h3{color:var(--primary);font-size:18px;margin-bottom:8px}
+.nick-popup p{font-size:13px;color:var(--text2);margin-bottom:16px}
+.nick-popup input{width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;text-align:center;margin-bottom:14px}
+.nick-popup input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-lt)}
+.nick-popup button{width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+.nick-popup button:hover{background:#D4623E}
+.nick-popup button:disabled{opacity:.5;cursor:not-allowed}
+.nick-tabs{display:flex;gap:0;margin-bottom:16px;border:2px solid var(--border);border-radius:10px;overflow:hidden}
+.nick-popup .nick-tab{flex:1;padding:8px;border:none;background:var(--bg);color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;width:auto;border-radius:0}
+.nick-popup .nick-tab.active{background:var(--primary);color:#fff;font-weight:600}
+.nick-pin{width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;text-align:center;margin-bottom:14px;letter-spacing:6px}
+.nick-pin:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-lt)}
+.nick-hint{font-size:11px;color:var(--text2);margin:-8px 0 12px}
+.nick-err{font-size:12px;color:var(--danger);margin-bottom:8px;display:none}
+.nick-err.show{display:block}
+
+.conn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;margin-left:8px;vertical-align:middle;transition:background .3s}
+.conn-dot.on{background:#4CAF50}
+.conn-dot.off{background:#E74C3C}
+.nick-tag{font-size:12px;color:var(--text2);cursor:pointer;padding:3px 8px;border-radius:6px;background:var(--primary-lt)}
+.nick-tag:hover{background:#FDDDD0}
+.my-row td{background:#FFF8F0 !important}
+.my-row:hover td{background:#FFF3E8 !important}
+.my-row td.col-name{font-weight:600;color:var(--primary)}
+
+.team-header-row td{background:#F0EBF5 !important;color:#8B6EAE;font-weight:700;font-size:13px;padding:8px 6px;border-top:2px solid #D8CCE8}
+.team-header-row td.col-idx,.team-header-row td.col-name{background:#F0EBF5 !important}
+.team-subtotal td{background:#FDF6E3 !important;font-weight:600;font-size:11px;color:#B5960F;border-bottom:2px solid #E8DFC0}
+.team-subtotal td.col-idx,.team-subtotal td.col-name{background:#FDF6E3 !important}
+.team-select{display:flex;gap:16px;justify-content:center;margin-bottom:14px}
+.team-select label{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;padding:8px 16px;border:2px solid var(--border);border-radius:10px;transition:all .15s}
+.team-select label:has(input:checked){border-color:var(--primary);background:var(--primary-lt)}
+.team-select input[type="radio"]{accent-color:var(--primary)}
+.team-tag{font-size:12px;color:#8B6EAE;cursor:pointer;padding:3px 8px;border-radius:6px;background:var(--purple-lt)}
+.team-tag:hover{background:#E0D6EC}
+.pay-action-bar{display:flex;gap:8px;max-width:700px;margin:0 auto 16px;justify-content:center;flex-wrap:wrap}
+.btn-my-export{flex:1;min-width:0;padding:13px 16px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3);transition:all .15s;letter-spacing:.3px;white-space:nowrap}
+.btn-my-export:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,113,74,.4)}
+.btn-my-export:active{transform:translateY(0)}
+.btn-pay-qr{flex:1;min-width:0;padding:13px 16px;background:#fff;color:var(--primary);border:2px solid var(--primary);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-pay-qr:hover{background:var(--primary-lt);transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,113,74,.2)}
+.btn-pay-qr:active{transform:translateY(0)}
+.btn-pay-confirm{flex:1;min-width:0;padding:13px 16px;background:linear-gradient(135deg,#5BA87D,#4A9B6F);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(91,168,125,.3);transition:all .15s;white-space:nowrap}
+.btn-pay-confirm:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(91,168,125,.4)}
+.btn-pay-confirm:active{transform:translateY(0)}
+.btn-pay-confirm:disabled{opacity:.7;cursor:not-allowed;transform:none}
+.btn-pay-confirm.self-confirmed{background:linear-gradient(135deg,#E8714A,#D4623E)}
+.btn-pay-confirm.confirmed{background:linear-gradient(135deg,#2D8B5E,#247A50)}
+.btn-admin{background:#f0ede8;color:#999;font-size:11px;border:1px dashed #ddd}.btn-admin:hover{background:#e8e4de;color:#666}
+.btn-lock{background:var(--danger);color:#fff;font-size:13px;font-weight:600;border:none;padding:8px 20px;border-radius:10px;cursor:pointer;transition:all .15s}.btn-lock:hover{background:#C0392B;transform:translateY(-1px)}.btn-lock.unlocked{background:var(--green)}.btn-lock.unlocked:hover{background:#5BA87D}
+.lock-banner{margin:0 24px;padding:14px 18px;background:linear-gradient(135deg,#FDEAEA,#FDE8E8);border:2px solid var(--danger);border-radius:12px;text-align:center;font-size:14px;font-weight:600;color:var(--danger);display:none;margin-top:14px}
+.lock-banner.show{display:block}
+.locked-input{opacity:.5;pointer-events:none}
+.lock-notice{font-size:12px;color:var(--danger);font-weight:500;margin-left:8px}
+
+/* === Payment status === */
+.col-pay{min-width:90px;width:90px}
+.pay-badge{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:8px;white-space:nowrap}
+.pay-unpaid{background:#f0f0f0;color:#999}
+.pay-unpaid::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;border:2px solid #ccc;background:transparent}
+.pay-self{background:#FFF3E0;color:#E8714A}
+.pay-self::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:#E8714A}
+.pay-confirmed{background:#E8F7EF;color:#2D8B5E}
+.pay-confirmed::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:#2D8B5E}
+.pay-btn{border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer;font-size:11px;padding:3px 8px;transition:all .15s;white-space:nowrap}
+.pay-btn:hover{background:var(--primary-lt);color:var(--primary);border-color:var(--primary)}
+.pay-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.pay-btn.active:hover{background:#D4623E}
+.pay-btn-confirm{border-color:var(--green);color:var(--green);background:#f0faf4}
+.pay-btn-confirm:hover{background:var(--green);color:#fff}
+.pay-stats{font-size:11px;font-weight:500;margin-left:8px}
+.pay-stats-ok{color:#2D8B5E}
+.pay-stats-pending{color:var(--danger)}
+.pay-qr-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:none;align-items:center;justify-content:center}
+.pay-qr-overlay.on{display:flex}
+.pay-qr-popup{background:#fff;border-radius:16px;padding:28px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+.pay-qr-popup h3{color:var(--primary);font-size:18px;margin-bottom:4px}
+.pay-qr-popup .pay-qr-leader{font-size:13px;color:var(--text2);margin-bottom:16px}
+.pay-qr-popup img{width:240px;height:240px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.1);margin-bottom:16px;object-fit:contain;background:#f9f9f9}
+.pay-qr-popup .pay-qr-hint{font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.8;text-align:left;background:#FFF8F5;border-radius:8px;padding:10px 14px;border:1px solid #FFE0D0}
+.pay-qr-popup button{width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+.pay-qr-popup button:hover{background:#D4623E}
+.pay-qr-no-img{width:240px;height:120px;display:flex;align-items:center;justify-content:center;background:#f9f9f9;border-radius:12px;margin:0 auto 16px;color:var(--text2);font-size:13px;border:2px dashed var(--border)}
+
+.notice{margin:0 24px;padding-top:18px}
+.notice details{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden}
+.notice summary{padding:14px 18px;cursor:pointer;font-size:15px;font-weight:600;color:var(--primary);list-style:none;display:flex;align-items:center;gap:8px;user-select:none}
+.notice summary::-webkit-details-marker{display:none}
+.notice summary::before{content:'';display:inline-block;width:0;height:0;border-left:6px solid var(--primary);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .2s}
+.notice details[open] summary::before{transform:rotate(90deg)}
+.notice-body{padding:0 18px 18px;font-size:13px;line-height:1.8;color:var(--text)}
+.notice-body h4{font-size:14px;font-weight:600;margin:14px 0 6px;color:var(--primary);display:flex;align-items:center;gap:6px}
+.notice-body h4:first-child{margin-top:4px}
+.notice-body p{margin:2px 0}
+.notice-body .tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:8px;font-weight:500}
+.tag-date{background:#E8F7EF;color:#2D8B5E}
+.tag-warn{background:#FDEAEA;color:var(--danger)}
+.notice-body ol,.notice-body ul{padding-left:20px;margin:4px 0}
+.notice-body li{margin:2px 0}
+.notice-divider{height:1px;background:var(--border);margin:14px 0}
+@media(max-width:768px){.notice{margin:0 14px;padding-top:14px}}
+
+.submit-bar{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#FDE8DC,#F5E1F0);border-top:2px solid var(--primary);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:500;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:0 -4px 20px rgba(0,0,0,.1)}
+.submit-bar.show{transform:translateY(0)}
+.submit-bar-info{font-size:13px;color:var(--text)}
+.submit-bar-info strong{color:var(--primary);font-size:15px}
+.submit-bar-btn{padding:10px 28px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.submit-bar-btn:hover{background:#D4623E;transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,113,74,.3)}
+.submit-bar-btn:active{transform:translateY(0)}
+.submit-bar-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.submit-bar-btn.success{background:var(--green)}
+</style>
+</head>
+<body>
+
+<div class="nick-overlay" id="nickOverlay" style="display:none">
+  <div class="nick-popup">
+    <h3>Claude Code 贴纸拼团</h3>
+    <div class="nick-tabs">
+      <button class="nick-tab active" id="tabRegister" onclick="switchAuthTab('register')">新用户注册</button>
+      <button class="nick-tab" id="tabLogin" onclick="switchAuthTab('login')">已有账号</button>
+    </div>
+    <p id="authHint">请输入你的昵称（群内昵称，方便大家认出你）</p>
+    <input type="text" id="nickInput" placeholder="你的昵称..." maxlength="20" autocomplete="off">
+    <input type="password" inputmode="numeric" class="nick-pin" id="pinInput" placeholder="设置密码" maxlength="6" autocomplete="off">
+    <p class="nick-hint" id="pinHint">4~6位数字，用于换设备时找回账号</p>
+    <p class="nick-err" id="authErr"></p>
+    <div id="teamSection">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:6px">选择你的分团</p>
+      <div class="team-select">
+        <label><input type="radio" name="team" value="1" checked> 团1</label>
+        <label><input type="radio" name="team" value="2"> 团2</label>
+        <label><input type="radio" name="team" value="3"> 团3</label>
+      </div>
+    </div>
+    <button id="nickBtn" onclick="submitAuth()" disabled>加入拼团</button>
+  </div>
+</div>
+
+<header>
+  <h1>Claude Code 贴纸拼团统计 <span class="conn-dot" id="connDot" title="连接中..."></span></h1>
+  <div class="settings">
+    <span class="nick-tag" id="nickTag" onclick="changeNick()" title="点击修改昵称"></span>
+    <span class="team-tag" id="teamTag" onclick="changeTeam()" title="点击切换分团"></span>
+    <span class="nick-tag" id="pinTag" onclick="changePin()" style="display:none;background:#E8F7EF;color:#2D8B5E" title="设置或修改密码">设密码</span>
+    <label id="rateLabel">汇率 1 USD = <input type="number" class="s-input" id="rateInput" step="0.01" min="0"> CNY</label><button class="btn-rate-save" id="btnRateSave" onclick="saveRate()">💾 保存</button>
+    <span id="actualUsdWrap" style="display:none;margin-left:4px;background:#FDF6E3;border:1px solid #E8C84A;border-radius:8px;padding:3px 10px;align-items:center;gap:5px"><label style="font-size:13px">实际USD = <input type="number" class="s-input" id="actualUsdInput" step="0.01" min="0" placeholder="SM总价" style="width:100px"></label><button id="btnActualUsdSave" onclick="saveActualUSD()" style="display:none;padding:3px 10px;background:#E8C84A;color:#3D3D3D;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:4px">💾 保存</button></span>
+    <span id="taxCnyWrap" style="display:none;margin-left:4px;background:#FDEAEA;border:1px solid #E74C3C;border-radius:8px;padding:3px 10px;align-items:center;gap:5px"><label style="font-size:13px">关税 ¥ <input type="number" class="s-input" id="taxCnyInput" step="0.01" min="0" placeholder="总税额" style="width:100px"></label><button id="btnTaxCnySave" onclick="saveTaxCNY()" style="display:none;padding:3px 10px;background:#E74C3C;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:4px">💾 保存</button></span>
+    <span class="grand-total" id="grandTotal"></span>
+    <span class="last-saved" id="lastSaved"></span>
+  </div>
+</header>
+
+<div class="notice">
+  <details open>
+    <summary>开团须知 · 请先阅读</summary>
+    <div class="notice-body">
+      <h4>分团说明</h4>
+      <p>为了团长不会太累，本次拼团分为<strong>团1</strong>、<strong>团2</strong>和<strong>团3</strong>，对应三个微信群</p>
+      <p><span class="tag tag-warn">重要</span> 你在哪个群就选哪个团，请大家<strong>不要乱选</strong>给团长增加工作量。到货后由各团团长分别发货</p>
+      <p>三个团统一下单购买（人越多越便宜），但收款和发货按团分开进行</p>
+
+      <h4>流程与时间</h4>
+      <p><span class="tag tag-date">暂定3月6日</span> 截单 — 截单前可随时修改数量，截单后锁定不可更改</p>
+      <p><span class="tag tag-date">3月8日</span> 截止收款 — 按表单显示金额付款，具体收款方式截单前群内通知</p>
+      <p><span class="tag tag-warn">注意</span> 全员到账后团长统一下单，<strong>团长不垫付！！！先收钱再下单！</strong></p>
+
+      <h4>费用说明</h4>
+      <p>本次先收<strong>贴纸本体费用</strong>（Sticker Mule 免国际运费，不需要额外付海外邮费）</p>
+      <p>汇率以下单当日实际汇率为准，届时统一更新，会在群里通知大家</p>
+      <p>如被海关征税，税费由全体团员<strong>平摊</strong></p>
+      <p>国内邮费等到货发货时再收，走闲鱼付运费</p>
+
+      <h4>注意事项</h4>
+      <p><span class="tag tag-warn">重要</span> <strong>下单后不接受退款！！！</strong></p>
+      <p>付款方式会在截团时通知大家，请在收款截止日期前付清全款，并将付款截图发到群里</p>
+      <p>买的人越多单价越低！每款贴纸的当前单价会实时显示在下方卡片上</p>
+
+      <h4>💰 锁单后付款流程</h4>
+      <p>1. 锁单后，点击「📱 查看付款码」查看你所在团的团长收款码</p>
+      <p>2. 点击「📋 导出我的订单」复制你的订单明细（包含实付金额）</p>
+      <p>3. 实付金额 = 你的人民币总额 + 0.1%转账手续费（微信/支付宝转银行卡会收取）</p>
+      <p>4. 向团长扫码转账实付金额</p>
+      <p>5. 将<strong>导出的订单详情</strong>和<strong>付款截图</strong>一起发到群里</p>
+      <p>6. 回到本页点击「💰 我已完成付款」标记付款状态</p>
+      <p>7. 团长核实到账后会将你的状态更新为 ✅ 已确认</p>
+
+      <div class="notice-divider"></div>
+
+      <h4>网站使用说明</h4>
+      <ol>
+        <li><strong>注册：</strong>首次打开会弹出注册框，填写你的<strong>群昵称</strong>、设置一个<strong>4~6位数字密码</strong>，并选择你所在的分团（团1、团2或团3）</li>
+        <li><strong>登录：</strong>换手机或换浏览器时，点击「已有账号」，输入昵称和密码即可恢复数据。老用户首次登录会自动设置密码</li>
+        <li>填表后会获得一个序号（显示在表格 # 列），<strong>请在群昵称前加上你的序号</strong>，格式如：<code>01-昵称</code></li>
+        <li>在贴纸卡片上点 <strong>+/-</strong> 按钮选择数量，也可以在统计表里直接填写</li>
+        <li><strong>改完数量记得点底部的「保存」按钮！</strong>修改不会自动上传，需要手动保存。关闭页面前如果忘了保存，系统会提醒你</li>
+        <li>贴纸卡片上会显示每款的总数量、当前单价和下一档价格，方便决策</li>
+        <li>页面左上角可以点击昵称修改昵称、点击团号切换分团、点击「改密码」修改密码</li>
+      </ol>
+    </div>
+  </details>
+</div>
+
+<div class="lock-banner" id="lockBanner">🔒 已锁单 — 所有贴纸数量已锁定，不可修改</div>
+
+<section>
+  <div class="section-title">贴纸一览</div>
+  <div class="sticker-grid" id="stickerGrid"></div>
+</section>
+
+<div class="qr-section">
+  <h3>🧡 加入小克交流群</h3>
+  <p>拼完贴纸，友谊不散场。<br>聊 Claude、聊 AI、聊一切有趣的事。以后 Anthropic 出了新周边，我们继续一起拼！</p>
+  <img src="qr-wechat-group.png" alt="小克交流群二维码">
+  <p class="qr-sub">微信扫码加入 · 群满或过期请联系团长</p>
+</div>
+
+<section>
+  <div class="section-title">拼团统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
+  <div class="pay-action-bar">
+    <button class="btn-my-export" onclick="exportMyOrder()">📋 导出我的订单</button>
+    <button class="btn-pay-qr" id="btnPayQR" onclick="showPaymentQR()">📱 查看付款码</button>
+    <button class="btn-pay-confirm" id="btnPayConfirm" onclick="handlePayBtnClick()">💰 我已完成付款</button>
+  </div>
+  <div class="table-controls">
+    <button class="btn btn-lock" id="lockBtn" onclick="toggleLock()" style="display:none">🔒 锁单</button>
+    <button class="btn btn-admin" onclick="showExport()">团长导出全部</button>
+    <button class="btn btn-admin" onclick="showImport()">团长导入</button>
+    <button class="btn" id="btnHideEmpty" onclick="toggleHideEmpty()" style="background:#F0F4FF;color:#6B7FA3;border:1px dashed #B8C9E0;font-size:11px">👁 隐藏空订单</button>
+  </div>
+  <div class="table-wrap">
+    <table id="orderTable"></table>
+  </div>
+</section>
+
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3 id="modalTitle"></h3>
+    <textarea id="modalText"></textarea>
+    <div class="modal-btns">
+      <button class="btn btn-v" onclick="closeModal()">取消</button>
+      <button class="btn btn-p" id="modalOk"></button>
+    </div>
+  </div>
+</div>
+
+<div class="pay-qr-overlay" id="payQrOverlay" onclick="if(event.target===this)closePaymentQR()">
+  <div class="pay-qr-popup">
+    <h3 id="payQrTitle">付款二维码</h3>
+    <p class="pay-qr-leader" id="payQrLeader"></p>
+    <div id="payQrImgWrap"></div>
+    <p class="pay-qr-hint" id="payQrHint"></p>
+    <button onclick="closePaymentQR()">关闭</button>
+  </div>
+</div>
+
+<div class="submit-bar" id="submitBar">
+  <div class="submit-bar-info">你有 <strong id="submitCount">0</strong> 项修改未保存</div>
+  <button class="submit-bar-btn" id="submitBtn" onclick="submitCart()">保存</button>
+</div>
+
+<footer>Claude Code Sticker Group Buy Tool · Made with love by Sylux</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+// ============ CONFIG ============
+const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
+const ADMIN_NAMES = ['鹅鹅'];
+const TEAM_LEADERS = {1: '无法上吊之物', 2: 'Keichi', 3: '鹅鹅'};
+const TEAM_QR = {1: 'qr-pay-1.jpg', 2: 'qr-pay-3.png', 3: 'qr-pay-3.png'};
+
+// ============ STICKER DATA ============
+const S = [
+  {id:'clawd', name:'Clawd', type:'dc', size:'2"x1.6"', itemId:19156131,
+   img:'https://storage.googleapis.com/sm-artworks/5719926a-04ae-4afb-9925-f1f4521d38ce/large.png?cacheFor=b1c948c6194db63359b0f8564d4a7eed',
+   t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,89],[300,106],[500,138],[1000,207],[2000,327],[3000,435],[5000,631],[10000,1062]]},
+  {id:'ultrathink', name:'ultrathink', type:'dc', size:'4.21"x0.75"', itemId:19236575,
+   img:'https://storage.googleapis.com/sm-artworks/0006ba04-0f46-4c86-930b-1b41a9480f14/large.png?cacheFor=f7003b57a2fc7bafc920f3ed2acb368a',
+   t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,88],[300,106],[500,137],[1000,206],[2000,325],[3000,431],[5000,626],[10000,1053]]},
+  {id:'clawd-happy', name:'Clawd happy', type:'dc', size:'2"x1.6"', itemId:19156132,
+   img:'https://storage.googleapis.com/sm-artworks/be75b541-e429-4b61-a058-6a04bc35f712/large.png?cacheFor=26b5d38b95c02b9de101edd57a5846a9',
+   t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,89],[300,106],[500,138],[1000,207],[2000,327],[3000,435],[5000,631],[10000,1062]]},
+  {id:'vibing-dc', name:'Vibing', type:'dc', size:'3.21"x0.75"', itemId:17478826,
+   img:'https://storage.googleapis.com/sm-artworks/c6e41ee6-4500-403f-a36c-3e6e72596e3a/large.png?cacheFor=e67ba358b1881dbc5ebedc5943e67dcb',
+   t:[[1,5],[5,9],[10,16],[50,56],[100,65],[200,82],[300,97],[500,123],[1000,181],[2000,282],[3000,371],[5000,534],[10000,892]]},
+  {id:'clawd-shiny', name:'Clawd shiny', type:'holo', size:'2"x1.61"', itemId:19156133,
+   img:'https://storage.googleapis.com/sm-artworks/1c69d7fd-a6de-42a8-99be-3edc7b32c8f1/large.png?cacheFor=31a4293c9f5cc540655eb3642dd66c15',
+   t:[[10,17],[50,63],[100,76],[200,99],[300,120],[500,158],[1000,241],[2000,385],[3000,514],[5000,752],[10000,1410]]},
+  {id:'claudecode', name:'claudecode', type:'dc', size:'5.13"x0.75"', itemId:19156134,
+   img:'https://storage.googleapis.com/sm-artworks/1a18c149-6820-437c-83a3-4053259f28d5/large.png?cacheFor=5d8dcc208c6c3caee71731b8daf13233',
+   t:[[1,5],[5,10],[10,17],[50,60],[100,72],[200,94],[300,114],[500,149],[1000,227],[2000,363],[3000,485],[5000,706],[10000,1195]]},
+  {id:'vibing-holo', name:'Vibing', type:'holo', size:'3.21"x0.75"', itemId:17478832,
+   img:'https://storage.googleapis.com/sm-artworks/d85490fc-cd48-4248-b208-0bda8dad0e59/large.png?cacheFor=7ba69e81720e19d7d1fbb48a8163cbd9',
+   t:[[10,17],[50,60],[100,71],[200,90],[300,108],[500,139],[1000,208],[2000,327],[3000,434],[5000,628],[10000,1119]]},
+  {id:'reticulating', name:'reticulating', type:'dc', size:'5.13"x0.75"', itemId:19156130,
+   img:'https://storage.googleapis.com/sm-artworks/3133e32f-64d5-48ee-9215-be6453365d8b/large.png?cacheFor=666df05e24c335393669a33fa071c47c',
+   t:[[1,5],[5,10],[10,17],[50,60],[100,72],[200,94],[300,114],[500,150],[1000,229],[2000,365],[3000,488],[5000,712],[10000,1205]]},
+  {id:'shipping', name:'Shipping', type:'dc', size:'3.63"x0.75"', itemId:17478831,
+   img:'https://storage.googleapis.com/sm-artworks/4296af64-9d1c-4e87-889f-e5397b680e4a/large.png?cacheFor=ed5d463f001823bf25db91888595a687',
+   t:[[1,5],[5,10],[10,16],[50,57],[100,68],[200,86],[300,103],[500,132],[1000,197],[2000,310],[3000,411],[5000,595],[10000,998]]},
+  {id:'manifesting-holo', name:'Manifesting', type:'holo', size:'5.13"x0.75"', itemId:19156128,
+   img:'https://storage.googleapis.com/sm-artworks/7c5cd395-b662-440f-a668-bf9052c8aafc/large.png?cacheFor=1f302fa314f6fee5ed260ed773250db6',
+   t:[[10,18],[50,64],[100,78],[200,104],[300,126],[500,167],[1000,257],[2000,414],[3000,556],[5000,829],[10000,1566]]},
+  {id:'baking', name:'Baking', type:'dc', size:'3.13"x0.75"', itemId:17478829,
+   img:'https://storage.googleapis.com/sm-artworks/32774d7b-adab-48ca-8fc4-18fb0b0ec1c2/large.png?cacheFor=3bd97a513abf6349abb718b2cbdc00a7',
+   t:[[1,5],[5,9],[10,16],[50,56],[100,65],[200,82],[300,96],[500,123],[1000,181],[2000,281],[3000,371],[5000,534],[10000,891]]},
+  {id:'clawd-wave', name:'Clawd wave', type:'dc', size:'2.4"x1.5"', itemId:19235847,
+   img:'https://storage.googleapis.com/sm-artworks/f1ec9028-203f-4d6f-a360-5eea91e9723e/large.png?cacheFor=73d7616389ce26a3ea44a9d279ca3ed9',
+   t:[[1,5],[5,10],[10,17],[50,59],[100,71],[200,93],[300,112],[500,146],[1000,222],[2000,354],[3000,472],[5000,688],[10000,1162]]},
+  {id:'manifesting-glt', name:'Manifesting', type:'glt', size:'5.13"x0.75"', itemId:17478833,
+   img:'https://storage.googleapis.com/sm-artworks/15c2280e-7a5f-46d8-ba05-86073c9d0b09/large.png?cacheFor=1fa9c7949a091c06af06347102479bea',
+   t:[[10,18],[50,64],[100,78],[200,104],[300,126],[500,167],[1000,257],[2000,414],[3000,556],[5000,830],[10000,1567]]}
+];
+
+const TYPE_LABEL = {dc:'模切', holo:'全息', glt:'闪粉'};
+const TYPE_CLS = {dc:'badge-dc', holo:'badge-holo', glt:'badge-glt'};
+
+// ============ STATE ============
+let myName = localStorage.getItem('gb_nickname') || '';
+let myTeam = parseInt(localStorage.getItem('gb_team')) || 1;
+let allOrders = {}; // {name: {stickerId: qty}}
+let allTeams = {}; // {name: teamNumber (1 or 2)}
+let allJoinOrder = {}; // {name: minRecordId} — for global join sequence
+let globalSeqMap = {}; // {name: globalSequenceNumber}
+let rate = 6.90;
+let actualUSD = 0; // actual SM cart total in USD (set by admin after checkout)
+let taxCNY = 0; // customs tax total in CNY (set by admin after customs clearance)
+let sb = null;
+let connected = false;
+let isLocked = false;
+let allPaySelf = {}; // {name: true} — self-confirmed payment
+let allPayLeader = {}; // {name: true} — leader-confirmed payment
+let allActualPaid = {}; // {name: cny_amount} — actual paid amount set by team leader
+let allRefunded = {}; // {name: cny_amount} — already refunded amount set by team leader
+let allShipFeeSelf = {}; // {name: true} — self-confirmed shipping fee paid
+let allShipFeeLeader = {}; // {name: true} — leader-confirmed shipping fee paid
+let allShipped = {}; // {name: true} — leader-confirmed shipped
+let hideEmptyOrders = false; // toggle: hide people with zero orders
+let writeTimers = {};
+let renderTimer = null;
+
+// ============ SUPABASE ============
+function initSupabaseClient() {
+  if (typeof window.supabase === 'undefined') return false;
+  try {
+    sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+    return true;
+  } catch(e) {
+    console.error('Supabase client init failed:', e);
+    return false;
+  }
+}
+
+async function initSupabase() {
+  if (!sb && !initSupabaseClient()) {
+    setConnected(false);
+    updateStatus('SDK加载失败，离线模式');
+    loadOffline();
+    return;
+  }
+  try {
+    await loadAll();
+    subscribeRealtime();
+    setConnected(true);
+    updateStatus('已连接');
+  } catch(e) {
+    console.error('Supabase init failed:', e);
+    setConnected(false);
+    updateStatus('连接失败，离线模式');
+    loadOffline();
+  }
+}
+
+async function loadAll() {
+  // Paginate to get ALL rows (Supabase default limit is 1000)
+  let orders = [];
+  let from = 0;
+  const PAGE = 1000;
+  while (true) {
+    const {data, error} = await sb.from('orders').select('*').order('id').range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    orders = orders.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  allOrders = {};
+  allTeams = {};
+  allPaySelf = {};
+  allPayLeader = {};
+  allActualPaid = {};
+  const joinOrd = {};
+  for (const row of orders) {
+    if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
+    if (row.sticker_id === '_team') {
+      allTeams[row.name] = row.quantity;
+    } else if (row.sticker_id === '_pin') {
+      // Skip PIN records
+    } else if (row.sticker_id === '_payment_self') {
+      if (row.quantity > 0) allPaySelf[row.name] = true;
+    } else if (row.sticker_id === '_payment_leader') {
+      if (row.quantity > 0) allPayLeader[row.name] = true;
+    } else if (row.sticker_id === '_actual_paid') {
+      if (row.quantity > 0) allActualPaid[row.name] = row.quantity / 100;
+    } else if (row.sticker_id === '_refunded') {
+      if (row.quantity > 0) allRefunded[row.name] = row.quantity / 100;
+    } else if (row.sticker_id === '_shipfee_self') {
+      if (row.quantity > 0) allShipFeeSelf[row.name] = true;
+    } else if (row.sticker_id === '_shipfee_leader') {
+      if (row.quantity > 0) allShipFeeLeader[row.name] = true;
+    } else if (row.sticker_id === '_shipped') {
+      if (row.quantity > 0) allShipped[row.name] = true;
+    } else if (row.quantity > 0) {
+      if (!allOrders[row.name]) allOrders[row.name] = {};
+      allOrders[row.name][row.sticker_id] = row.quantity;
+    }
+  }
+  allJoinOrder = joinOrd;
+  const {data: settings, error: e2} = await sb.from('settings').select('*');
+  if (e2) throw e2;
+  if (settings) {
+    for (const s of settings) {
+      if (s.key === 'rate') rate = parseFloat(s.value) || 6.90;
+      if (s.key === 'locked') isLocked = s.value === '1';
+      if (s.key === 'actual_usd') actualUSD = parseFloat(s.value) || 0;
+      if (s.key === 'tax_cny') taxCNY = parseFloat(s.value) || 0;
+    }
+  }
+}
+
+function subscribeRealtime() {
+  sb.channel('gb-sync')
+    .on('postgres_changes', {event: '*', schema: 'public', table: 'orders'}, payload => {
+      handleOrderEvent(payload);
+    })
+    .on('postgres_changes', {event: '*', schema: 'public', table: 'settings'}, payload => {
+      handleSettingsEvent(payload);
+    })
+    .subscribe(status => {
+      setConnected(status === 'SUBSCRIBED');
+    });
+}
+
+function handleOrderEvent(payload) {
+  const row = payload.new || payload.old;
+  if (!row || row.name === myName) return; // skip my own echoes
+  if (row.sticker_id === '_pin') return; // skip PIN records
+
+  // Track join order for new arrivals
+  if (payload.new && payload.new.id) {
+    const n = payload.new.name;
+    if (!allJoinOrder[n] || payload.new.id < allJoinOrder[n]) allJoinOrder[n] = payload.new.id;
+  }
+
+  // Handle team assignment changes
+  if (row.sticker_id === '_team') {
+    if (payload.eventType === 'DELETE') {
+      delete allTeams[row.name];
+    } else {
+      allTeams[payload.new.name] = payload.new.quantity;
+    }
+    scheduleRender();
+    saveOffline();
+    return;
+  }
+
+  // Handle payment status changes
+  if (row.sticker_id === '_payment_self') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
+      delete allPaySelf[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allPaySelf[payload.new.name] = true;
+    }
+    scheduleRender();
+    saveOffline();
+    return;
+  }
+  if (row.sticker_id === '_payment_leader') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
+      delete allPayLeader[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allPayLeader[payload.new.name] = true;
+    }
+    scheduleRender();
+    saveOffline();
+    return;
+  }
+  if (row.sticker_id === '_actual_paid') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity <= 0)) {
+      delete allActualPaid[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allActualPaid[payload.new.name] = payload.new.quantity / 100;
+    }
+    scheduleRender();
+    saveOffline();
+    return;
+  }
+  if (row.sticker_id === '_refunded') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity <= 0)) {
+      delete allRefunded[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allRefunded[payload.new.name] = payload.new.quantity / 100;
+    }
+    scheduleRender();
+    saveOffline();
+    return;
+  }
+  if (row.sticker_id === '_shipfee_self') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
+      delete allShipFeeSelf[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allShipFeeSelf[payload.new.name] = true;
+    }
+    scheduleRender(); saveOffline(); return;
+  }
+  if (row.sticker_id === '_shipfee_leader') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
+      delete allShipFeeLeader[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allShipFeeLeader[payload.new.name] = true;
+    }
+    scheduleRender(); saveOffline(); return;
+  }
+  if (row.sticker_id === '_shipped') {
+    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
+      delete allShipped[row.name];
+    } else if (payload.new && payload.new.quantity > 0) {
+      allShipped[payload.new.name] = true;
+    }
+    scheduleRender(); saveOffline(); return;
+  }
+
+  if (payload.eventType === 'DELETE') {
+    if (allOrders[row.name]) {
+      delete allOrders[row.name][row.sticker_id];
+      if (Object.keys(allOrders[row.name]).length === 0) delete allOrders[row.name];
+    }
+  } else {
+    const {name, sticker_id, quantity} = payload.new;
+    if (!allOrders[name]) allOrders[name] = {};
+    if (quantity > 0) {
+      allOrders[name][sticker_id] = quantity;
+    } else {
+      delete allOrders[name][sticker_id];
+      if (Object.keys(allOrders[name]).length === 0) delete allOrders[name];
+    }
+  }
+  scheduleRender();
+  saveOffline();
+}
+
+function handleSettingsEvent(payload) {
+  if (!payload.new) return;
+  if (payload.new.key === 'rate') {
+    rate = parseFloat(payload.new.value) || 6.90;
+    document.getElementById('rateInput').value = rate;
+    recalculate();
+    saveOffline();
+  }
+  if (payload.new.key === 'locked') {
+    isLocked = payload.new.value === '1';
+    applyLockState();
+    saveOffline();
+  }
+  if (payload.new.key === 'actual_usd') {
+    actualUSD = parseFloat(payload.new.value) || 0;
+    document.getElementById('actualUsdInput').value = actualUSD || '';
+    recalculate();
+    saveOffline();
+  }
+  if (payload.new.key === 'tax_cny') {
+    taxCNY = parseFloat(payload.new.value) || 0;
+    document.getElementById('taxCnyInput').value = taxCNY || '';
+    recalculate();
+    saveOffline();
+  }
+}
+
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(() => {
+    renderTable();
+    recalculate();
+  }, 100);
+}
+
+let pendingChanges = {}; // {sid: qty} — local changes not yet submitted to Supabase
+
+function trackChange(sid, qty) {
+  pendingChanges[sid] = qty;
+  updateSubmitBar();
+}
+
+function updateSubmitBar() {
+  const count = Object.keys(pendingChanges).length;
+  const bar = document.getElementById('submitBar');
+  const countEl = document.getElementById('submitCount');
+  const btn = document.getElementById('submitBtn');
+  if (count > 0) {
+    bar.classList.add('show');
+    countEl.textContent = count;
+    btn.textContent = '保存';
+    btn.disabled = false;
+    btn.className = 'submit-bar-btn';
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+async function submitCart() {
+  if (isLocked) { alert('已锁单，无法修改'); return; }
+  if (!sb || !myName) return;
+  const entries = Object.entries(pendingChanges);
+  if (entries.length === 0) return;
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+
+  try {
+    const rows = entries.map(([sid, qty]) => ({
+      name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()
+    }));
+    const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'}).select();
+    if (error) throw error;
+
+    pendingChanges = {};
+    btn.textContent = '已保存 ✓';
+    btn.className = 'submit-bar-btn success';
+    updateStatus('已保存');
+    setTimeout(() => updateSubmitBar(), 1500);
+  } catch(e) {
+    console.error('Submit failed:', e);
+    btn.disabled = false;
+    btn.textContent = '保存失败，点击重试';
+    updateStatus('保存失败');
+  }
+}
+
+// Safety net: auto-save on page close/hide
+function flushPendingOnExit() {
+  if (!sb || !myName || Object.keys(pendingChanges).length === 0) return;
+  const rows = Object.entries(pendingChanges).map(([sid, qty]) => ({
+    name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()
+  }));
+  // Use sendBeacon for reliability on page close
+  const url = SUPA_URL + '/rest/v1/orders?on_conflict=name,sticker_id';
+  const blob = new Blob([JSON.stringify(rows)], {type: 'application/json'});
+  try {
+    const sent = navigator.sendBeacon(url + '&apikey=' + SUPA_KEY, blob);
+    if (sent) pendingChanges = {};
+  } catch(e) {
+    // Fallback: fire-and-forget fetch
+    fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'resolution=merge-duplicates'},
+      body: JSON.stringify(rows),
+      keepalive: true
+    }).catch(() => {});
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) flushPendingOnExit();
+});
+window.addEventListener('beforeunload', (e) => {
+  if (Object.keys(pendingChanges).length > 0) {
+    flushPendingOnExit();
+    e.preventDefault();
+    e.returnValue = '你有未保存的修改，确定要离开吗？';
+  }
+});
+window.addEventListener('pagehide', flushPendingOnExit);
+
+async function saveRate() {
+  if (!sb || !isAdmin(myName)) {
+    alert('只有管理员可以修改汇率');
+    return;
+  }
+  const newRate = parseFloat(document.getElementById('rateInput').value) || 6.90;
+  if (newRate <= 0 || newRate > 100) {
+    alert('汇率数值不太对哦，请检查一下');
+    return;
+  }
+  const saveBtn = document.getElementById('btnRateSave');
+  if (saveBtn) { saveBtn.textContent = '保存中...'; saveBtn.style.pointerEvents = 'none'; }
+  try {
+    await sb.from('settings').upsert({key: 'rate', value: String(newRate), updated_at: new Date().toISOString()}, {onConflict: 'key'});
+    rate = newRate;
+    recalculate();
+    saveOffline();
+    if (saveBtn) { saveBtn.classList.remove('unsaved'); saveBtn.textContent = '✅ 已保存'; }
+    setTimeout(() => { if (saveBtn) saveBtn.textContent = '💾 保存'; saveBtn.style.pointerEvents = ''; }, 1500);
+  } catch(e) {
+    console.error('Rate save failed:', e);
+    alert('汇率保存失败：' + e.message);
+    if (saveBtn) { saveBtn.textContent = '💾 保存'; saveBtn.style.pointerEvents = ''; }
+  }
+}
+
+async function saveActualUSD() {
+  if (!sb || !isAdmin(myName)) {
+    alert('只有管理员可以设置实际美元总价');
+    return;
+  }
+  const val = parseFloat(document.getElementById('actualUsdInput').value) || 0;
+  const saveBtn = document.getElementById('btnActualUsdSave');
+  if (saveBtn) { saveBtn.textContent = '保存中...'; saveBtn.style.pointerEvents = 'none'; }
+  try {
+    await sb.from('settings').upsert({key: 'actual_usd', value: String(val), updated_at: new Date().toISOString()}, {onConflict: 'key'});
+    actualUSD = val;
+    recalculate();
+    saveOffline();
+    if (saveBtn) { saveBtn.textContent = '✅ 已保存'; }
+    setTimeout(() => { if (saveBtn) { saveBtn.textContent = '💾 保存'; saveBtn.style.pointerEvents = ''; } }, 1500);
+  } catch(e) {
+    console.error('Actual USD save failed:', e);
+    alert('保存失败：' + e.message);
+    if (saveBtn) { saveBtn.textContent = '💾 保存'; saveBtn.style.pointerEvents = ''; }
+  }
+}
+
+async function saveTaxCNY() {
+  if (!sb || !isAdmin(myName)) {
+    alert('只有管理员可以设置关税总额');
+    return;
+  }
+  const val = parseFloat(document.getElementById('taxCnyInput').value) || 0;
+  const saveBtn = document.getElementById('btnTaxCnySave');
+  if (saveBtn) { saveBtn.textContent = '保存中...'; saveBtn.style.pointerEvents = 'none'; }
+  try {
+    await sb.from('settings').upsert({key: 'tax_cny', value: String(val), updated_at: new Date().toISOString()}, {onConflict: 'key'});
+    taxCNY = val;
+    recalculate();
+    saveOffline();
+    if (saveBtn) { saveBtn.textContent = '✅ 已保存'; }
+    setTimeout(() => { if (saveBtn) { saveBtn.textContent = '💾 保存'; saveBtn.style.pointerEvents = ''; } }, 1500);
+  } catch(e) {
+    console.error('Tax CNY save failed:', e);
+    alert('保存失败：' + e.message);
+    if (saveBtn) { saveBtn.textContent = '💾 保存'; saveBtn.style.pointerEvents = ''; }
+  }
+}
+
+// ============ LOCK ============
+async function toggleLock() {
+  if (!sb || !ADMIN_NAMES.includes(myName)) return;
+  const newVal = isLocked ? '0' : '1';
+  const lockBtn = document.getElementById('lockBtn');
+  if (lockBtn) { lockBtn.disabled = true; lockBtn.textContent = '处理中...'; }
+  try {
+    const {error} = await sb.from('settings').update(
+      {value: newVal, updated_at: new Date().toISOString()}
+    ).eq('key', 'locked');
+    if (error) throw error;
+    isLocked = !isLocked;
+    applyLockState();
+    saveOffline();
+  } catch(e) {
+    console.error('Lock toggle failed:', e);
+    alert('锁单操作失败：' + e.message);
+  }
+  if (lockBtn) lockBtn.disabled = false;
+}
+
+function applyLockState() {
+  const banner = document.getElementById('lockBanner');
+  const lockBtn = document.getElementById('lockBtn');
+  if (banner) banner.classList.toggle('show', isLocked);
+  if (lockBtn) {
+    if (ADMIN_NAMES.includes(myName)) {
+      lockBtn.style.display = '';
+      if (isLocked) {
+        lockBtn.textContent = '🔓 解锁';
+        lockBtn.className = 'btn btn-lock unlocked';
+      } else {
+        lockBtn.textContent = '🔒 锁单';
+        lockBtn.className = 'btn btn-lock';
+      }
+    }
+  }
+  document.querySelectorAll('.qty-btn').forEach(b => {
+    b.disabled = isLocked;
+    b.style.opacity = isLocked ? '.4' : '';
+    b.style.pointerEvents = isLocked ? 'none' : '';
+  });
+  document.querySelectorAll('#orderTable input[type="number"]').forEach(inp => {
+    if (inp.dataset.ap || inp.dataset.rf) return; // actual-paid & refunded inputs stay editable after lock
+    inp.disabled = isLocked;
+    inp.style.opacity = isLocked ? '.5' : '';
+  });
+  document.querySelectorAll('.del-btn').forEach(b => {
+    b.disabled = isLocked;
+    b.style.opacity = isLocked ? '.4' : '';
+    b.style.pointerEvents = isLocked ? 'none' : '';
+  });
+  if (isLocked) {
+    const bar = document.getElementById('submitBar');
+    if (bar) bar.classList.remove('show');
+    pendingChanges = {};
+  }
+}
+
+// ============ OFFLINE FALLBACK ============
+function saveOffline() {
+  try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader, allActualPaid, actualUSD, taxCNY, allShipFeeSelf, allShipFeeLeader, allShipped})); } catch(e) {}
+}
+
+function loadOffline() {
+  try {
+    const d = JSON.parse(localStorage.getItem('gb_cache'));
+    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; allActualPaid = d.allActualPaid || {}; actualUSD = d.actualUSD || 0; taxCNY = d.taxCNY || 0; allShipFeeSelf = d.allShipFeeSelf || {}; allShipFeeLeader = d.allShipFeeLeader || {}; allShipped = d.allShipped || {}; }
+  } catch(e) {}
+}
+
+// ============ UI HELPERS ============
+function setConnected(on) {
+  connected = on;
+  const dot = document.getElementById('connDot');
+  dot.className = 'conn-dot ' + (on ? 'on' : 'off');
+  dot.title = on ? '已连接 · 实时同步中' : '未连接';
+}
+
+function updateStatus(msg) {
+  const el = document.getElementById('lastSaved');
+  if (el) el.textContent = msg + ' ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+}
+
+// ============ AUTH (NICKNAME + PIN) ============
+let authMode = 'register'; // 'register' or 'login'
+
+function showNicknamePopup() {
+  const overlay = document.getElementById('nickOverlay');
+  overlay.style.display = 'flex';
+  const nickInp = document.getElementById('nickInput');
+  const pinInp = document.getElementById('pinInput');
+  const btn = document.getElementById('nickBtn');
+  const checkReady = () => {
+    const nick = nickInp.value.trim();
+    const pin = pinInp.value;
+    btn.disabled = !nick || pin.length < 4;
+  };
+  nickInp.addEventListener('input', checkReady);
+  pinInp.addEventListener('input', () => {
+    pinInp.value = pinInp.value.replace(/\D/g, '').slice(0, 6);
+    checkReady();
+  });
+  nickInp.addEventListener('keydown', e => { if (e.key === 'Enter') pinInp.focus(); });
+  pinInp.addEventListener('keydown', e => { if (e.key === 'Enter' && !btn.disabled) submitAuth(); });
+  nickInp.focus();
+}
+
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.getElementById('tabRegister').className = 'nick-tab' + (mode === 'register' ? ' active' : '');
+  document.getElementById('tabLogin').className = 'nick-tab' + (mode === 'login' ? ' active' : '');
+  document.getElementById('teamSection').style.display = mode === 'register' ? '' : 'none';
+  document.getElementById('authHint').textContent = mode === 'register'
+    ? '请输入你的昵称（群内昵称，方便大家认出你）'
+    : '输入你注册时的昵称和密码';
+  document.getElementById('pinInput').placeholder = mode === 'register' ? '设置密码' : '输入密码';
+  document.getElementById('pinHint').textContent = mode === 'register'
+    ? '4~6位数字，用于换设备时找回账号'
+    : '输入你注册时设置的4~6位数字密码';
+  document.getElementById('nickBtn').textContent = mode === 'register' ? '加入拼团' : '登录';
+  hideAuthErr();
+}
+
+function showAuthErr(msg) {
+  const el = document.getElementById('authErr');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function hideAuthErr() {
+  document.getElementById('authErr').classList.remove('show');
+}
+
+async function submitAuth() {
+  const name = document.getElementById('nickInput').value.trim();
+  const pin = document.getElementById('pinInput').value;
+  if (!name || pin.length < 4) return;
+  hideAuthErr();
+  const btn = document.getElementById('nickBtn');
+  btn.disabled = true;
+  btn.textContent = '处理中...';
+
+  try {
+    if (authMode === 'register') {
+      await doRegister(name, pin);
+    } else {
+      await doLogin(name, pin);
+    }
+  } catch(e) {
+    showAuthErr(e.message || '操作失败，请重试');
+    btn.disabled = false;
+    btn.textContent = authMode === 'register' ? '加入拼团' : '登录';
+  }
+}
+
+async function doRegister(name, pin) {
+  // Round 1 已截团，新用户请去 Round 2
+  throw new Error('本页（Round 1）已截团，不接受新注册。如果你是新用户，请前往 Round 2 页面注册下单。如果你是老用户，请切换到「已有账号」登录。');
+}
+
+async function doLogin(name, pin) {
+  if (!sb) throw new Error('未连接到服务器，请刷新后重试');
+
+  // Verify PIN
+  const {data: pinRows} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', '_pin');
+  if (!pinRows || pinRows.length === 0) {
+    // Check if user exists but has no PIN (old user before login system)
+    const {data: anyRows} = await sb.from('orders').select('sticker_id').eq('name', name).limit(1);
+    if (anyRows && anyRows.length > 0) {
+      // Old user — set PIN for them and log in
+      const {error: pinErr} = await sb.from('orders').upsert(
+        {name, sticker_id: '_pin', quantity: parseInt(pin), updated_at: new Date().toISOString()},
+        {onConflict: 'name,sticker_id'}
+      ).select();
+      if (pinErr) throw new Error('密码设置失败: ' + pinErr.message);
+      // Continue to success flow below (skip PIN check)
+    } else {
+      throw new Error('该昵称不存在，请检查拼写或切换到「新用户注册」');
+    }
+  } else if (pinRows[0].quantity !== parseInt(pin)) {
+    throw new Error('密码错误，请重试');
+  }
+
+  // Success — load their data
+  myName = name;
+  localStorage.setItem('gb_nickname', myName);
+
+  // Get their team
+  const {data: teamRows} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', '_team');
+  if (teamRows && teamRows.length > 0) {
+    myTeam = teamRows[0].quantity;
+    localStorage.setItem('gb_team', myTeam);
+  } else {
+    // Check if this is a Round 2 user who came to the wrong page
+    const {data: r2TeamRows} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r2__team');
+    if (r2TeamRows && r2TeamRows.length > 0) {
+      throw new Error('你是 Round 2 的用户，请前往 Round 2 页面登录。本页是 Round 1。');
+    }
+  }
+
+  document.getElementById('nickOverlay').style.display = 'none';
+  updateNickDisplay();
+  renderTable();
+  recalculate();
+  setTimeout(() => {
+    const tbl = document.getElementById('orderTable');
+    if (tbl) tbl.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }, 300);
+}
+
+function changeNick() {
+  const newName = prompt('修改昵称:', myName);
+  if (newName && newName.trim() && newName.trim() !== myName) {
+    const oldName = myName;
+    myName = newName.trim();
+    localStorage.setItem('gb_nickname', myName);
+    if (allOrders[oldName]) {
+      allOrders[myName] = allOrders[oldName];
+      delete allOrders[oldName];
+    }
+    if (allTeams[oldName]) {
+      allTeams[myName] = allTeams[oldName];
+      delete allTeams[oldName];
+    }
+    if (sb) {
+      sb.from('orders').update({name: myName, updated_at: new Date().toISOString()}).eq('name', oldName)
+        .then(({error}) => { if (error) console.error('Nickname migration failed:', error); });
+    }
+    updateNickDisplay();
+    renderTable();
+    recalculate();
+  }
+}
+
+function changeTeam() {
+  const options = [1, 2, 3].filter(t => t !== myTeam);
+  const choice = prompt('当前：团' + myTeam + '\n输入要切换到的团号（' + options.join(' 或 ') + '）：');
+  if (!choice) return;
+  const newTeam = parseInt(choice);
+  if (![1, 2, 3].includes(newTeam) || newTeam === myTeam) { alert('请输入有效的团号'); return; }
+  myTeam = newTeam;
+  localStorage.setItem('gb_team', myTeam);
+  allTeams[myName] = myTeam;
+  updateNickDisplay();
+  if (sb) {
+    sb.from('orders').upsert(
+      {name: myName, sticker_id: '_team', quantity: myTeam, updated_at: new Date().toISOString()},
+      {onConflict: 'name,sticker_id'}
+    ).select().then(r => { if (r.error) console.error('team change failed:', r.error); });
+  }
+  renderTable();
+  recalculate();
+}
+
+function updateNickDisplay() {
+  const el = document.getElementById('nickTag');
+  if (el) el.textContent = myName;
+  const tEl = document.getElementById('teamTag');
+  if (tEl) tEl.textContent = '团' + myTeam;
+  // Show/hide PIN tag
+  const pEl = document.getElementById('pinTag');
+  if (pEl && myName && sb) {
+    sb.from('orders').select('quantity').eq('name', myName).eq('sticker_id', '_pin').then(({data}) => {
+      if (data && data.length > 0) {
+        pEl.textContent = '改密码';
+        pEl.style.display = '';
+      } else {
+        pEl.textContent = '设密码';
+        pEl.style.display = '';
+      }
+    });
+  }
+  // Rate input: admin-only editing
+  applyRatePermission();
+}
+
+function applyRatePermission() {
+  const rateInp = document.getElementById('rateInput');
+  const saveBtn = document.getElementById('btnRateSave');
+  if (!rateInp) return;
+  const canEdit = isAdmin(myName);
+  rateInp.disabled = !canEdit;
+  if (!canEdit && saveBtn) saveBtn.classList.remove('unsaved');
+  // Show actual USD input for admin
+  const auWrap = document.getElementById('actualUsdWrap');
+  const auBtn = document.getElementById('btnActualUsdSave');
+  if (auWrap) auWrap.style.display = canEdit ? 'inline-flex' : 'none';
+  if (auBtn) auBtn.style.display = canEdit ? 'inline-block' : 'none';
+  const auInput = document.getElementById('actualUsdInput');
+  if (auInput && actualUSD > 0) auInput.value = actualUSD;
+  // Show tax CNY input for admin
+  const taxWrap = document.getElementById('taxCnyWrap');
+  const taxBtn = document.getElementById('btnTaxCnySave');
+  if (taxWrap) taxWrap.style.display = canEdit ? 'inline-flex' : 'none';
+  if (taxBtn) taxBtn.style.display = canEdit ? 'inline-block' : 'none';
+  const taxInput = document.getElementById('taxCnyInput');
+  if (taxInput && taxCNY > 0) taxInput.value = taxCNY;
+}
+
+async function changePin() {
+  if (!sb || !myName) return;
+  const {data: existing} = await sb.from('orders').select('quantity').eq('name', myName).eq('sticker_id', '_pin');
+  const hasPin = existing && existing.length > 0;
+
+  if (hasPin) {
+    const oldPin = prompt('请输入当前密码:');
+    if (!oldPin) return;
+    if (existing[0].quantity !== parseInt(oldPin)) {
+      alert('当前密码不正确');
+      return;
+    }
+  }
+  const newPin = prompt(hasPin ? '请输入新的4~6位数字密码:' : '请设置4~6位数字密码（用于换设备时找回账号）:');
+  if (!newPin) return;
+  const cleaned = newPin.replace(/\D/g, '');
+  if (cleaned.length < 4 || cleaned.length > 6) {
+    alert('密码需要4~6位数字');
+    return;
+  }
+  const {error} = await sb.from('orders').upsert(
+    {name: myName, sticker_id: '_pin', quantity: parseInt(cleaned), updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    alert('密码设置失败: ' + error.message);
+  } else {
+    alert(hasPin ? '密码已修改！' : '密码设置成功！下次换设备时可以用这个密码登录。');
+    updateNickDisplay();
+  }
+}
+
+// ============ PAYMENT ============
+function isAdmin(name) { return ADMIN_NAMES.includes(name); }
+function isLeaderOf(name, team) { return TEAM_LEADERS[team] === name || isAdmin(name); }
+function getMyLeaderTeams() {
+  // Returns array of team numbers this user is leader of
+  const teams = [];
+  for (const [t, leader] of Object.entries(TEAM_LEADERS)) {
+    if (leader === myName || isAdmin(myName)) teams.push(parseInt(t));
+  }
+  return teams;
+}
+
+function paymentStatusOf(name) {
+  if (allPayLeader[name]) return 'confirmed';
+  if (allPaySelf[name]) return 'self';
+  return 'unpaid';
+}
+
+function paymentBadgeHTML(name) {
+  const st = paymentStatusOf(name);
+  if (st === 'confirmed') return '<span class="pay-badge pay-confirmed">已确认</span>';
+  if (st === 'self') return '<span class="pay-badge pay-self">待核实</span>';
+  return '<span class="pay-badge pay-unpaid">未付</span>';
+}
+
+function paymentCellHTML(name, team) {
+  const st = paymentStatusOf(name);
+  const isMe = name === myName;
+  const iAmLeader = isLeaderOf(myName, team);
+  let html = paymentBadgeHTML(name);
+
+  // Payment action buttons only appear after locking (锁单后才能付款操作)
+  if (!isLocked) return html;
+
+  // Self-confirm button (only for current user, when not yet self-confirmed)
+  if (isMe && st === 'unpaid') {
+    html += ' <button class="pay-btn" onclick="confirmMyPayment()">我已付款</button>';
+  }
+  // Cancel self-confirm (only for current user, when self-confirmed but not leader-confirmed)
+  if (isMe && st === 'self') {
+    html += ' <button class="pay-btn active" onclick="cancelMyPayment()">撤销</button>';
+  }
+  // Leader confirm button (for leader/admin, when member self-confirmed but not yet leader-confirmed)
+  if (iAmLeader && st === 'self') {
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmPayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
+  }
+  // Leader revoke (for leader/admin, when already leader-confirmed)
+  if (iAmLeader && st === 'confirmed') {
+    html += ' <button class="pay-btn" onclick="leaderRevokePayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
+  }
+  // Leader/admin can also confirm directly even if member hasn't self-confirmed
+  if (iAmLeader && st === 'unpaid' && !isMe) {
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmPayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
+  }
+
+  return html;
+}
+
+async function confirmMyPayment() {
+  if (!sb || !myName) return;
+  if (!isLocked) { alert('请等待团长锁单后再确认付款'); return; }
+  if (!confirm('确认你已完成付款？')) return;
+  allPaySelf[myName] = true;
+  renderTable();
+  recalculate();
+  saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: myName, sticker_id: '_payment_self', quantity: 1, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Payment confirm failed:', error);
+    delete allPaySelf[myName];
+    renderTable(); recalculate();
+    alert('付款确认失败：' + error.message);
+  } else {
+    updateStatus('已标记付款');
+  }
+}
+
+async function cancelMyPayment() {
+  if (!sb || !myName) return;
+  if (!isLocked) { alert('请等待团长锁单后再操作'); return; }
+  if (!confirm('确定要撤销付款确认吗？')) return;
+  delete allPaySelf[myName];
+  renderTable();
+  recalculate();
+  saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: myName, sticker_id: '_payment_self', quantity: 0, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Payment cancel failed:', error);
+    allPaySelf[myName] = true;
+    renderTable(); recalculate();
+    alert('撤销失败：' + error.message);
+  }
+}
+
+async function leaderConfirmPayment(memberName) {
+  if (!sb) return;
+  if (!isLocked) { alert('请等待锁单后再操作'); return; }
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  allPayLeader[memberName] = true;
+  if (!allPaySelf[memberName]) allPaySelf[memberName] = true; // auto-mark self too
+  renderTable();
+  recalculate();
+  saveOffline();
+  const rows = [
+    {name: memberName, sticker_id: '_payment_leader', quantity: 1, updated_at: new Date().toISOString()},
+    {name: memberName, sticker_id: '_payment_self', quantity: 1, updated_at: new Date().toISOString()}
+  ];
+  const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'}).select();
+  if (error) {
+    console.error('Leader confirm failed:', error);
+    delete allPayLeader[memberName];
+    renderTable(); recalculate();
+    alert('确认失败：' + error.message);
+  } else {
+    updateStatus('已确认 ' + memberName + ' 的付款');
+  }
+}
+
+async function leaderRevokePayment(memberName) {
+  if (!sb) return;
+  if (!isLocked) { alert('请等待锁单后再操作'); return; }
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  if (!confirm('确定要撤销对 ' + memberName + ' 的付款确认吗？')) return;
+  delete allPayLeader[memberName];
+  renderTable();
+  recalculate();
+  saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_payment_leader', quantity: 0, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Leader revoke failed:', error);
+    allPayLeader[memberName] = true;
+    renderTable(); recalculate();
+    alert('撤销失败：' + error.message);
+  }
+}
+
+// ============ SHIPPING FEE STATUS ============
+function shipFeeStatusOf(name) {
+  if (allShipFeeLeader[name]) return 'confirmed';
+  if (allShipFeeSelf[name]) return 'self';
+  return 'unpaid';
+}
+
+function shipFeeBadgeHTML(name) {
+  const st = shipFeeStatusOf(name);
+  if (st === 'confirmed') return '<span class="pay-badge pay-confirmed">已确认</span>';
+  if (st === 'self') return '<span class="pay-badge pay-self">待核实</span>';
+  return '<span class="pay-badge pay-unpaid">未付</span>';
+}
+
+function shipFeeCellHTML(name, team) {
+  const st = shipFeeStatusOf(name);
+  const isMe = name === myName;
+  const iAmLeader = isLeaderOf(myName, team);
+  let html = shipFeeBadgeHTML(name);
+  if (!isLocked) return html;
+  if (isMe && st === 'unpaid') {
+    html += ' <button class="pay-btn" onclick="confirmMyShipFee()">已付运费</button>';
+  }
+  if (isMe && st === 'self') {
+    html += ' <button class="pay-btn active" onclick="cancelMyShipFee()">撤销</button>';
+  }
+  if (iAmLeader && st === 'self') {
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmShipFee(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
+  }
+  if (iAmLeader && st === 'confirmed') {
+    html += ' <button class="pay-btn" onclick="leaderRevokeShipFee(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
+  }
+  if (iAmLeader && st === 'unpaid' && !isMe) {
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmShipFee(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
+  }
+  return html;
+}
+
+async function confirmMyShipFee() {
+  if (!sb || !myName) return;
+  if (!isLocked) { alert('请等待团长锁单后再操作'); return; }
+  if (!confirm('确认你已付运费？')) return;
+  allShipFeeSelf[myName] = true;
+  renderTable(); recalculate(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: myName, sticker_id: '_shipfee_self', quantity: 1, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('ShipFee confirm failed:', error);
+    delete allShipFeeSelf[myName];
+    renderTable(); recalculate();
+    alert('确认失败：' + error.message);
+  } else { updateStatus('已标记付运费'); }
+}
+
+async function cancelMyShipFee() {
+  if (!sb || !myName) return;
+  if (!confirm('确定要撤销运费确认吗？')) return;
+  delete allShipFeeSelf[myName];
+  renderTable(); recalculate(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: myName, sticker_id: '_shipfee_self', quantity: 0, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('ShipFee cancel failed:', error);
+    allShipFeeSelf[myName] = true;
+    renderTable(); recalculate();
+    alert('撤销失败：' + error.message);
+  }
+}
+
+async function leaderConfirmShipFee(memberName) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  allShipFeeLeader[memberName] = true;
+  if (!allShipFeeSelf[memberName]) allShipFeeSelf[memberName] = true;
+  renderTable(); recalculate(); saveOffline();
+  const rows = [
+    {name: memberName, sticker_id: '_shipfee_leader', quantity: 1, updated_at: new Date().toISOString()},
+    {name: memberName, sticker_id: '_shipfee_self', quantity: 1, updated_at: new Date().toISOString()}
+  ];
+  const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'}).select();
+  if (error) {
+    console.error('Leader shipfee confirm failed:', error);
+    delete allShipFeeLeader[memberName];
+    renderTable(); recalculate();
+    alert('确认失败：' + error.message);
+  } else { updateStatus('已确认 ' + memberName + ' 的运费'); }
+}
+
+async function leaderRevokeShipFee(memberName) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  if (!confirm('确定要撤销对 ' + memberName + ' 的运费确认吗？')) return;
+  delete allShipFeeLeader[memberName];
+  renderTable(); recalculate(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_shipfee_leader', quantity: 0, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Leader shipfee revoke failed:', error);
+    allShipFeeLeader[memberName] = true;
+    renderTable(); recalculate();
+    alert('撤销失败：' + error.message);
+  }
+}
+
+// ============ SHIPPED STATUS ============
+function shippedCellHTML(name, team) {
+  const shipped = allShipped[name];
+  const iAmLeader = isLeaderOf(myName, team);
+  if (shipped) {
+    let html = '<span class="pay-badge" style="background:#E8F5E9;color:#2E7D32">已发货</span>';
+    if (iAmLeader) {
+      html += ' <button class="pay-btn" onclick="leaderUnmarkShipped(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
+    }
+    return html;
+  } else {
+    let html = '<span class="pay-badge pay-unpaid">未发</span>';
+    if (iAmLeader) {
+      html += ' <button class="pay-btn" style="background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7" onclick="leaderMarkShipped(\'' + esc(name).replace(/'/g, "\\'") + '\')">📦 发货</button>';
+    }
+    return html;
+  }
+}
+
+async function leaderMarkShipped(memberName) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  allShipped[memberName] = true;
+  renderTable(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_shipped', quantity: 1, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Mark shipped failed:', error);
+    delete allShipped[memberName];
+    renderTable();
+    alert('标记发货失败：' + error.message);
+  } else { updateStatus('已标记 ' + memberName + ' 发货'); }
+}
+
+async function leaderUnmarkShipped(memberName) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  if (!confirm('确定要撤销 ' + memberName + ' 的发货标记吗？')) return;
+  delete allShipped[memberName];
+  renderTable(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_shipped', quantity: 0, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Unmark shipped failed:', error);
+    allShipped[memberName] = true;
+    renderTable();
+    alert('撤销失败：' + error.message);
+  }
+}
+
+// ============ ACTUAL PAID ============
+async function saveActualPaid(memberName, amount) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  const cents = Math.round(amount * 100);
+  if (cents > 0) {
+    allActualPaid[memberName] = amount;
+  } else {
+    delete allActualPaid[memberName];
+  }
+  recalculate();
+  saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_actual_paid', quantity: cents, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) {
+    console.error('Save actual paid failed:', error);
+    alert('保存实付金额失败：' + error.message);
+  } else {
+    updateStatus('已更新 ' + memberName + ' 的实付金额');
+  }
+}
+
+async function saveRefunded(memberName, amount) {
+  if (!sb) return;
+  const memberTeam = allTeams[memberName] || 1;
+  if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  const cents = Math.round(amount * 100);
+  if (cents > 0) { allRefunded[memberName] = amount; } else { delete allRefunded[memberName]; }
+  recalculate(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: '_refunded', quantity: cents, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) { console.error('Save refunded failed:', error); alert('保存已退金额失败：' + error.message); }
+  else { updateStatus('已更新 ' + memberName + ' 的已退金额'); }
+}
+
+function showPaymentQR() {
+  if (!isLocked) { alert('截单后才能查看付款码哦～请等待团长锁单'); return; }
+  const team = myTeam;
+  const leader = TEAM_LEADERS[team] || '未知';
+  const qrSrc = TEAM_QR[team];
+
+  // Calculate my total payment amount
+  let myUSD = 0;
+  let grandUSD = 0;
+  const orders = allOrders[myName] || {};
+  S.forEach(s => {
+    let totalQty = 0;
+    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
+    const up = unitPrice(s, totalQty);
+    const q = orders[s.id] || 0;
+    if (q > 0) myUSD += r2(q * up);
+    // accumulate grand total based on per-sticker totals (stable across transfers)
+    grandUSD += r2(totalQty * up);
+  });
+  // Estimated amounts (no discount)
+  const myCNY = r2(myUSD * rate);
+  const myFee = r2(myCNY * 0.001);
+  const myEstTotal = r2(myCNY + myFee);
+  // Actual amounts (with SM multi-design discount + tax)
+  const discountRatio = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
+  const myTax = (taxCNY > 0 && grandUSD > 0 && myUSD > 0) ? r2(myUSD / grandUSD * taxCNY) : 0;
+  let myActualTotal = 0;
+  if (discountRatio > 0 && myUSD > 0) {
+    const actualBase = r2(myUSD * discountRatio * rate);
+    const actualFee = r2(actualBase * 0.001);
+    myActualTotal = r2(actualBase + actualFee + myTax);
+  } else if (myUSD > 0 && myTax > 0) {
+    myActualTotal = r2(myCNY + myFee + myTax);
+  }
+
+  document.getElementById('payQrTitle').textContent = '团' + team + ' 付款码';
+  document.getElementById('payQrLeader').textContent = '团长：' + leader;
+  const wrap = document.getElementById('payQrImgWrap');
+  if (qrSrc) {
+    wrap.innerHTML = '<img src="' + qrSrc + '" alt="团' + team + '付款码">';
+  } else {
+    wrap.innerHTML = '<div class="pay-qr-no-img">付款码准备中…<br>请联系团长获取</div>';
+  }
+
+  // Build amount display + instructions
+  let amountHTML = '';
+  if (myUSD > 0) {
+    if (myActualTotal > 0) {
+      const myPaid = allActualPaid[myName] || 0;
+      const myRefunded = allRefunded[myName] || 0;
+      const myDiff = r2(myPaid - myActualTotal - myRefunded);
+      if (myPaid > 0 && myDiff < 0) {
+        // Already paid but owes more — show 应收 amount
+        const oweAmt = r2(-myDiff);
+        amountHTML = '<div style="background:linear-gradient(135deg,#FFF8E1,#FFE0B2);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#E67E22;border:1px solid #FFD0B5">'
+          + '你需要补交：<span style="font-size:20px">\u00A5' + oweAmt.toFixed(2) + '</span>'
+          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付 \u00A5' + myActualTotal.toFixed(2) + '，已付 \u00A5' + myPaid.toFixed(2) + (myRefunded > 0 ? '，已退 \u00A5' + myRefunded.toFixed(2) : '') + '</div>'
+          + '</div>';
+      } else if (myPaid > 0 && myDiff > 0) {
+        // Overpaid — show 应退
+        amountHTML = '<div style="background:linear-gradient(135deg,#E8F5E9,#C8E6C9);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#2E7D32;border:1px solid #A5D6A7">'
+          + '你已多付 \u00A5' + myDiff.toFixed(2) + '，无需补款'
+          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付 \u00A5' + myActualTotal.toFixed(2) + '，已付 \u00A5' + myPaid.toFixed(2) + (myRefunded > 0 ? '，已退 \u00A5' + myRefunded.toFixed(2) : '') + '，差额会退还</div>'
+          + '</div>';
+      } else if (myPaid > 0 && myDiff === 0) {
+        // Exactly right
+        amountHTML = '<div style="background:linear-gradient(135deg,#E8F5E9,#C8E6C9);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#2E7D32;border:1px solid #A5D6A7">'
+          + '你已付清，无需补款 \u2714'
+          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付 \u00A5' + myActualTotal.toFixed(2) + '，已付 \u00A5' + myPaid.toFixed(2) + '</div>'
+          + '</div>';
+      } else {
+        // Not paid yet — show full actual amount
+        amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
+          + '你需要转账：<span style="font-size:20px">\u00A5' + myActualTotal.toFixed(2) + '</span>'
+          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付（含0.1%手续费' + (myTax > 0 ? ' + 关税¥' + myTax.toFixed(2) : '') + '），已折算SM多款折扣</div>'
+          + '<div style="font-size:11px;font-weight:400;color:#bbb;margin-top:2px">原预估 \u00A5' + myEstTotal.toFixed(2) + '</div>'
+          + '</div>';
+      }
+    } else {
+      // No actual USD set yet, show estimate
+      amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
+        + '预估转账金额：<span style="font-size:20px">\u00A5' + myEstTotal.toFixed(2) + '</span>'
+        + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">预估金额（含0.1%手续费），实际金额待团长确认</div>'
+        + '</div>';
+    }
+  } else {
+    amountHTML = '<div style="background:#f5f5f5;border-radius:10px;padding:12px;margin:10px 0;color:#999;font-size:13px">你还没有选购贴纸</div>';
+  }
+
+  document.getElementById('payQrHint').innerHTML = amountHTML
+    + '<strong>付款说明</strong><br>'
+    + '1. 请按上方金额向团长转账<br>'
+    + '2. 完成转账后，将<b>导出的订单详情</b>和<b>付款截图</b>一起发到群里<br>'
+    + '3. 回到本页点击「💰 我已完成付款」确认';
+  document.getElementById('payQrOverlay').classList.add('on');
+}
+
+function closePaymentQR() {
+  document.getElementById('payQrOverlay').classList.remove('on');
+}
+
+function handlePayBtnClick() {
+  if (!isLocked) { alert('截单后才能确认付款哦～请等待团长锁单'); return; }
+  const st = paymentStatusOf(myName);
+  if (st === 'confirmed') return;
+  if (st === 'self') cancelMyPayment();
+  else confirmMyPayment();
+}
+
+function updatePaymentBtns() {
+  const btn = document.getElementById('btnPayConfirm');
+  const qrBtn = document.getElementById('btnPayQR');
+  if (!btn) return;
+
+  // Before locking: show disabled state with hint
+  if (!isLocked) {
+    btn.textContent = '🔒 截单后付款';
+    btn.className = 'btn-pay-confirm';
+    btn.disabled = true;
+    if (qrBtn) { qrBtn.style.opacity = '0.5'; qrBtn.style.pointerEvents = 'none'; }
+    return;
+  }
+
+  // After locking: enable QR button
+  if (qrBtn) { qrBtn.style.opacity = '1'; qrBtn.style.pointerEvents = 'auto'; }
+
+  const st = paymentStatusOf(myName);
+  if (st === 'confirmed') {
+    btn.textContent = '✅ 团长已确认';
+    btn.className = 'btn-pay-confirm confirmed';
+    btn.disabled = true;
+  } else if (st === 'self') {
+    btn.textContent = '🟠 已付款(待确认)';
+    btn.className = 'btn-pay-confirm self-confirmed';
+    btn.disabled = false;
+  } else {
+    btn.textContent = '💰 我已完成付款';
+    btn.className = 'btn-pay-confirm';
+    btn.disabled = false;
+  }
+}
+
+// ============ PRICING ============
+// Round to N decimal places (avoids floating-point drift)
+function r2(n) { return Math.round(n * 100) / 100; }
+
+function unitPrice(sticker, qty) {
+  const tiers = sticker.t;
+  if (qty <= 0) return tiers[0][1] / tiers[0][0];
+  // Find surrounding tiers and interpolate (SM uses continuous pricing)
+  let lower = tiers[0], upper = null;
+  for (let i = 0; i < tiers.length; i++) {
+    if (qty >= tiers[i][0]) lower = tiers[i];
+    if (qty < tiers[i][0] && !upper) upper = tiers[i];
+  }
+  if (!upper) return lower[1] / lower[0]; // at or above max tier
+  // Linear interpolation of total price between tiers
+  const ratio = (qty - lower[0]) / (upper[0] - lower[0]);
+  const totalPrice = lower[1] + ratio * (upper[1] - lower[1]);
+  return totalPrice / qty;
+}
+
+function tierInfo(sticker, qty) {
+  const tiers = sticker.t;
+  const minQ = tiers[0][0];
+  if (qty === 0) return {txt: '起订 ' + minQ + ' 张', warn: false};
+  if (qty < minQ) return {txt: '需至少' + minQ + '张 (差' + (minQ - qty) + '张)', warn: true};
+  let ci = 0;
+  for (let i = 0; i < tiers.length; i++) { if (qty >= tiers[i][0]) ci = i; }
+  if (ci < tiers.length - 1) {
+    const nxt = tiers[ci + 1];
+    const diff = nxt[0] - qty;
+    const np = (nxt[1] / nxt[0]).toFixed(2);
+    return {txt: tiers[ci][0] + '档 \u00B7 再' + diff + '张\u2192' + nxt[0] + '档($' + np + ')', warn: false};
+  }
+  return {txt: tiers[ci][0] + '档 (最高)', warn: false};
+}
+
+// ============ RENDER CARDS ============
+function renderCards() {
+  const grid = document.getElementById('stickerGrid');
+  let html = '';
+  S.forEach(s => {
+    const url = 'https://www.stickermule.com/claudecode/item/' + s.itemId + '?origin=PUBLIC_PROFILE';
+    html += '<div class="sticker-card" id="card-' + s.id + '">'
+      + '<img src="' + s.img + '" alt="' + s.name + '" loading="lazy">'
+      + '<div class="card-name">' + s.name + '</div>'
+      + '<span class="type-badge ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span>'
+      + '<span class="card-size">' + s.size + '</span>'
+      + '<div class="card-total-row"><span class="card-total-label">全团</span> <span class="card-qty" id="cq-' + s.id + '">0</span></div>'
+      + '<div class="card-price" id="cp-' + s.id + '">暂无订购</div>'
+      + '<div class="card-price-cny" id="cc-' + s.id + '"></div>'
+      + '<div class="card-tier" id="ct-' + s.id + '"></div>'
+      + '<div class="card-my">'
+      +   '<div><span class="card-my-label">我选的</span> <span class="card-my-qty" id="cmq-' + s.id + '">0 张</span></div>'
+      + '</div>'
+      + '<div class="qty-ctrl">'
+      +   '<button class="qty-btn minus" data-sid="' + s.id + '" data-dir="-1">\u2212</button>'
+      +   '<span class="qty-val" id="cv-' + s.id + '">0</span>'
+      +   '<button class="qty-btn plus" data-sid="' + s.id + '" data-dir="1">+</button>'
+      + '</div>'
+      + '<a class="card-link" href="' + url + '" target="_blank">查看原页 \u2192</a>'
+      + '</div>';
+  });
+  grid.innerHTML = html;
+}
+
+function updateCards(data) {
+  S.forEach(s => {
+    const d = data[s.id];
+    const q = d.totalQty;
+    const up = d.unitPrice;
+    document.getElementById('cq-' + s.id).textContent = q + ' 张';
+    if (q > 0) {
+      document.getElementById('cp-' + s.id).textContent = '$' + up.toFixed(4) + '/张';
+      document.getElementById('cc-' + s.id).textContent = '\u00A5' + (up * rate).toFixed(4) + '/张';
+    } else {
+      document.getElementById('cp-' + s.id).textContent = '暂无订购';
+      document.getElementById('cc-' + s.id).textContent = '';
+    }
+    const ti = tierInfo(s, q);
+    const el = document.getElementById('ct-' + s.id);
+    el.textContent = ti.txt;
+    el.className = 'card-tier' + (ti.warn ? ' warn' : '');
+    // Update personal quantity on card
+    const myQty = (allOrders[myName] && allOrders[myName][s.id]) || 0;
+    const cmq = document.getElementById('cmq-' + s.id);
+    if (cmq) cmq.textContent = myQty + ' 张';
+    const cv = document.getElementById('cv-' + s.id);
+    if (cv) {
+      cv.textContent = myQty;
+      cv.className = 'qty-val' + (myQty > 0 ? ' has-qty' : '');
+    }
+  });
+}
+
+// ============ RENDER TABLE ============
+function getTeamsData() {
+  const names = new Set(Object.keys(allOrders));
+  Object.keys(allTeams).forEach(n => names.add(n));
+  names.add(myName);
+  const arr = [...names];
+
+  const groups = {1: [], 2: [], 3: [], 0: []};
+  for (const n of arr) {
+    const t = allTeams[n] || 1;
+    if (!groups[t]) groups[t] = [];
+    groups[t].push(n);
+  }
+  for (const t of Object.keys(groups)) {
+    groups[t].sort((a, b) => {
+      if (a === myName) return -1;
+      if (b === myName) return 1;
+      return (allJoinOrder[a] || Infinity) - (allJoinOrder[b] || Infinity);
+    });
+  }
+
+  const result = [];
+  // Put user's team first, then others in order
+  if (groups[myTeam] && groups[myTeam].length > 0) result.push({team: myTeam, names: groups[myTeam]});
+  for (const t of [1, 2, 3]) {
+    if (t !== myTeam && groups[t] && groups[t].length > 0) result.push({team: t, names: groups[t]});
+  }
+  if (groups[0] && groups[0].length > 0) result.push({team: 0, names: groups[0]});
+  return result;
+}
+
+function renderTable() {
+  const tbl = document.getElementById('orderTable');
+  const teamsData = getTeamsData();
+
+  let totalActive = 0;
+  teamsData.forEach(g => {
+    totalActive += g.names.filter(n => {
+      const o = allOrders[n];
+      return o && Object.values(o).some(q => q > 0);
+    }).length;
+  });
+  document.getElementById('memberCount').textContent = totalActive > 0 ? '（' + totalActive + ' 人参团）' : '';
+
+  let h = '<thead><tr><th class="col-idx">#</th><th class="col-name">昵称</th>';
+  S.forEach(s => {
+    h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
+  });
+  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（预估）</th><th>手续费</th><th>关税</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应收</th><th>应退</th><th class="col-pay">付款</th><th class="col-pay">运费</th><th class="col-pay">发货</th></tr></thead>';
+
+  h += '<tbody>';
+  // Combined summary rows (pricing uses combined totals across all teams)
+  h += '<tr class="s-row r-qty"><td class="col-idx"></td><td class="col-name">总数量</td>';
+  S.forEach(s => { h += '<td id="sq-' + s.id + '">0</td>'; });
+  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+
+  h += '<tr class="s-row r-price"><td class="col-idx"></td><td class="col-name">单价(¥)</td>';
+  S.forEach(s => { h += '<td id="sp-' + s.id + '">\u2014</td>'; });
+  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+
+  h += '<tr class="s-row r-total"><td class="col-idx"></td><td class="col-name">该款总价</td>';
+  S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
+  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-tax"></td><td id="st-grand-actual"></td><td></td><td></td><td></td><td></td><td></td></tr>';
+
+  // 三团汇总 row (grand totals across all teams)
+  h += '<tr class="team-subtotal" style="background:#FFF8F0;font-weight:700"><td class="col-idx"></td><td class="col-name">三团汇总</td>';
+  S.forEach(s => { h += '<td id="gtsq-' + s.id + '"></td>'; });
+  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-tax"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refunded"></td><td id="gt-owe"></td><td id="gt-refund"></td><td></td><td></td><td></td></tr>';
+
+  // Compute global join-order sequence numbers (stable: based on ALL registered users, not just visible ones)
+  const sortedByJoin = Object.entries(allJoinOrder).sort((a, b) => a[1] - b[1]);
+  const seqMap = {};
+  sortedByJoin.forEach(([name], i) => { seqMap[name] = i + 1; });
+  globalSeqMap = seqMap;
+
+  // Team sections
+  let personIdx = 0;
+  teamsData.forEach(g => {
+    const teamLabel = g.team > 0 ? '团' + g.team : '未分组';
+    const visibleNames = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
+    if (visibleNames.length === 0) return; // skip empty teams when filtering
+
+    // Team header row
+    // Payment stats for team header
+    let teamConfirmed = 0, teamSelfPaid = 0;
+    visibleNames.forEach(n => { const ps = paymentStatusOf(n); if (ps === 'confirmed') teamConfirmed++; else if (ps === 'self') teamSelfPaid++; });
+    const teamUnpaid = visibleNames.length - teamConfirmed - teamSelfPaid;
+    let payStats = '';
+    if (teamConfirmed > 0) payStats += '<span class="pay-stats pay-stats-ok">✅' + teamConfirmed + '</span> ';
+    if (teamSelfPaid > 0) payStats += '<span class="pay-stats" style="color:#E8714A">🟠' + teamSelfPaid + '</span> ';
+    if (teamUnpaid > 0) payStats += '<span class="pay-stats pay-stats-pending">⭕' + teamUnpaid + '</span>';
+    // Shipping fee stats
+    let sfConfirmed = 0, sfSelf = 0;
+    visibleNames.forEach(n => { const ss = shipFeeStatusOf(n); if (ss === 'confirmed') sfConfirmed++; else if (ss === 'self') sfSelf++; });
+    const sfUnpaid = visibleNames.length - sfConfirmed - sfSelf;
+    let sfStats = '';
+    if (sfConfirmed > 0) sfStats += '<span class="pay-stats pay-stats-ok">✅' + sfConfirmed + '</span> ';
+    if (sfSelf > 0) sfStats += '<span class="pay-stats" style="color:#E8714A">🟠' + sfSelf + '</span> ';
+    if (sfUnpaid > 0) sfStats += '<span class="pay-stats pay-stats-pending">⭕' + sfUnpaid + '</span>';
+    // Shipped stats
+    let shippedCount = 0;
+    visibleNames.forEach(n => { if (allShipped[n]) shippedCount++; });
+    const notShipped = visibleNames.length - shippedCount;
+    let shipStats = '';
+    if (shippedCount > 0) shipStats += '<span class="pay-stats" style="color:#2E7D32">📦' + shippedCount + '</span> ';
+    if (notShipped > 0) shipStats += '<span class="pay-stats pay-stats-pending">⭕' + notShipped + '</span>';
+
+    const headerCount = hideEmptyOrders ? visibleNames.length + '/' + g.names.length : '' + g.names.length;
+    h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + teamLabel + '（' + headerCount + ' 人）</td>';
+    S.forEach(() => { h += '<td></td>'; });
+    h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>' + payStats + '</td><td>' + sfStats + '</td><td>' + shipStats + '</td></tr>';
+
+    // Person rows
+    visibleNames.forEach(name => {
+      const isMe = name === myName;
+      const orders = allOrders[name] || {};
+      h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-name="' + esc(name) + '">';
+      h += '<td class="col-idx">' + (seqMap[name] || '') + '</td>';
+      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small> <button class="del-btn" onclick="clearMyOrders()" title="清空我的订单">清空</button>' : '') + '</td>';
+      S.forEach(s => {
+        const v = orders[s.id] || 0;
+        if (isMe) {
+          h += '<td><input type="number" min="0" value="' + (v || '') + '" data-si="' + s.id + '"></td>';
+        } else {
+          h += '<td>' + (v || '') + '</td>';
+        }
+      });
+      h += '<td class="pt-items" id="pi-' + personIdx + '">0</td>';
+      h += '<td class="pt-usd" id="pu-' + personIdx + '">\u2014</td>';
+      h += '<td class="pt-cny" id="pc-' + personIdx + '">\u2014</td>';
+      h += '<td class="pt-fee" id="pf-' + personIdx + '">\u2014</td>';
+      h += '<td class="pt-tax" id="px-' + personIdx + '">\u2014</td>';
+      h += '<td class="pt-actual" id="pa-' + personIdx + '">\u2014</td>';
+      // Actual paid column — editable by team leader / admin only
+      const apVal = allActualPaid[name];
+      const canEditAP = isLeaderOf(myName, g.team);
+      if (canEditAP) {
+        h += '<td class="pt-ap"><input type="number" min="0" step="0.01" value="' + (apVal !== undefined ? apVal.toFixed(2) : '') + '" data-ap="' + esc(name) + '" placeholder="\u2014" style="width:78px;color:#E8714A"></td>';
+      } else {
+        h += '<td class="pt-ap">' + (apVal !== undefined ? '<span style="color:#E8714A">\u00A5' + apVal.toFixed(2) + '</span>' : '\u2014') + '</td>';
+      }
+      // Refunded column — editable by team leader / admin only
+      const rfVal = allRefunded[name];
+      if (canEditAP) {
+        h += '<td class="pt-rfd"><input type="number" min="0" step="0.01" value="' + (rfVal !== undefined ? rfVal.toFixed(2) : '') + '" data-rf="' + esc(name) + '" placeholder="\u2014" style="width:78px;color:#7BC9A0"></td>';
+      } else {
+        h += '<td class="pt-rfd">' + (rfVal !== undefined ? '<span style="color:#7BC9A0">\u00A5' + rfVal.toFixed(2) + '</span>' : '\u2014') + '</td>';
+      }
+      h += '<td class="pt-owe" id="po-' + personIdx + '">\u2014</td>';
+      h += '<td class="pt-refund" id="pr-' + personIdx + '">\u2014</td>';
+      h += '<td>' + paymentCellHTML(name, g.team) + '</td>';
+      h += '<td>' + shipFeeCellHTML(name, g.team) + '</td>';
+      h += '<td>' + shippedCellHTML(name, g.team) + '</td>';
+      h += '</tr>';
+      personIdx++;
+    });
+
+    // Team subtotal row
+    h += '<tr class="team-subtotal"><td class="col-idx"></td><td class="col-name">' + teamLabel + '小计</td>';
+    S.forEach(s => { h += '<td id="tsq-' + g.team + '-' + s.id + '"></td>'; });
+    h += '<td id="tsi-' + g.team + '"></td>';
+    h += '<td id="tsu-' + g.team + '"></td>';
+    h += '<td id="tsc-' + g.team + '"></td>';
+    h += '<td id="tsf-' + g.team + '"></td>';
+    h += '<td id="tsx-' + g.team + '"></td>';
+    h += '<td id="tsa-' + g.team + '"></td>';
+    h += '<td id="tsap-' + g.team + '"></td>';
+    h += '<td id="tsrf-' + g.team + '"></td>';
+    h += '<td id="tsow-' + g.team + '"></td>';
+    h += '<td id="tsr-' + g.team + '"></td>';
+    h += '<td></td><td></td><td></td>';
+    h += '</tr>';
+  });
+
+  h += '</tbody>';
+
+  // Save focus state (sticker inputs and actual-paid inputs)
+  const focused = document.activeElement;
+  let focusSid = null, focusAp = null, focusRf = null, focusVal = null, focusPos = null;
+  if (focused && focused.dataset) {
+    if (focused.dataset.si) { focusSid = focused.dataset.si; }
+    else if (focused.dataset.ap) { focusAp = focused.dataset.ap; }
+    else if (focused.dataset.rf) { focusRf = focused.dataset.rf; }
+    if (focusSid || focusAp || focusRf) {
+      focusVal = focused.value;
+      focusPos = focused.selectionStart;
+    }
+  }
+
+  tbl.innerHTML = h;
+
+  // Restore focus
+  let restoreInp = null;
+  if (focusSid) restoreInp = tbl.querySelector('input[data-si="' + focusSid + '"]');
+  else if (focusAp) restoreInp = tbl.querySelector('input[data-ap="' + CSS.escape(focusAp) + '"]');
+  else if (focusRf) restoreInp = tbl.querySelector('input[data-rf="' + CSS.escape(focusRf) + '"]');
+  if (restoreInp) {
+    restoreInp.value = focusVal;
+    restoreInp.focus();
+    try { restoreInp.setSelectionRange(focusPos, focusPos); } catch(e) {}
+  }
+
+  // Re-apply lock state to newly rendered inputs
+  applyLockState();
+  updatePaymentBtns();
+  // Update hide-empty toggle button text
+  const btnHE = document.getElementById('btnHideEmpty');
+  if (btnHE) btnHE.textContent = hideEmptyOrders ? '👁 显示全部' : '👁 隐藏空订单';
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function hasOrders(name) { const o = allOrders[name]; return o && Object.values(o).some(q => q > 0); }
+function toggleHideEmpty() { hideEmptyOrders = !hideEmptyOrders; renderTable(); recalculate(); }
+
+// ============ RECALCULATE ============
+function recalculate() {
+  const teamsData = getTeamsData();
+  const data = {};
+
+  // Combined totals for pricing (both teams together = better price)
+  S.forEach(s => {
+    let totalQty = 0;
+    for (const name in allOrders) { totalQty += (allOrders[name][s.id] || 0); }
+    const up = unitPrice(s, totalQty);
+    data[s.id] = {totalQty, unitPrice: up};
+    const sqEl = document.getElementById('sq-' + s.id);
+    const spEl = document.getElementById('sp-' + s.id);
+    const stEl = document.getElementById('st-' + s.id);
+    if (sqEl) sqEl.textContent = totalQty;
+    if (spEl) spEl.textContent = totalQty > 0 ? '¥' + (up * rate).toFixed(2) : '\u2014';
+    if (stEl) stEl.textContent = totalQty > 0 ? '$' + (totalQty * up).toFixed(2) : '\u2014';
+  });
+
+  // Pre-compute grand total USD — based on per-sticker totals (not per-person)
+  // so that transferring orders between people doesn't change grandUSD
+  let grandUSD = 0;
+  S.forEach(s => { grandUSD += r2(data[s.id].totalQty * data[s.id].unitPrice); });
+  const discountRatio = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
+
+  // Per-person totals and per-team subtotals
+  let personIdx = 0;
+  let gtItems = 0, gtUSD = 0, gtActual = 0, gtCNY = 0, gtFee = 0, gtTax = 0, gtAP = 0, gtRefunded = 0, gtOwe = 0, gtRefund = 0;
+  const gtStickerQty = {};
+  S.forEach(s => { gtStickerQty[s.id] = 0; });
+
+  teamsData.forEach(g => {
+    let teamItems = 0, teamUSD = 0, teamFee = 0, teamTax = 0, teamActualPaid = 0, teamActualCNY = 0, teamRefunded = 0, teamOwe = 0, teamRefund = 0;
+    const teamStickerQty = {};
+    S.forEach(s => { teamStickerQty[s.id] = 0; });
+
+    const visibleNames = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
+    if (visibleNames.length === 0) return;
+
+    visibleNames.forEach(name => {
+      const orders = allOrders[name] || {};
+      let items = 0, usd = 0;
+      S.forEach(s => {
+        const q = orders[s.id] || 0;
+        items += q;
+        usd += r2(q * data[s.id].unitPrice);
+        teamStickerQty[s.id] += q;
+        gtStickerQty[s.id] += q;
+      });
+      const cny = r2(usd * rate);
+      teamItems += items;
+      teamUSD += usd;
+
+      const fee = r2(cny * 0.001); // 0.1% bank transfer fee
+      teamFee += fee;
+      // Per-person tax: proportional to their USD share
+      const personTax = (taxCNY > 0 && grandUSD > 0 && usd > 0) ? r2(usd / grandUSD * taxCNY) : 0;
+      teamTax += personTax;
+      if (allActualPaid[name] !== undefined) teamActualPaid += allActualPaid[name];
+      if (allRefunded[name] !== undefined) teamRefunded += allRefunded[name];
+      let personRefund = 0, personOwe = 0;
+
+      // CNY（实际应付）= proportional share of actual SM total × rate, plus fee, plus tax
+      let personActual = 0;
+      if (discountRatio > 0 && items > 0) {
+        const actualBase = r2(usd * discountRatio * rate);
+        const actualFee = r2(actualBase * 0.001);
+        personActual = r2(actualBase + actualFee + personTax);
+        teamActualCNY += personActual;
+      } else if (items > 0 && personTax > 0) {
+        // No actual USD set yet but tax exists — show estimate + tax
+        personActual = r2(cny + fee + personTax);
+        teamActualCNY += personActual;
+      }
+
+      const piEl = document.getElementById('pi-' + personIdx);
+      const puEl = document.getElementById('pu-' + personIdx);
+      const paEl = document.getElementById('pa-' + personIdx);
+      const pcEl = document.getElementById('pc-' + personIdx);
+      const pfEl = document.getElementById('pf-' + personIdx);
+      const pxEl = document.getElementById('px-' + personIdx);
+      if (piEl) piEl.textContent = items;
+      if (puEl) puEl.textContent = items > 0 ? '$' + usd.toFixed(2) : '\u2014';
+      if (paEl) paEl.textContent = (personActual > 0) ? '\u00A5' + personActual.toFixed(2) : '\u2014';
+      if (pcEl) pcEl.textContent = items > 0 ? '\u00A5' + cny.toFixed(2) : '\u2014';
+      if (pfEl) pfEl.textContent = items > 0 ? '\u00A5' + fee.toFixed(2) : '\u2014';
+      if (pxEl) pxEl.textContent = personTax > 0 ? '\u00A5' + personTax.toFixed(2) : '\u2014';
+      if (pxEl && personTax > 0) pxEl.style.color = '#E74C3C';
+      // 应收/应退 calculation
+      const paid = allActualPaid[name] || 0;
+      const refunded = allRefunded[name] || 0;
+      const poEl = document.getElementById('po-' + personIdx);
+      const prEl = document.getElementById('pr-' + personIdx);
+      if (paid > 0 && personActual > 0) {
+        const diff = r2(paid - personActual - refunded);
+        if (diff < 0) {
+          personOwe = r2(-diff);
+          if (poEl) { poEl.textContent = '\u00A5' + personOwe.toFixed(2); poEl.style.color = '#E67E22'; }
+          if (prEl) { prEl.textContent = '\u2014'; prEl.style.color = ''; }
+        } else if (diff > 0) {
+          personRefund = diff;
+          if (poEl) { poEl.textContent = '\u2014'; poEl.style.color = ''; }
+          if (prEl) { prEl.textContent = '\u00A5' + personRefund.toFixed(2); prEl.style.color = '#E74C3C'; }
+        } else {
+          if (poEl) { poEl.textContent = '\u2014'; poEl.style.color = ''; }
+          if (prEl) { prEl.textContent = '\u2014'; prEl.style.color = ''; }
+        }
+      } else {
+        if (poEl) { poEl.textContent = '\u2014'; poEl.style.color = ''; }
+        if (prEl) { prEl.textContent = '\u2014'; prEl.style.color = ''; }
+      }
+      teamOwe += personOwe;
+      teamRefund += personRefund;
+      personIdx++;
+    });
+
+    // Fill team subtotal row
+    const teamCNY = teamUSD * rate;
+    S.forEach(s => {
+      const el = document.getElementById('tsq-' + g.team + '-' + s.id);
+      if (el) el.textContent = teamStickerQty[s.id] || '';
+    });
+    const tsiEl = document.getElementById('tsi-' + g.team);
+    const tsuEl = document.getElementById('tsu-' + g.team);
+    const tsaEl = document.getElementById('tsa-' + g.team);
+    const tscEl = document.getElementById('tsc-' + g.team);
+    const tsfEl = document.getElementById('tsf-' + g.team);
+    if (tsiEl) tsiEl.textContent = teamItems;
+    if (tsuEl) tsuEl.textContent = teamItems > 0 ? '$' + teamUSD.toFixed(2) : '\u2014';
+    if (tsaEl) tsaEl.textContent = teamActualCNY > 0 ? '\u00A5' + teamActualCNY.toFixed(2) : '\u2014';
+    if (tscEl) tscEl.textContent = teamItems > 0 ? '\u00A5' + teamCNY.toFixed(2) : '\u2014';
+    if (tsfEl) tsfEl.textContent = teamItems > 0 ? '\u00A5' + teamFee.toFixed(2) : '\u2014';
+    const tsxEl = document.getElementById('tsx-' + g.team);
+    if (tsxEl) tsxEl.textContent = teamTax > 0 ? '\u00A5' + teamTax.toFixed(2) : '\u2014';
+    if (tsxEl && teamTax > 0) tsxEl.style.color = '#E74C3C';
+    const tsapEl = document.getElementById('tsap-' + g.team);
+    if (tsapEl && teamActualPaid > 0) tsapEl.innerHTML = '<span style="color:#E8714A">\u00A5' + teamActualPaid.toFixed(2) + '</span>';
+    else if (tsapEl) tsapEl.textContent = '\u2014';
+    const tsrfEl = document.getElementById('tsrf-' + g.team);
+    if (tsrfEl && teamRefunded > 0) tsrfEl.innerHTML = '<span style="color:#7BC9A0">\u00A5' + teamRefunded.toFixed(2) + '</span>';
+    else if (tsrfEl) tsrfEl.textContent = '\u2014';
+    const tsowEl = document.getElementById('tsow-' + g.team);
+    if (tsowEl) tsowEl.textContent = teamOwe > 0 ? '\u00A5' + teamOwe.toFixed(2) : '\u2014';
+    if (tsowEl && teamOwe > 0) tsowEl.style.color = '#E67E22';
+    const tsrEl = document.getElementById('tsr-' + g.team);
+    if (tsrEl) tsrEl.textContent = teamRefund > 0 ? '\u00A5' + teamRefund.toFixed(2) : '\u2014';
+
+    // Accumulate grand totals
+    gtItems += teamItems; gtUSD += teamUSD; gtActual += teamActualCNY;
+    gtCNY += teamCNY; gtFee += teamFee; gtTax += teamTax; gtAP += teamActualPaid; gtRefunded += teamRefunded; gtOwe += teamOwe; gtRefund += teamRefund;
+  });
+
+  const grandCNY = r2(grandUSD * rate);
+  const grandFee = r2(grandCNY * 0.001);
+  const grandActualCNY = discountRatio > 0 ? r2(actualUSD * rate * 1.001 + taxCNY) : 0;
+  let grandTotalText = '总金额 $' + grandUSD.toFixed(2) + ' / \u00A5' + (grandCNY + grandFee).toFixed(2) + '(含手续费)';
+  if (actualUSD > 0) grandTotalText += ' | 实际 $' + actualUSD.toFixed(2) + ' / \u00A5' + grandActualCNY.toFixed(2);
+  if (taxCNY > 0) grandTotalText += ' | 关税 \u00A5' + taxCNY.toFixed(2);
+  document.getElementById('grandTotal').textContent = grandTotalText;
+  const sgU = document.getElementById('st-grand-usd');
+  const sgA = document.getElementById('st-grand-actual');
+  const sgC = document.getElementById('st-grand-cny');
+  const sgF = document.getElementById('st-grand-fee');
+  const sgX = document.getElementById('st-grand-tax');
+  if (sgU) sgU.textContent = '$' + grandUSD.toFixed(2);
+  if (sgA) sgA.textContent = grandActualCNY > 0 ? '\u00A5' + grandActualCNY.toFixed(2) : '\u2014';
+  if (sgC) sgC.textContent = '\u00A5' + grandCNY.toFixed(2);
+  if (sgF) sgF.textContent = '\u00A5' + grandFee.toFixed(2);
+  if (sgX) { sgX.textContent = taxCNY > 0 ? '\u00A5' + taxCNY.toFixed(2) : '\u2014'; if (taxCNY > 0) sgX.style.color = '#E74C3C'; }
+
+  // Fill 三团汇总 row
+  S.forEach(s => {
+    const el = document.getElementById('gtsq-' + s.id);
+    if (el) el.textContent = gtStickerQty[s.id] || '';
+  });
+  const gtiEl = document.getElementById('gt-items');
+  const gtuEl = document.getElementById('gt-usd');
+  const gtaEl = document.getElementById('gt-actual');
+  const gtcEl = document.getElementById('gt-cny');
+  const gtfEl = document.getElementById('gt-fee');
+  const gtapEl = document.getElementById('gt-ap');
+  if (gtiEl) gtiEl.textContent = gtItems;
+  if (gtuEl) gtuEl.textContent = gtItems > 0 ? '$' + gtUSD.toFixed(2) : '\u2014';
+  if (gtaEl) gtaEl.textContent = gtActual > 0 ? '\u00A5' + gtActual.toFixed(2) : '\u2014';
+  if (gtcEl) gtcEl.textContent = gtItems > 0 ? '\u00A5' + gtCNY.toFixed(2) : '\u2014';
+  if (gtfEl) gtfEl.textContent = gtItems > 0 ? '\u00A5' + gtFee.toFixed(2) : '\u2014';
+  const gtxEl = document.getElementById('gt-tax');
+  if (gtxEl) { gtxEl.textContent = gtTax > 0 ? '\u00A5' + gtTax.toFixed(2) : '\u2014'; if (gtTax > 0) gtxEl.style.color = '#E74C3C'; }
+  if (gtapEl && gtAP > 0) gtapEl.innerHTML = '<span style="color:#E8714A">\u00A5' + gtAP.toFixed(2) + '</span>';
+  else if (gtapEl) gtapEl.textContent = '\u2014';
+  const gtrfEl = document.getElementById('gt-refunded');
+  if (gtrfEl && gtRefunded > 0) gtrfEl.innerHTML = '<span style="color:#7BC9A0">\u00A5' + gtRefunded.toFixed(2) + '</span>';
+  else if (gtrfEl) gtrfEl.textContent = '\u2014';
+  const gtowEl = document.getElementById('gt-owe');
+  if (gtowEl) gtowEl.textContent = gtOwe > 0 ? '\u00A5' + gtOwe.toFixed(2) : '\u2014';
+  if (gtowEl && gtOwe > 0) gtowEl.style.color = '#E67E22';
+  const gtrEl = document.getElementById('gt-refund');
+  if (gtrEl) gtrEl.textContent = gtRefund > 0 ? '\u00A5' + gtRefund.toFixed(2) : '\u2014';
+
+  updateCards(data);
+}
+
+// ============ EVENT HANDLERS ============
+document.getElementById('orderTable').addEventListener('input', function(e) {
+  if (isLocked) return;
+  const el = e.target;
+  if (el.matches('input[type="number"]') && el.dataset.si) {
+    const sid = el.dataset.si;
+    const v = Math.max(0, parseInt(el.value) || 0);
+    if (!allOrders[myName]) allOrders[myName] = {};
+    if (v > 0) {
+      allOrders[myName][sid] = v;
+    } else {
+      delete allOrders[myName][sid];
+    }
+    recalculate();
+    trackChange(sid, v);
+    saveOffline();
+  }
+});
+
+// Actual paid & refunded inputs — team leader edits, saved on change
+document.getElementById('orderTable').addEventListener('change', function(e) {
+  const el = e.target;
+  if (el.matches('input[type="number"]') && el.dataset.ap) {
+    const memberName = el.dataset.ap;
+    const amount = Math.max(0, parseFloat(el.value) || 0);
+    saveActualPaid(memberName, amount);
+  }
+  if (el.matches('input[type="number"]') && el.dataset.rf) {
+    const memberName = el.dataset.rf;
+    const amount = Math.max(0, parseFloat(el.value) || 0);
+    saveRefunded(memberName, amount);
+  }
+});
+
+function exportMyOrder() {
+  const seq = globalSeqMap[myName] || '?';
+  const teamLabel = myTeam > 0 ? '团' + myTeam : '未分组';
+  const orders = allOrders[myName] || {};
+  const data = {};
+  S.forEach(s => {
+    let totalQty = 0;
+    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
+    data[s.id] = {unitPrice: unitPrice(s, totalQty)};
+  });
+  const lines = ['Claude Code 贴纸拼团 - 订单详情', '序号：#' + seq, '昵称：' + myName, '分团：' + teamLabel, ''];
+  let totalItems = 0, totalUSD = 0;
+  const details = [];
+  S.forEach(s => {
+    const q = orders[s.id] || 0;
+    if (q > 0) {
+      const up = data[s.id].unitPrice;
+      const sub = r2(q * up);
+      details.push(s.name + '(' + TYPE_LABEL[s.type] + ') x' + q + ' = $' + sub.toFixed(2));
+      totalItems += q;
+      totalUSD += sub;
+    }
+  });
+  if (details.length === 0) {
+    lines.push('暂无订购');
+  } else {
+    lines.push(...details);
+  }
+  const estCNY = r2(totalUSD * rate);
+  const estFee = r2(estCNY * 0.001);
+  const estTotal = r2(estCNY + estFee);
+  // Calculate actual amount with SM multi-design discount (per-sticker totals, stable across transfers)
+  let grandUSD = 0;
+  S.forEach(s => {
+    let totalQty = 0;
+    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
+    grandUSD += r2(totalQty * data[s.id].unitPrice);
+  });
+  const dr = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
+  const myTax = (taxCNY > 0 && grandUSD > 0 && totalUSD > 0) ? r2(totalUSD / grandUSD * taxCNY) : 0;
+  lines.push('', '总件数：' + totalItems);
+  if (dr > 0 && totalUSD > 0) {
+    const actBase = r2(totalUSD * dr * rate);
+    const actFee = r2(actBase * 0.001);
+    const actTotal = r2(actBase + actFee + myTax);
+    lines.push('CNY（实际应付）：¥' + actTotal.toFixed(2) + '（含0.1%手续费' + (myTax > 0 ? ' + 关税¥' + myTax.toFixed(2) : '') + '）');
+    // 应收/应退
+    const paid = allActualPaid[myName] || 0;
+    const refunded = allRefunded[myName] || 0;
+    if (paid > 0) {
+      const diff = r2(paid - actTotal - refunded);
+      if (diff < 0) {
+        lines.push('应补缴：¥' + r2(-diff).toFixed(2));
+      } else if (diff > 0) {
+        lines.push('可抵扣国内运费：¥' + diff.toFixed(2));
+      } else {
+        lines.push('无需补缴');
+      }
+    }
+  } else {
+    lines.push('（实际金额待团长确认后更新）');
+  }
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text)
+    .then(() => alert('已复制到剪贴板，可以直接粘贴到群里！'))
+    .catch(() => { prompt('请手动复制：', text); });
+}
+
+function clearMyOrders() {
+  if (isLocked) { alert('已锁单，无法修改'); return; }
+  if (!confirm('确定要清空你的所有订单吗？')) return;
+  const sids = Object.keys(allOrders[myName] || {});
+  delete allOrders[myName];
+  renderTable();
+  recalculate();
+  saveOffline();
+  if (sb && sids.length > 0) {
+    const rows = sids.map(sid => ({name: myName, sticker_id: sid, quantity: 0, updated_at: new Date().toISOString()}));
+    sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'})
+      .then(({error}) => {
+        if (error) console.error('Clear failed:', error);
+        else updateStatus('已清空');
+      });
+  }
+}
+
+document.getElementById('rateInput').addEventListener('input', function() {
+  if (!isAdmin(myName)) return;
+  const newRate = parseFloat(this.value) || 6.90;
+  rate = newRate;
+  recalculate();
+  // Show save button instead of auto-writing
+  const saveBtn = document.getElementById('btnRateSave');
+  if (saveBtn) saveBtn.classList.add('unsaved');
+});
+document.getElementById('taxCnyInput').addEventListener('input', function() {
+  if (!isAdmin(myName)) return;
+  taxCNY = parseFloat(this.value) || 0;
+  recalculate();
+  const saveBtn = document.getElementById('btnTaxCnySave');
+  if (saveBtn) saveBtn.style.display = 'inline-block';
+});
+
+// ============ IMPORT / EXPORT ============
+function showExport() {
+  const people = [];
+  for (const [name, orders] of Object.entries(allOrders)) {
+    const nonZero = {};
+    for (const [sid, qty] of Object.entries(orders)) {
+      if (qty > 0) nonZero[sid] = qty;
+    }
+    if (Object.keys(nonZero).length > 0) {
+      people.push({name, team: allTeams[name] || 1, orders: nonZero});
+    }
+  }
+  document.getElementById('modalTitle').textContent = '导出数据';
+  document.getElementById('modalText').value = JSON.stringify({rate, people}, null, 2);
+  document.getElementById('modalOk').textContent = '复制到剪贴板';
+  document.getElementById('modalOk').onclick = function() {
+    navigator.clipboard.writeText(document.getElementById('modalText').value)
+      .then(() => { alert('已复制！'); closeModal(); })
+      .catch(() => { document.getElementById('modalText').select(); document.execCommand('copy'); alert('已复制！'); closeModal(); });
+  };
+  document.getElementById('modalBg').classList.add('on');
+}
+
+function showImport() {
+  document.getElementById('modalTitle').textContent = '导入数据（批量迁移）';
+  document.getElementById('modalText').value = '';
+  document.getElementById('modalOk').textContent = '导入到云端';
+  document.getElementById('modalOk').onclick = async function() {
+    try {
+      const d = JSON.parse(document.getElementById('modalText').value);
+      if (!d || !Array.isArray(d.people)) { alert('数据格式不正确，需包含 people 数组'); return; }
+      if (!sb) { alert('未连接到服务器，无法导入'); return; }
+
+      const rows = [];
+      for (const p of d.people) {
+        for (const [sid, qty] of Object.entries(p.orders || {})) {
+          if (qty > 0) rows.push({name: p.name, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()});
+        }
+        if (p.team) {
+          rows.push({name: p.name, sticker_id: '_team', quantity: p.team, updated_at: new Date().toISOString()});
+        }
+      }
+      if (rows.length > 0) {
+        const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'});
+        if (error) { alert('导入失败: ' + error.message); return; }
+      }
+      if (d.rate && isAdmin(myName)) {
+        await sb.from('settings').update({value: String(d.rate), updated_at: new Date().toISOString()}).eq('key', 'rate');
+        rate = d.rate;
+        document.getElementById('rateInput').value = rate;
+      }
+      await loadAll();
+      renderTable();
+      recalculate();
+      saveOffline();
+      closeModal();
+      alert('导入成功！共 ' + d.people.length + ' 人，' + rows.length + ' 条订购记录');
+    } catch(e) {
+      alert('JSON解析失败: ' + e.message);
+    }
+  };
+  document.getElementById('modalBg').classList.add('on');
+}
+
+function closeModal() {
+  document.getElementById('modalBg').classList.remove('on');
+}
+
+// ============ INIT ============
+(async function init() {
+  renderCards();
+
+  // Card qty +/- buttons
+  document.getElementById('stickerGrid').addEventListener('click', function(e) {
+    const btn = e.target.closest('.qty-btn');
+    if (!btn || !myName) return;
+    if (isLocked) return;
+    const sid = btn.dataset.sid;
+    const dir = parseInt(btn.dataset.dir);
+    if (!allOrders[myName]) allOrders[myName] = {};
+    const cur = allOrders[myName][sid] || 0;
+    const next = Math.max(0, cur + dir);
+    if (next > 0) {
+      allOrders[myName][sid] = next;
+    } else {
+      delete allOrders[myName][sid];
+      if (Object.keys(allOrders[myName]).length === 0) delete allOrders[myName];
+    }
+    recalculate();
+    renderTable();
+    trackChange(sid, next);
+    saveOffline();
+  });
+
+  // Create Supabase client early so auth popup can use it
+  initSupabaseClient();
+
+  if (!myName) {
+    showNicknamePopup();
+    await new Promise(resolve => {
+      const check = setInterval(() => {
+        if (myName) { clearInterval(check); resolve(); }
+      }, 100);
+    });
+  }
+
+  updateNickDisplay();
+  document.getElementById('rateInput').value = rate;
+  document.getElementById('orderTable').innerHTML = '<tbody><tr><td style="text-align:center;padding:40px;color:#999" colspan="24">连接中...</td></tr></tbody>';
+
+  await initSupabase();
+
+  // Sync team for returning users
+  if (myName && allTeams[myName]) {
+    myTeam = allTeams[myName];
+    localStorage.setItem('gb_team', myTeam);
+  } else if (myName && !allTeams[myName]) {
+    allTeams[myName] = myTeam;
+    if (sb) {
+      await sb.from('orders').upsert(
+        {name: myName, sticker_id: '_team', quantity: myTeam, updated_at: new Date().toISOString()},
+        {onConflict: 'name,sticker_id'}
+      ).select();
+    }
+  }
+  updateNickDisplay();
+
+  document.getElementById('rateInput').value = rate;
+  renderTable();
+  recalculate();
+})();
+</script>
+</body>
+</html>
