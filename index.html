@@ -517,7 +517,14 @@ async function loadAll() {
   allPayLeader = {};
   allActualPaid = {};
   const joinOrd = {};
+  // Collect Round 2 users (have r2__team record) to exclude from Round 1 display
+  const r2Users = new Set();
   for (const row of orders) {
+    if (row.sticker_id === 'r2__team') r2Users.add(row.name);
+  }
+  for (const row of orders) {
+    if (r2Users.has(row.name)) continue; // Skip Round 2 users entirely
+    if (row.sticker_id.startsWith('r2_')) continue; // Skip any r2_ prefixed records
     if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
     if (row.sticker_id === '_team') {
       allTeams[row.name] = row.quantity;
@@ -1025,41 +1032,8 @@ async function submitAuth() {
 }
 
 async function doRegister(name, pin) {
-  if (!sb) throw new Error('未连接到服务器，请刷新后重试');
-
-  // Check if nickname already exists (with PIN or with any orders)
-  const {data: pinCheck} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', '_pin');
-  if (pinCheck && pinCheck.length > 0) {
-    throw new Error('该昵称已被注册，请换一个昵称或切换到「已有账号」登录');
-  }
-  const {data: anyCheck} = await sb.from('orders').select('sticker_id').eq('name', name).limit(1);
-  if (anyCheck && anyCheck.length > 0) {
-    throw new Error('该昵称已有订单记录，请切换到「已有账号」登录（首次登录会自动设置密码）');
-  }
-
-  const team = parseInt(document.querySelector('input[name="team"]:checked')?.value) || 1;
-
-  // Save PIN and team to Supabase
-  const {error} = await sb.from('orders').upsert([
-    {name, sticker_id: '_pin', quantity: parseInt(pin), updated_at: new Date().toISOString()},
-    {name, sticker_id: '_team', quantity: team, updated_at: new Date().toISOString()}
-  ], {onConflict: 'name,sticker_id'}).select();
-  if (error) throw new Error('注册失败: ' + error.message);
-
-  // Success
-  myName = name;
-  myTeam = team;
-  localStorage.setItem('gb_nickname', myName);
-  localStorage.setItem('gb_team', myTeam);
-  allTeams[myName] = myTeam;
-  document.getElementById('nickOverlay').style.display = 'none';
-  updateNickDisplay();
-  renderTable();
-  recalculate();
-  setTimeout(() => {
-    const tbl = document.getElementById('orderTable');
-    if (tbl) tbl.scrollIntoView({behavior: 'smooth', block: 'start'});
-  }, 300);
+  // Round 1 已截团，新用户请去 Round 2
+  throw new Error('本页（Round 1）已截团，不接受新注册。如果你是新用户，请前往 Round 2 页面注册下单。如果你是老用户，请切换到「已有账号」登录。');
 }
 
 async function doLogin(name, pin) {
@@ -1094,6 +1068,12 @@ async function doLogin(name, pin) {
   if (teamRows && teamRows.length > 0) {
     myTeam = teamRows[0].quantity;
     localStorage.setItem('gb_team', myTeam);
+  } else {
+    // Check if this is a Round 2 user who came to the wrong page
+    const {data: r2TeamRows} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r2__team');
+    if (r2TeamRows && r2TeamRows.length > 0) {
+      throw new Error('你是 Round 2 的用户，请前往 Round 2 页面登录。本页是 Round 1。');
+    }
   }
 
   document.getElementById('nickOverlay').style.display = 'none';
