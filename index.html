@@ -153,13 +153,12 @@ input[type="number"]{-moz-appearance:textfield}
 .od-close{background:none;border:none;font-size:20px;cursor:pointer;color:#999;padding:4px 8px}
 .od-close:hover{color:#333}
 .od-body{padding:12px 20px}
-.od-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5}
+.od-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0f0f0}
 .od-item:last-child{border-bottom:none}
-.od-item-name{font-size:14px;color:var(--text)}
+.od-item-name{font-size:15px;font-weight:600;color:var(--text)}
 .od-item-type{font-size:11px;padding:2px 6px;border-radius:4px;margin-left:6px}
 .od-item-right{text-align:right;white-space:nowrap}
-.od-item-qty{font-size:14px;font-weight:600;color:var(--primary)}
-.od-item-price{font-size:12px;color:#999;margin-top:2px}
+.od-item-qty{font-size:18px;font-weight:700;color:var(--primary)}
 .od-footer{padding:12px 20px;border-top:2px solid #f0f0f0;background:#FAFAFA;border-radius:0 0 16px 16px}
 .od-total{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
 .od-total.main{font-size:15px;font-weight:700;color:var(--primary);padding:8px 0 4px}
@@ -2362,7 +2361,7 @@ function showOrderDetail(name) {
       totalItems += q;
       totalUSD += sub;
       const typeCls = TYPE_CLS[s.type] || '';
-      items += '<div class="od-item"><div><span class="od-item-name">' + esc(s.name) + '</span><span class="od-item-type ' + typeCls + '">' + TYPE_LABEL[s.type] + '</span></div><div class="od-item-right"><div class="od-item-qty">x' + q + '</div><div class="od-item-price">$' + sub.toFixed(2) + '</div></div></div>';
+      items += '<div class="od-item"><div><span class="od-item-name">' + esc(s.name) + '</span><span class="od-item-type ' + typeCls + '">' + TYPE_LABEL[s.type] + '</span></div><div class="od-item-right"><div class="od-item-qty">x' + q + '</div></div></div>';
     }
   });
   if (!items) items = '<div style="padding:20px;text-align:center;color:#999">暂无订购</div>';
@@ -2376,8 +2375,7 @@ function showOrderDetail(name) {
   });
   const dr = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
   const myTax = (taxCNY > 0 && grandUSD > 0 && totalUSD > 0) ? r2(totalUSD / grandUSD * taxCNY) : 0;
-  let footerHTML = '<div class="od-total"><span>总件数</span><span>' + totalItems + '</span></div>';
-  footerHTML += '<div class="od-total"><span>USD（预估）</span><span>$' + totalUSD.toFixed(2) + '</span></div>';
+  let footerHTML = '<div class="od-total main"><span>总件数</span><span>' + totalItems + ' 件</span></div>';
   if (dr > 0 && totalUSD > 0) {
     const actBase = r2(totalUSD * dr * rate);
     const actFee = r2(actBase * 0.001);
