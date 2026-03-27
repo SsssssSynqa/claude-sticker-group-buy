@@ -281,6 +281,7 @@ input[type="number"]{-moz-appearance:textfield}
         <label><input type="radio" name="team" value="2"> 团2</label>
         <label><input type="radio" name="team" value="3"> 团3</label>
         <label><input type="radio" name="team" value="4" checked> 团4</label>
+        <label><input type="radio" name="team" value="5"> 团5</label>
       </div>
     </div>
     <button id="nickBtn" onclick="submitAuth()" disabled>加入拼团</button>
@@ -306,9 +307,9 @@ input[type="number"]{-moz-appearance:textfield}
     <summary>第二波拼团须知 · 请先阅读</summary>
     <div class="notice-body">
       <h4>分团说明</h4>
-      <p>第二波拼团现按<strong>团1</strong>、<strong>团2</strong>、<strong>团3</strong>、<strong>团4</strong> 分组统计和收款，请按你所在的群选择对应分团</p>
+      <p>第二波拼团现按<strong>团1</strong>、<strong>团2</strong>、<strong>团3</strong>、<strong>团4</strong>、<strong>团5</strong> 分组统计和收款，请按你所在的群选择对应分团</p>
       <p><span class="tag tag-warn">重要</span> 请不要乱选分团，后续到账核对、通知和发货都会按分团处理</p>
-      <p>四个团统一汇总下单购买，数量越多单价越低；但收款、核账和后续发货按各团分别进行</p>
+      <p>五个团统一汇总下单购买，数量越多单价越低；但收款、核账和后续发货按各团分别进行</p>
 
       <h4>流程与时间</h4>
       <p><span class="tag tag-date">开团中</span> 截团时间<strong>暂未确定</strong>，截团前可随时修改数量</p>
@@ -335,7 +336,7 @@ input[type="number"]{-moz-appearance:textfield}
 
       <h4>网站使用说明</h4>
       <ol>
-        <li><strong>注册：</strong>首次打开会弹出注册框，填写你的<strong>昵称</strong>、设置<strong>4~6位数字密码</strong>，并选择你所在的分团（团1、团2、团3、团4）</li>
+        <li><strong>注册：</strong>首次打开会弹出注册框，填写你的<strong>昵称</strong>、设置<strong>4~6位数字密码</strong>，并选择你所在的分团（团1、团2、团3、团4、团5）</li>
         <li><strong>登录：</strong>换手机或换浏览器时，点击「已有账号」，输入昵称和密码即可恢复数据</li>
         <li>在贴纸卡片上点 <strong>+/-</strong> 按钮选择数量，也可以在统计表里直接填写</li>
         <li><strong>改完数量记得点底部的「保存」按钮！</strong> 关闭页面前如果还有未保存修改，系统会提醒</li>
@@ -413,9 +414,9 @@ input[type="number"]{-moz-appearance:textfield}
 const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
 const ADMIN_NAMES = ['鹅鹅', '鹅'];
-const TEAM_LEADERS = {1: '待定', 2: '待定', 3: '待定', 4: '待定'};
-const TEAM_QR = {1: '', 2: '', 3: '', 4: ''};
-const ROUND2_TEAMS = [1, 2, 3, 4];
+const TEAM_LEADERS = {1: '待定', 2: '待定', 3: '待定', 4: '待定', 5: '待定'};
+const TEAM_QR = {1: '', 2: '', 3: '', 4: '', 5: ''};
+const ROUND2_TEAMS = [1, 2, 3, 4, 5];
 const PAYMENT_FEATURES_ENABLED = false;
 
 // ============ STICKER DATA ============
@@ -1924,7 +1925,7 @@ function getTeamsData() {
   names.add(myName);
   const arr = [...names];
 
-  const groups = {1: [], 2: [], 3: [], 4: [], 0: []};
+  const groups = {1: [], 2: [], 3: [], 4: [], 5: [], 0: []};
   for (const n of arr) {
     const t = allTeams[n] || 4;
     if (!groups[t]) groups[t] = [];
