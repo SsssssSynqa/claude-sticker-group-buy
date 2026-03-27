@@ -144,6 +144,26 @@ input[type="number"]{-moz-appearance:textfield}
 .conn-dot.on{background:#4CAF50}
 .conn-dot.off{background:#E74C3C}
 .nick-tag{font-size:12px;color:var(--text2);cursor:pointer;padding:3px 8px;border-radius:6px;background:var(--primary-lt)}
+.order-detail-btn{background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;opacity:.5;transition:opacity .15s}
+.order-detail-btn:hover{opacity:1}
+.od-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px}
+.od-card{background:#fff;border-radius:16px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.od-header{padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center}
+.od-header h3{margin:0;font-size:16px;color:var(--text)}
+.od-close{background:none;border:none;font-size:20px;cursor:pointer;color:#999;padding:4px 8px}
+.od-close:hover{color:#333}
+.od-body{padding:12px 20px}
+.od-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0f0f0}
+.od-item:last-child{border-bottom:none}
+.od-item-name{font-size:15px;font-weight:600;color:var(--text)}
+.od-item-type{font-size:11px;padding:2px 6px;border-radius:4px;margin-left:6px}
+.od-item-right{text-align:right;white-space:nowrap}
+.od-item-qty{font-size:18px;font-weight:700;color:var(--primary)}
+.od-footer{padding:12px 20px;border-top:2px solid #f0f0f0;background:#FAFAFA;border-radius:0 0 16px 16px}
+.od-total{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+.od-total.main{font-size:15px;font-weight:700;color:var(--primary);padding:8px 0 4px}
+.od-copy{width:100%;margin-top:10px;padding:8px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+.od-copy:hover{background:#D4623E}
 .nick-tag:hover{background:#FDDDD0}
 .my-row td{background:#FFF8F0 !important}
 .my-row:hover td{background:#FFF3E8 !important}
@@ -170,6 +190,9 @@ input[type="number"]{-moz-appearance:textfield}
 .btn-pay-confirm:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(91,168,125,.4)}
 .btn-pay-confirm:active{transform:translateY(0)}
 .btn-pay-confirm:disabled{opacity:.7;cursor:not-allowed;transform:none}
+.btn-clear-orders{flex:1;min-width:0;padding:13px 16px;background:#FDEAEA;color:#D94040;border:2px solid #F0C0C0;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-clear-orders:hover{background:#F8D0D0;transform:translateY(-1px);box-shadow:0 4px 12px rgba(217,64,64,.2)}
+.btn-clear-orders:active{transform:translateY(0)}
 .btn-pay-confirm.self-confirmed{background:linear-gradient(135deg,#E8714A,#D4623E)}
 .btn-pay-confirm.confirmed{background:linear-gradient(135deg,#2D8B5E,#247A50)}
 .btn-admin{background:#f0ede8;color:#999;font-size:11px;border:1px dashed #ddd}.btn-admin:hover{background:#e8e4de;color:#666}
@@ -254,6 +277,9 @@ input[type="number"]{-moz-appearance:textfield}
     <div id="teamSection">
       <p style="font-size:13px;color:var(--text2);margin-bottom:6px">选择你的分团</p>
       <div class="team-select">
+        <label><input type="radio" name="team" value="1"> 团1</label>
+        <label><input type="radio" name="team" value="2"> 团2</label>
+        <label><input type="radio" name="team" value="3"> 团3</label>
         <label><input type="radio" name="team" value="4" checked> 团4</label>
       </div>
     </div>
@@ -279,22 +305,42 @@ input[type="number"]{-moz-appearance:textfield}
   <details open>
     <summary>第二波拼团须知 · 请先阅读</summary>
     <div class="notice-body">
-      <h4>📢 这是第二波需求统计</h4>
-      <p>第一波拼团已顺利完成发货！很多小伙伴问还能不能再来一波，所以先开这个页面<strong>统计需求量</strong></p>
-      <p><span class="tag tag-warn">重要</span> 本次<strong>不一定能成团</strong>！如果人数多、总量够、价格划算才会正式下单。先登记你想买的数量，后续视情况决定</p>
-      <p>目前阶段<strong>只统计数量，暂不收款</strong>。如果确定成团，会另行通知收款流程</p>
+      <h4>分团说明</h4>
+      <p>第二波拼团现按<strong>团1</strong>、<strong>团2</strong>、<strong>团3</strong>、<strong>团4</strong> 分组统计和收款，请按你所在的群选择对应分团</p>
+      <p><span class="tag tag-warn">重要</span> 请不要乱选分团，后续到账核对、通知和发货都会按分团处理</p>
+      <p>四个团统一汇总下单购买，数量越多单价越低；但收款、核账和后续发货按各团分别进行</p>
 
-      <h4>贴纸说明</h4>
-      <p>贴纸种类和第一波完全一样，共13款 Clawd 贴纸（模切、全息、闪粉三种工艺）</p>
-      <p>买的人越多单价越低！每款贴纸的当前单价会根据总量实时显示在下方卡片上</p>
-      <p>价格来源：<a href="https://www.stickermule.com" target="_blank">Sticker Mule</a>，USD定价，最终按实际汇率换算人民币</p>
+      <h4>流程与时间</h4>
+      <p><span class="tag tag-date">开团中</span> 截团时间<strong>暂未确定</strong>，截团前可随时修改数量</p>
+      <p><span class="tag tag-date">锁单后</span> 页面会锁定数量，团长会再统一通知具体付款方式和时间</p>
+      <p><span class="tag tag-warn">注意</span> 目前先完成登记，付款相关流程会在截团锁单后另行通知</p>
+
+      <h4>费用说明</h4>
+      <p>Round2 当前共开放 <strong>25 款</strong> 贴纸，包含第一批 13 款和今天新增的后 12 款</p>
+      <p>价格来源：<a href="https://www.stickermule.com/claudecode" target="_blank">Sticker Mule</a>，以 USD 计价，页面会根据总量实时计算当前档位单价</p>
+      <p>人民币金额按实际汇率换算；若产生关税，默认按全体团员占比分摊</p>
+      <p>国内邮费等到货后另算，到时再按各团实际发货情况处理</p>
+
+      <h4>注意事项</h4>
+      <p><span class="tag tag-warn">重要</span> 锁单并付款后默认不接受退款，请确认好数量再提交</p>
+      <p>买的人越多单价越低，卡片上的单价和下一档价格会随总量实时变化</p>
+      <p>如果你换设备或换浏览器，直接用昵称和密码登录即可恢复订单</p>
+
+      <h4>后续付款说明</h4>
+      <p>截团锁单之后，团长会再统一通知付款方式、付款码、付款截止时间和群内反馈要求</p>
+      <p>当前页面上的付款相关入口暂未开放，请先以登记数量为准</p>
+      <p>页面里的金额会继续实时计算，方便大家提前查看和核对；真正的付款入口会在截团锁单后再开放</p>
+
+      <div class="notice-divider"></div>
 
       <h4>网站使用说明</h4>
       <ol>
-        <li><strong>注册：</strong>首次打开会弹出注册框，填写你的<strong>昵称</strong>并设置一个<strong>4~6位数字密码</strong></li>
+        <li><strong>注册：</strong>首次打开会弹出注册框，填写你的<strong>昵称</strong>、设置<strong>4~6位数字密码</strong>，并选择你所在的分团（团1、团2、团3、团4）</li>
         <li><strong>登录：</strong>换手机或换浏览器时，点击「已有账号」，输入昵称和密码即可恢复数据</li>
-        <li><strong>选贴纸：</strong>在下方卡片中点击 +/- 调整你想要的数量</li>
-        <li><strong>实时同步：</strong>所有人的数据实时同步，可以看到总量和对应的单价变化</li>
+        <li>在贴纸卡片上点 <strong>+/-</strong> 按钮选择数量，也可以在统计表里直接填写</li>
+        <li><strong>改完数量记得点底部的「保存」按钮！</strong> 关闭页面前如果还有未保存修改，系统会提醒</li>
+        <li>页面左上角可以点击昵称修改昵称、点击团号切换分团、点击「设密码/改密码」修改密码</li>
+        <li>表格名字旁的 <strong>📋</strong> 可以查看任意成员的订单详情；你自己的订单也可以一键清空重填</li>
       </ol>
     </div>
   </details>
@@ -325,6 +371,7 @@ input[type="number"]{-moz-appearance:textfield}
     <button class="btn btn-lock" id="lockBtn" onclick="toggleLock()" style="display:none">🔒 锁单</button>
     <button class="btn btn-admin" onclick="showExport()">团长导出全部</button>
     <button class="btn btn-admin" onclick="showImport()">团长导入</button>
+    <button class="btn-clear-orders" id="btnClearOrders" onclick="clearMyOrders()">🗑 清空我的订单</button>
     <button class="btn" id="btnHideEmpty" onclick="toggleHideEmpty()" style="background:#F0F4FF;color:#6B7FA3;border:1px dashed #B8C9E0;font-size:11px">👁 隐藏空订单</button>
   </div>
   <div class="table-wrap">
@@ -365,9 +412,11 @@ input[type="number"]{-moz-appearance:textfield}
 // ============ CONFIG ============
 const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
-const ADMIN_NAMES = ['鹅鹅'];
-const TEAM_LEADERS = {4: '待定'};
-const TEAM_QR = {4: ''};
+const ADMIN_NAMES = ['鹅鹅', '鹅'];
+const TEAM_LEADERS = {1: '待定', 2: '待定', 3: '待定', 4: '待定'};
+const TEAM_QR = {1: '', 2: '', 3: '', 4: ''};
+const ROUND2_TEAMS = [1, 2, 3, 4];
+const PAYMENT_FEATURES_ENABLED = false;
 
 // ============ STICKER DATA ============
 const S = [
@@ -409,7 +458,43 @@ const S = [
    t:[[1,5],[5,10],[10,17],[50,59],[100,71],[200,93],[300,112],[500,146],[1000,222],[2000,354],[3000,472],[5000,688],[10000,1162]]},
   {id:'r2_manifesting-glt', name:'Manifesting', type:'glt', size:'5.13"x0.75"', itemId:17478833,
    img:'https://storage.googleapis.com/sm-artworks/15c2280e-7a5f-46d8-ba05-86073c9d0b09/large.png?cacheFor=1fa9c7949a091c06af06347102479bea',
-   t:[[10,18],[50,64],[100,78],[200,104],[300,126],[500,167],[1000,257],[2000,414],[3000,556],[5000,830],[10000,1567]]}
+   t:[[10,18],[50,64],[100,78],[200,104],[300,126],[500,167],[1000,257],[2000,414],[3000,556],[5000,830],[10000,1567]]},
+  {id:'r2_clawd-heart', name:'clawd heart', type:'dc', size:'2"x1.48"', itemId:20005406,
+   img:'https://storage.googleapis.com/sm-artworks/d3c8ea82-59f0-4606-97fa-88acd0bf21a0/large.png',
+   t:[[1,5],[5,10],[10,16],[50,57],[100,68],[200,87],[300,103],[500,133],[1000,199],[2000,314],[3000,416],[5000,602],[10000,1011]]},
+  {id:'r2_clawd-headphones', name:'Clawd Headphones', type:'dc', size:'2"x1.77"', itemId:19982716,
+   img:'https://storage.googleapis.com/sm-artworks/d683c1c3-a865-4797-a5d3-7b1f82b90e86/large.png',
+   t:[[1,5],[5,10],[10,17],[50,59],[100,71],[200,92],[300,110],[500,144],[1000,218],[2000,346],[3000,461],[5000,671],[10000,1132]]},
+  {id:'r2_clawd-wand', name:'Clawd Wand', type:'dc', size:'2"x0.97"', itemId:19982721,
+   img:'https://storage.googleapis.com/sm-artworks/297554b5-c858-4e1d-8c96-86eb18496131/large.png',
+   t:[[1,5],[5,9],[10,16],[50,54],[100,63],[200,78],[300,91],[500,114],[1000,166],[2000,254],[3000,333],[5000,476],[10000,788]]},
+  {id:'r2_clawd-bubble', name:'Clawd Bubble', type:'dc', size:'2"x1.43"', itemId:19982712,
+   img:'https://storage.googleapis.com/sm-artworks/15cfce1b-f09f-46c4-9b1c-6da9d0d157d6/large.png',
+   t:[[1,5],[5,10],[10,16],[50,57],[100,68],[200,86],[300,102],[500,131],[1000,196],[2000,308],[3000,408],[5000,589],[10000,989]]},
+  {id:'r2_clawd-coffee', name:'Clawd Coffee', type:'dc', size:'2"x1.12"', itemId:19982714,
+   img:'https://storage.googleapis.com/sm-artworks/a751fc7b-1ef4-4ae6-9ae4-f0a92e428c33/large.png',
+   t:[[1,5],[5,9],[10,16],[50,55],[100,64],[200,80],[300,95],[500,120],[1000,176],[2000,272],[3000,358],[5000,514],[10000,856]]},
+  {id:'r2_clawd-skateboard', name:'Clawd Skateboard', type:'dc', size:'1.99"x2"', itemId:19982720,
+   img:'https://storage.googleapis.com/sm-artworks/298ed85d-dfc2-497d-a7c1-0bef98f77c02/large.png',
+   t:[[1,5],[5,10],[10,17],[50,60],[100,73],[200,95],[300,115],[500,151],[1000,231],[2000,369],[3000,494],[5000,720],[10000,1219]]},
+  {id:'r2_clawd-book', name:'Clawd Book', type:'dc', size:'2"x1.4"', itemId:19982711,
+   img:'https://storage.googleapis.com/sm-artworks/9d8d9dac-a077-4ad3-b60b-969b18dfa8a3/large.png',
+   t:[[1,5],[5,10],[10,16],[50,57],[100,67],[200,85],[300,101],[500,130],[1000,194],[2000,304],[3000,402],[5000,581],[10000,974]]},
+  {id:'r2_clawd-cape', name:'Clawd Cape', type:'dc', size:'1.7"x2"', itemId:19982713,
+   img:'https://storage.googleapis.com/sm-artworks/7046cd5f-a1e1-466c-a211-7b49671d23ab/large.png',
+   t:[[1,5],[5,10],[10,17],[50,58],[100,70],[200,90],[300,109],[500,141],[1000,214],[2000,339],[3000,451],[5000,654],[10000,1104]]},
+  {id:'r2_clawd-dizzy', name:'Clawd Dizzy', type:'dc', size:'2"x1.33"', itemId:19982715,
+   img:'https://storage.googleapis.com/sm-artworks/5df191cb-99cf-421a-b5ef-818977b487b8/large.png',
+   t:[[1,5],[5,9],[10,16],[50,56],[100,67],[200,84],[300,100],[500,128],[1000,190],[2000,297],[3000,392],[5000,566],[10000,948]]},
+  {id:'r2_clawd-kite', name:'Clawd Kite', type:'dc', size:'2"x1.89"', itemId:19982717,
+   img:'https://storage.googleapis.com/sm-artworks/3f521137-f17f-4119-9039-91e433c269c4/large.png',
+   t:[[1,5],[5,10],[10,17],[50,59],[100,72],[200,94],[300,113],[500,148],[1000,225],[2000,359],[3000,480],[5000,699],[10000,1182]]},
+  {id:'r2_clawd-lightbulb', name:'Clawd Lightbulb', type:'dc', size:'1.33"x2"', itemId:19982718,
+   img:'https://storage.googleapis.com/sm-artworks/966c86c2-9273-4064-9951-ab56fecd27bb/large.png',
+   t:[[1,5],[5,9],[10,16],[50,56],[100,66],[200,84],[300,100],[500,128],[1000,189],[2000,296],[3000,391],[5000,564],[10000,944]]},
+  {id:'r2_clawd-magnifier', name:'Clawd Magnifier', type:'dc', size:'2"x1.79"', itemId:19982719,
+   img:'https://storage.googleapis.com/sm-artworks/b604152e-1a17-444d-846e-c0fe257bda95/large.png',
+   t:[[1,5],[5,10],[10,17],[50,59],[100,71],[200,92],[300,110],[500,144],[1000,219],[2000,348],[3000,463],[5000,674],[10000,1138]]}
 ];
 
 const TYPE_LABEL = {dc:'模切', holo:'全息', glt:'闪粉'};
@@ -438,6 +523,7 @@ let allShipped = {}; // {name: true} — leader-confirmed shipped
 let hideEmptyOrders = false; // toggle: hide people with zero orders
 let writeTimers = {};
 let renderTimer = null;
+const PENDING_DRAFT_KEY = 'gb2_pending_changes';
 
 // ============ SUPABASE ============
 function initSupabaseClient() {
@@ -543,7 +629,7 @@ function subscribeRealtime() {
 
 function handleOrderEvent(payload) {
   const row = payload.new || payload.old;
-  if (!row || row.name === myName) return; // skip my own echoes
+  if (!row) return;
   if (row.sticker_id === 'r2__pin') return; // skip PIN records
 
   // Track join order for new arrivals
@@ -688,6 +774,7 @@ let pendingChanges = {}; // {sid: qty} — local changes not yet submitted to Su
 
 function trackChange(sid, qty) {
   pendingChanges[sid] = qty;
+  savePendingDraft();
   updateSubmitBar();
 }
 
@@ -704,6 +791,7 @@ function updateSubmitBar() {
     btn.className = 'submit-bar-btn';
   } else {
     bar.classList.remove('show');
+    clearPendingDraft();
   }
 }
 
@@ -725,6 +813,7 @@ async function submitCart() {
     if (error) throw error;
 
     pendingChanges = {};
+    clearPendingDraft();
     btn.textContent = '已保存 ✓';
     btn.className = 'submit-bar-btn success';
     updateStatus('已保存');
@@ -740,24 +829,17 @@ async function submitCart() {
 // Safety net: auto-save on page close/hide
 function flushPendingOnExit() {
   if (!sb || !myName || Object.keys(pendingChanges).length === 0) return;
+  savePendingDraft();
   const rows = Object.entries(pendingChanges).map(([sid, qty]) => ({
     name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()
   }));
-  // Use sendBeacon for reliability on page close
   const url = SUPA_URL + '/rest/v1/orders?on_conflict=name,sticker_id';
-  const blob = new Blob([JSON.stringify(rows)], {type: 'application/json'});
-  try {
-    const sent = navigator.sendBeacon(url + '&apikey=' + SUPA_KEY, blob);
-    if (sent) pendingChanges = {};
-  } catch(e) {
-    // Fallback: fire-and-forget fetch
-    fetch(url, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'resolution=merge-duplicates'},
-      body: JSON.stringify(rows),
-      keepalive: true
-    }).catch(() => {});
-  }
+  fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'resolution=merge-duplicates'},
+    body: JSON.stringify(rows),
+    keepalive: true
+  }).catch(() => {});
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -894,6 +976,12 @@ function applyLockState() {
     b.style.opacity = isLocked ? '.4' : '';
     b.style.pointerEvents = isLocked ? 'none' : '';
   });
+  const clearBtn = document.getElementById('btnClearOrders');
+  if (clearBtn) {
+    clearBtn.disabled = isLocked;
+    clearBtn.style.opacity = isLocked ? '.4' : '';
+    clearBtn.style.pointerEvents = isLocked ? 'none' : '';
+  }
   if (isLocked) {
     const bar = document.getElementById('submitBar');
     if (bar) bar.classList.remove('show');
@@ -904,6 +992,34 @@ function applyLockState() {
 // ============ OFFLINE FALLBACK ============
 function saveOffline() {
   try { localStorage.setItem('gb2_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader, allActualPaid, actualUSD, taxCNY, allShipFeeSelf, allShipFeeLeader, allShipped})); } catch(e) {}
+}
+
+function savePendingDraft() {
+  try {
+    if (!myName || Object.keys(pendingChanges).length === 0) {
+      clearPendingDraft();
+      return;
+    }
+    localStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify({name: myName, changes: pendingChanges}));
+  } catch(e) {}
+}
+
+function clearPendingDraft() {
+  try { localStorage.removeItem(PENDING_DRAFT_KEY); } catch(e) {}
+}
+
+function restorePendingDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(PENDING_DRAFT_KEY));
+    if (!d || d.name !== myName || !d.changes || typeof d.changes !== 'object') return;
+    pendingChanges = d.changes;
+    if (!allOrders[myName]) allOrders[myName] = {};
+    for (const [sid, qty] of Object.entries(pendingChanges)) {
+      const val = Math.max(0, parseInt(qty) || 0);
+      if (val > 0) allOrders[myName][sid] = val;
+      else delete allOrders[myName][sid];
+    }
+  } catch(e) {}
 }
 
 function loadOffline() {
@@ -1007,10 +1123,11 @@ async function doRegister(name, pin) {
   }
   const {data: anyCheck} = await sb.from('orders').select('sticker_id').eq('name', name).like('sticker_id', 'r2_%').limit(1);
   if (anyCheck && anyCheck.length > 0) {
-    throw new Error('该昵称已有订单记录，请切换到「已有账号」登录（首次登录会自动设置密码）');
+    throw new Error('该昵称已有订单记录，请切换到「已有账号」登录');
   }
 
   const team = parseInt(document.querySelector('input[name="team"]:checked')?.value) || 4;
+  if (!ROUND2_TEAMS.includes(team)) throw new Error('请选择有效的分团');
 
   // Save PIN and team to Supabase
   const {error} = await sb.from('orders').upsert([
@@ -1041,16 +1158,9 @@ async function doLogin(name, pin) {
   // Verify PIN
   const {data: pinRows} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r2__pin');
   if (!pinRows || pinRows.length === 0) {
-    // Check if user exists but has no PIN (old user before login system)
     const {data: anyRows} = await sb.from('orders').select('sticker_id').eq('name', name).like('sticker_id', 'r2_%').limit(1);
     if (anyRows && anyRows.length > 0) {
-      // Old user — set PIN for them and log in
-      const {error: pinErr} = await sb.from('orders').upsert(
-        {name, sticker_id: 'r2__pin', quantity: parseInt(pin), updated_at: new Date().toISOString()},
-        {onConflict: 'name,sticker_id'}
-      ).select();
-      if (pinErr) throw new Error('密码设置失败: ' + pinErr.message);
-      // Continue to success flow below (skip PIN check)
+      throw new Error('该昵称是旧账号且尚未设置密码。为避免账号被冒领，当前已关闭自动设密码登录，请联系团长处理。');
     } else {
       throw new Error('该昵称不存在，请检查拼写或切换到「新用户注册」');
     }
@@ -1094,7 +1204,7 @@ function changeNick() {
       delete allTeams[oldName];
     }
     if (sb) {
-      sb.from('orders').update({name: myName, updated_at: new Date().toISOString()}).eq('name', oldName)
+      sb.from('orders').update({name: myName, updated_at: new Date().toISOString()}).eq('name', oldName).like('sticker_id', 'r2_%')
         .then(({error}) => { if (error) console.error('Nickname migration failed:', error); });
     }
     updateNickDisplay();
@@ -1104,11 +1214,11 @@ function changeNick() {
 }
 
 function changeTeam() {
-  const options = [4].filter(t => t !== myTeam);
+  const options = ROUND2_TEAMS.filter(t => t !== myTeam);
   const choice = prompt('当前：团' + myTeam + '\n输入要切换到的团号（' + options.join(' 或 ') + '）：');
   if (!choice) return;
   const newTeam = parseInt(choice);
-  if (![4].includes(newTeam) || newTeam === myTeam) { alert('请输入有效的团号'); return; }
+  if (!ROUND2_TEAMS.includes(newTeam) || newTeam === myTeam) { alert('请输入有效的团号'); return; }
   myTeam = newTeam;
   localStorage.setItem('gb2_team', myTeam);
   allTeams[myName] = myTeam;
@@ -1230,6 +1340,7 @@ function paymentCellHTML(name, team) {
   const isMe = name === myName;
   const iAmLeader = isLeaderOf(myName, team);
   let html = paymentBadgeHTML(name);
+  if (!PAYMENT_FEATURES_ENABLED) return html;
 
   // Payment action buttons only appear after locking (锁单后才能付款操作)
   if (!isLocked) return html;
@@ -1366,6 +1477,7 @@ function shipFeeCellHTML(name, team) {
   const isMe = name === myName;
   const iAmLeader = isLeaderOf(myName, team);
   let html = shipFeeBadgeHTML(name);
+  if (!PAYMENT_FEATURES_ENABLED) return html;
   if (!isLocked) return html;
   if (isMe && st === 'unpaid') {
     html += ' <button class="pay-btn" onclick="confirmMyShipFee()">已付运费</button>';
@@ -1556,6 +1668,7 @@ async function saveRefunded(memberName, amount) {
 }
 
 function showPaymentQR() {
+  if (!PAYMENT_FEATURES_ENABLED) { alert('付款功能暂未开放，截团锁单后会统一通知。'); return; }
   if (!isLocked) { alert('截单后才能查看付款码哦～请等待团长锁单'); return; }
   const team = myTeam;
   const leader = TEAM_LEADERS[team] || '未知';
@@ -1657,6 +1770,7 @@ function closePaymentQR() {
 }
 
 function handlePayBtnClick() {
+  if (!PAYMENT_FEATURES_ENABLED) { alert('付款功能暂未开放，截团锁单后会统一通知。'); return; }
   if (!isLocked) { alert('截单后才能确认付款哦～请等待团长锁单'); return; }
   const st = paymentStatusOf(myName);
   if (st === 'confirmed') return;
@@ -1668,6 +1782,18 @@ function updatePaymentBtns() {
   const btn = document.getElementById('btnPayConfirm');
   const qrBtn = document.getElementById('btnPayQR');
   if (!btn) return;
+
+  if (!PAYMENT_FEATURES_ENABLED) {
+    btn.textContent = '⏳ 付款暂未开放';
+    btn.className = 'btn-pay-confirm';
+    btn.disabled = true;
+    if (qrBtn) {
+      qrBtn.textContent = '⏳ 付款码暂未开放';
+      qrBtn.style.opacity = '0.5';
+      qrBtn.style.pointerEvents = 'none';
+    }
+    return;
+  }
 
   // Before locking: show disabled state with hint
   if (!isLocked) {
@@ -1798,7 +1924,7 @@ function getTeamsData() {
   names.add(myName);
   const arr = [...names];
 
-  const groups = {4: [], 0: []};
+  const groups = {1: [], 2: [], 3: [], 4: [], 0: []};
   for (const n of arr) {
     const t = allTeams[n] || 4;
     if (!groups[t]) groups[t] = [];
@@ -1815,7 +1941,7 @@ function getTeamsData() {
   const result = [];
   // Put user's team first, then others in order
   if (groups[myTeam] && groups[myTeam].length > 0) result.push({team: myTeam, names: groups[myTeam]});
-  for (const t of [4]) {
+  for (const t of ROUND2_TEAMS) {
     if (t !== myTeam && groups[t] && groups[t].length > 0) result.push({team: t, names: groups[t]});
   }
   if (groups[0] && groups[0].length > 0) result.push({team: 0, names: groups[0]});
@@ -1839,7 +1965,11 @@ function renderTable() {
   S.forEach(s => {
     h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
   });
-  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（预估）</th><th>手续费</th><th>关税</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应收</th><th>应退</th><th class="col-pay">付款</th><th class="col-pay">运费</th><th class="col-pay">发货</th></tr></thead>';
+  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（预估）</th><th>手续费</th><th>关税</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应收</th><th>应退</th>';
+  if (PAYMENT_FEATURES_ENABLED) {
+    h += '<th class="col-pay">付款</th><th class="col-pay">运费</th><th class="col-pay">发货</th>';
+  }
+  h += '</tr></thead>';
 
   h += '<tbody>';
   // Combined summary rows (pricing uses combined totals across all teams)
@@ -1853,12 +1983,16 @@ function renderTable() {
 
   h += '<tr class="s-row r-total"><td class="col-idx"></td><td class="col-name">该款总价</td>';
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-tax"></td><td id="st-grand-actual"></td><td></td><td></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-tax"></td><td id="st-grand-actual"></td><td></td><td></td><td></td><td></td>';
+  if (PAYMENT_FEATURES_ENABLED) h += '<td></td><td></td><td></td>';
+  h += '</tr>';
 
   // 三团汇总 row (grand totals across all teams)
   h += '<tr class="team-subtotal" style="background:#FFF8F0;font-weight:700"><td class="col-idx"></td><td class="col-name">三团汇总</td>';
   S.forEach(s => { h += '<td id="gtsq-' + s.id + '"></td>'; });
-  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-tax"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refunded"></td><td id="gt-owe"></td><td id="gt-refund"></td><td></td><td></td><td></td></tr>';
+  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-tax"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refunded"></td><td id="gt-owe"></td><td id="gt-refund"></td>';
+  if (PAYMENT_FEATURES_ENABLED) h += '<td></td><td></td><td></td>';
+  h += '</tr>';
 
   // Compute global join-order sequence numbers (stable: based on ALL registered users, not just visible ones)
   const sortedByJoin = Object.entries(allJoinOrder).sort((a, b) => a[1] - b[1]);
@@ -1873,43 +2007,43 @@ function renderTable() {
     const visibleNames = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
     if (visibleNames.length === 0) return; // skip empty teams when filtering
 
-    // Team header row
-    // Payment stats for team header
-    let teamConfirmed = 0, teamSelfPaid = 0;
-    visibleNames.forEach(n => { const ps = paymentStatusOf(n); if (ps === 'confirmed') teamConfirmed++; else if (ps === 'self') teamSelfPaid++; });
-    const teamUnpaid = visibleNames.length - teamConfirmed - teamSelfPaid;
-    let payStats = '';
-    if (teamConfirmed > 0) payStats += '<span class="pay-stats pay-stats-ok">✅' + teamConfirmed + '</span> ';
-    if (teamSelfPaid > 0) payStats += '<span class="pay-stats" style="color:#E8714A">🟠' + teamSelfPaid + '</span> ';
-    if (teamUnpaid > 0) payStats += '<span class="pay-stats pay-stats-pending">⭕' + teamUnpaid + '</span>';
-    // Shipping fee stats
-    let sfConfirmed = 0, sfSelf = 0;
-    visibleNames.forEach(n => { const ss = shipFeeStatusOf(n); if (ss === 'confirmed') sfConfirmed++; else if (ss === 'self') sfSelf++; });
-    const sfUnpaid = visibleNames.length - sfConfirmed - sfSelf;
-    let sfStats = '';
-    if (sfConfirmed > 0) sfStats += '<span class="pay-stats pay-stats-ok">✅' + sfConfirmed + '</span> ';
-    if (sfSelf > 0) sfStats += '<span class="pay-stats" style="color:#E8714A">🟠' + sfSelf + '</span> ';
-    if (sfUnpaid > 0) sfStats += '<span class="pay-stats pay-stats-pending">⭕' + sfUnpaid + '</span>';
-    // Shipped stats
-    let shippedCount = 0;
-    visibleNames.forEach(n => { if (allShipped[n]) shippedCount++; });
-    const notShipped = visibleNames.length - shippedCount;
-    let shipStats = '';
-    if (shippedCount > 0) shipStats += '<span class="pay-stats" style="color:#2E7D32">📦' + shippedCount + '</span> ';
-    if (notShipped > 0) shipStats += '<span class="pay-stats pay-stats-pending">⭕' + notShipped + '</span>';
-
     const headerCount = hideEmptyOrders ? visibleNames.length + '/' + g.names.length : '' + g.names.length;
     h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + teamLabel + '（' + headerCount + ' 人）</td>';
     S.forEach(() => { h += '<td></td>'; });
-    h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td>' + payStats + '</td><td>' + sfStats + '</td><td>' + shipStats + '</td></tr>';
+    h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
+    if (PAYMENT_FEATURES_ENABLED) {
+      let teamConfirmed = 0, teamSelfPaid = 0;
+      visibleNames.forEach(n => { const ps = paymentStatusOf(n); if (ps === 'confirmed') teamConfirmed++; else if (ps === 'self') teamSelfPaid++; });
+      const teamUnpaid = visibleNames.length - teamConfirmed - teamSelfPaid;
+      let payStats = '';
+      if (teamConfirmed > 0) payStats += '<span class="pay-stats pay-stats-ok">✅' + teamConfirmed + '</span> ';
+      if (teamSelfPaid > 0) payStats += '<span class="pay-stats" style="color:#E8714A">🟠' + teamSelfPaid + '</span> ';
+      if (teamUnpaid > 0) payStats += '<span class="pay-stats pay-stats-pending">⭕' + teamUnpaid + '</span>';
+      let sfConfirmed = 0, sfSelf = 0;
+      visibleNames.forEach(n => { const ss = shipFeeStatusOf(n); if (ss === 'confirmed') sfConfirmed++; else if (ss === 'self') sfSelf++; });
+      const sfUnpaid = visibleNames.length - sfConfirmed - sfSelf;
+      let sfStats = '';
+      if (sfConfirmed > 0) sfStats += '<span class="pay-stats pay-stats-ok">✅' + sfConfirmed + '</span> ';
+      if (sfSelf > 0) sfStats += '<span class="pay-stats" style="color:#E8714A">🟠' + sfSelf + '</span> ';
+      if (sfUnpaid > 0) sfStats += '<span class="pay-stats pay-stats-pending">⭕' + sfUnpaid + '</span>';
+      let shippedCount = 0;
+      visibleNames.forEach(n => { if (allShipped[n]) shippedCount++; });
+      const notShipped = visibleNames.length - shippedCount;
+      let shipStats = '';
+      if (shippedCount > 0) shipStats += '<span class="pay-stats" style="color:#2E7D32">📦' + shippedCount + '</span> ';
+      if (notShipped > 0) shipStats += '<span class="pay-stats pay-stats-pending">⭕' + notShipped + '</span>';
+      h += '<td>' + payStats + '</td><td>' + sfStats + '</td><td>' + shipStats + '</td>';
+    }
+    h += '</tr>';
 
     // Person rows
     visibleNames.forEach(name => {
       const isMe = name === myName;
       const orders = allOrders[name] || {};
+      const detailArg = JSON.stringify(name).replace(/"/g, '&quot;');
       h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-name="' + esc(name) + '">';
       h += '<td class="col-idx">' + (seqMap[name] || '') + '</td>';
-      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small> <button class="del-btn" onclick="clearMyOrders()" title="清空我的订单">清空</button>' : '') + '</td>';
+      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + detailArg + ')" title="查看订单详情">📋</button>' + (isMe ? ' <button class="del-btn" onclick="clearMyOrders()" title="清空我的订单">清空</button>' : '') + '</td>';
       S.forEach(s => {
         const v = orders[s.id] || 0;
         if (isMe) {
@@ -1941,9 +2075,11 @@ function renderTable() {
       }
       h += '<td class="pt-owe" id="po-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-refund" id="pr-' + personIdx + '">\u2014</td>';
-      h += '<td>' + paymentCellHTML(name, g.team) + '</td>';
-      h += '<td>' + shipFeeCellHTML(name, g.team) + '</td>';
-      h += '<td>' + shippedCellHTML(name, g.team) + '</td>';
+      if (PAYMENT_FEATURES_ENABLED) {
+        h += '<td>' + paymentCellHTML(name, g.team) + '</td>';
+        h += '<td>' + shipFeeCellHTML(name, g.team) + '</td>';
+        h += '<td>' + shippedCellHTML(name, g.team) + '</td>';
+      }
       h += '</tr>';
       personIdx++;
     });
@@ -1961,7 +2097,7 @@ function renderTable() {
     h += '<td id="tsrf-' + g.team + '"></td>';
     h += '<td id="tsow-' + g.team + '"></td>';
     h += '<td id="tsr-' + g.team + '"></td>';
-    h += '<td></td><td></td><td></td>';
+    if (PAYMENT_FEATURES_ENABLED) h += '<td></td><td></td><td></td>';
     h += '</tr>';
   });
 
@@ -2309,6 +2445,67 @@ function exportMyOrder() {
     .catch(() => { prompt('请手动复制：', text); });
 }
 
+function showOrderDetail(name) {
+  const seq = globalSeqMap[name] || '?';
+  const teamNum = allTeams[name] || '?';
+  const orders = allOrders[name] || {};
+  const priceData = {};
+  S.forEach(s => {
+    let totalQty = 0;
+    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
+    priceData[s.id] = unitPrice(s, totalQty);
+  });
+  let items = '';
+  let totalItems = 0, totalUSD = 0;
+  S.forEach(s => {
+    const q = orders[s.id] || 0;
+    if (q > 0) {
+      const up = priceData[s.id];
+      const sub = r2(q * up);
+      totalItems += q;
+      totalUSD += sub;
+      const typeCls = TYPE_CLS[s.type] || '';
+      items += '<div class="od-item"><div><span class="od-item-name">' + esc(s.name) + '</span><span class="od-item-type ' + typeCls + '">' + TYPE_LABEL[s.type] + '</span></div><div class="od-item-right"><div class="od-item-qty">x' + q + '</div></div></div>';
+    }
+  });
+  if (!items) items = '<div style="padding:20px;text-align:center;color:#999">暂无订购</div>';
+  const estCNY = r2(totalUSD * rate);
+  const estFee = r2(estCNY * 0.001);
+  let grandUSD = 0;
+  S.forEach(s => {
+    let totalQty = 0;
+    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
+    grandUSD += r2(totalQty * priceData[s.id]);
+  });
+  const dr = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
+  const myTax = (taxCNY > 0 && grandUSD > 0 && totalUSD > 0) ? r2(totalUSD / grandUSD * taxCNY) : 0;
+  let footerHTML = '<div class="od-total"><span>总件数</span><span>' + totalItems + ' 件</span></div>';
+  if (dr > 0 && totalUSD > 0) {
+    const actBase = r2(totalUSD * dr * rate);
+    const actFee = r2(actBase * 0.001);
+    const actTotal = r2(actBase + actFee + myTax);
+    footerHTML += '<div class="od-total main"><span>实际应付</span><span>\u00a5' + actTotal.toFixed(2) + '</span></div>';
+    const paid = allActualPaid[name] || 0;
+    const refunded = allRefunded[name] || 0;
+    footerHTML += '<div class="od-total"><span>已付</span><span>' + (paid > 0 ? '\u00a5' + paid.toFixed(2) : '\u2014') + '</span></div>';
+    if (paid > 0) {
+      if (refunded > 0) footerHTML += '<div class="od-total"><span>已退</span><span>\u00a5' + refunded.toFixed(2) + '</span></div>';
+      const diff = r2(paid - actTotal - refunded);
+      if (diff < -0.005) footerHTML += '<div class="od-total" style="color:#D94040;font-weight:700"><span>应补缴</span><span>\u00a5' + r2(-diff).toFixed(2) + '</span></div>';
+      else if (diff > 0.005) footerHTML += '<div class="od-total" style="color:#3DA06B;font-weight:700"><span>应退</span><span>\u00a5' + diff.toFixed(2) + '</span></div>';
+      else footerHTML += '<div class="od-total" style="color:#3DA06B"><span>已结清</span><span>\u2714</span></div>';
+    }
+  } else {
+    footerHTML += '<div class="od-total"><span>CNY（预估）</span><span>\u00a5' + r2(estCNY + estFee).toFixed(2) + '</span></div>';
+  }
+  const overlay = document.createElement('div');
+  overlay.className = 'od-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = '<div class="od-card"><div class="od-header"><h3>#' + seq + ' ' + esc(name) + ' \u00b7 团' + teamNum + '</h3><button class="od-close">\u2715</button></div><div class="od-body">' + items + '</div><div class="od-footer">' + footerHTML + '</div></div>';
+  overlay.querySelector('.od-close').onclick = () => overlay.remove();
+  document.body.appendChild(overlay);
+}
+
 function clearMyOrders() {
   if (isLocked) { alert('已锁单，无法修改'); return; }
   if (!confirm('确定要清空你的所有订单吗？')) return;
@@ -2470,6 +2667,7 @@ function closeModal() {
     }
   }
   updateNickDisplay();
+  restorePendingDraft();
 
   document.getElementById('rateInput').value = rate;
   renderTable();
