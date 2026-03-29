@@ -489,6 +489,12 @@ let allShipped = {}; // {name: true} — leader-confirmed shipped
 let hideEmptyOrders = false; // toggle: hide people with zero orders
 let writeTimers = {};
 let renderTimer = null;
+const PENDING_DRAFT_KEY = 'gb_pending_changes';
+const FOREIGN_NAMESPACE_PREFIXES = ['r2_', 'plush__'];
+
+function isForeignNamespaceSticker(stickerId) {
+  return FOREIGN_NAMESPACE_PREFIXES.some(prefix => String(stickerId || '').startsWith(prefix));
+}
 
 // ============ SUPABASE ============
 function initSupabaseClient() {
@@ -552,7 +558,7 @@ async function loadAll() {
   for (const name of r1Users) r2Users.delete(name);
   for (const row of orders) {
     if (r2Users.has(row.name)) continue; // Skip pure Round 2 users
-    if (row.sticker_id.startsWith('r2_')) continue; // Skip r2_ prefixed records
+    if (isForeignNamespaceSticker(row.sticker_id)) continue; // Skip records owned by other pages / namespaces
     if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
     if (row.sticker_id === '_team') {
       allTeams[row.name] = row.quantity;
@@ -605,7 +611,8 @@ function subscribeRealtime() {
 
 function handleOrderEvent(payload) {
   const row = payload.new || payload.old;
-  if (!row || row.name === myName) return; // skip my own echoes
+  if (!row) return;
+  if (isForeignNamespaceSticker(row.sticker_id)) return;
   if (row.sticker_id === '_pin') return; // skip PIN records
 
   // Track join order for new arrivals
@@ -750,6 +757,7 @@ let pendingChanges = {}; // {sid: qty} — local changes not yet submitted to Su
 
 function trackChange(sid, qty) {
   pendingChanges[sid] = qty;
+  savePendingDraft();
   updateSubmitBar();
 }
 
@@ -766,6 +774,7 @@ function updateSubmitBar() {
     btn.className = 'submit-bar-btn';
   } else {
     bar.classList.remove('show');
+    clearPendingDraft();
   }
 }
 
@@ -787,6 +796,7 @@ async function submitCart() {
     if (error) throw error;
 
     pendingChanges = {};
+    clearPendingDraft();
     btn.textContent = '已保存 ✓';
     btn.className = 'submit-bar-btn success';
     updateStatus('已保存');
@@ -802,24 +812,17 @@ async function submitCart() {
 // Safety net: auto-save on page close/hide
 function flushPendingOnExit() {
   if (!sb || !myName || Object.keys(pendingChanges).length === 0) return;
+  savePendingDraft();
   const rows = Object.entries(pendingChanges).map(([sid, qty]) => ({
     name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()
   }));
-  // Use sendBeacon for reliability on page close
   const url = SUPA_URL + '/rest/v1/orders?on_conflict=name,sticker_id';
-  const blob = new Blob([JSON.stringify(rows)], {type: 'application/json'});
-  try {
-    const sent = navigator.sendBeacon(url + '&apikey=' + SUPA_KEY, blob);
-    if (sent) pendingChanges = {};
-  } catch(e) {
-    // Fallback: fire-and-forget fetch
-    fetch(url, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'resolution=merge-duplicates'},
-      body: JSON.stringify(rows),
-      keepalive: true
-    }).catch(() => {});
-  }
+  fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'resolution=merge-duplicates'},
+    body: JSON.stringify(rows),
+    keepalive: true
+  }).catch(() => {});
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -970,6 +973,34 @@ function saveOffline() {
   try { localStorage.setItem('gb_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader, allActualPaid, actualUSD, taxCNY, allShipFeeSelf, allShipFeeLeader, allShipped})); } catch(e) {}
 }
 
+function savePendingDraft() {
+  try {
+    if (!myName || Object.keys(pendingChanges).length === 0) {
+      clearPendingDraft();
+      return;
+    }
+    localStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify({name: myName, changes: pendingChanges}));
+  } catch(e) {}
+}
+
+function clearPendingDraft() {
+  try { localStorage.removeItem(PENDING_DRAFT_KEY); } catch(e) {}
+}
+
+function restorePendingDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(PENDING_DRAFT_KEY));
+    if (!d || d.name !== myName || !d.changes || typeof d.changes !== 'object') return;
+    pendingChanges = d.changes;
+    if (!allOrders[myName]) allOrders[myName] = {};
+    for (const [sid, qty] of Object.entries(pendingChanges)) {
+      const val = Math.max(0, parseInt(qty) || 0);
+      if (val > 0) allOrders[myName][sid] = val;
+      else delete allOrders[myName][sid];
+    }
+  } catch(e) {}
+}
+
 function loadOffline() {
   try {
     const d = JSON.parse(localStorage.getItem('gb_cache'));
@@ -1072,16 +1103,10 @@ async function doLogin(name, pin) {
   // Verify PIN
   const {data: pinRows} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', '_pin');
   if (!pinRows || pinRows.length === 0) {
-    // Check if user exists but has no PIN (old user before login system)
-    const {data: anyRows} = await sb.from('orders').select('sticker_id').eq('name', name).limit(1);
-    if (anyRows && anyRows.length > 0) {
-      // Old user — set PIN for them and log in
-      const {error: pinErr} = await sb.from('orders').upsert(
-        {name, sticker_id: '_pin', quantity: parseInt(pin), updated_at: new Date().toISOString()},
-        {onConflict: 'name,sticker_id'}
-      ).select();
-      if (pinErr) throw new Error('密码设置失败: ' + pinErr.message);
-      // Continue to success flow below (skip PIN check)
+    const {data: anyRows} = await sb.from('orders').select('sticker_id').eq('name', name);
+    const stickerRows = (anyRows || []).filter(row => !isForeignNamespaceSticker(row.sticker_id));
+    if (stickerRows.length > 0) {
+      throw new Error('该昵称是旧账号且尚未设置密码。为避免账号被冒领，当前已关闭自动设密码登录，请联系团长处理。');
     } else {
       throw new Error('该昵称不存在，请检查拼写或切换到「新用户注册」');
     }
@@ -2568,6 +2593,7 @@ function closeModal() {
     }
   }
   updateNickDisplay();
+  restorePendingDraft();
 
   document.getElementById('rateInput').value = rate;
   renderTable();
