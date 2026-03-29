@@ -110,6 +110,8 @@ th:nth-child(2),td:nth-child(2){min-width:180px}
 .nick-tip{font-size:12px;color:var(--text2);margin-top:-2px;margin-bottom:12px}
 .auth-error{font-size:12px;color:var(--danger);margin:-4px 0 10px;display:none}
 .auth-error.show{display:block}
+.auth-tip-error{font-size:12px;color:var(--danger);margin:-6px 0 12px;display:none}
+.auth-tip-error.show{display:block}
 
 footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
 
@@ -156,6 +158,7 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
     <input class="input" id="nickInput" type="text" maxlength="30" placeholder="请输入你的小红书昵称">
     <input class="input" id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="设置 6 位数字密码">
     <div class="nick-tip" id="authTip">之后换设备时，输入编号、昵称和密码就能找回自己的记录。</div>
+    <div class="auth-tip-error" id="authInlineError">密码需要 6 位数字。</div>
     <div class="auth-error" id="authError"></div>
     <button class="btn btn-primary" style="width:100%" id="authBtn" disabled>注册并进入</button>
   </div>
@@ -595,9 +598,11 @@ function validateAuth() {
   document.getElementById('pinInput').value = pin;
   const no = document.getElementById('authNoInput').value.replace(/\D/g, '').slice(0, 3);
   document.getElementById('authNoInput').value = no;
+  const inlineErr = document.getElementById('authInlineError');
   const ok = authMode === 'register'
     ? !!nick && pin.length === 6
     : !!nick && pin.length === 6 && !!no;
+  inlineErr.classList.toggle('show', pin.length > 0 && pin.length < 6);
   document.getElementById('authBtn').disabled = !ok;
 }
 
