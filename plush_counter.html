@@ -163,7 +163,7 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
 
 <header>
   <h1><span class="hero-dot"></span>Clawd 毛绒挂件统计 <span class="conn-dot" id="connDot" title="连接状态"></span></h1>
-  <div class="header-sub">每人注册时自动分配编号。发声版和不发声版可以同时填；当前价格档：满 100 个 ¥29 / 个，满 300 个 ¥25 / 个，发声版每件额外 +¥0.50。</div>
+  <div class="header-sub">每人注册时自动分配编号。发声版和不发声版可以同时填；两个版本分别按各自总数量成团计价：满 100 个 ¥29 / 个，满 300 个 ¥25 / 个，发声版每件额外 +¥0.50。</div>
   <div class="settings">
     <span class="tag editable" id="nickTag" title="点击修改昵称">未设置账号</span>
     <span class="tag" id="tierTag">当前未到 100 个档</span>
@@ -177,8 +177,8 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
       <h2>Clawd 毛绒小挂件拼团登记</h2>
       <p>这一页支持同时填写两种版本。你可以只要发声版、只要不发声版，也可以两个都要。系统会按总数量自动切换价格档，方便大家一起看现在处在哪一档。</p>
       <div class="hero-meta">
-        <span class="pill orange">满 100 个后 ¥29 / 个</span>
-        <span class="pill gold">满 300 个后 ¥25 / 个</span>
+        <span class="pill orange">各版本满 100 个后 ¥29 / 个</span>
+        <span class="pill gold">各版本满 300 个后 ¥25 / 个</span>
         <span class="pill green">发声版每件再 +¥0.50</span>
       </div>
     </div>
@@ -290,6 +290,7 @@ const NS_PIN = 'plush__pin';
 const MEMBER_KEY = 'plush_member_name';
 const DISPLAY_KEY = 'plush_display_nick';
 const DRAFT_KEY = 'plush_pending_draft';
+const NEXT_SEQ_KEY = 'plush_next_seq';
 
 let sb = null;
 let myName = localStorage.getItem(MEMBER_KEY) || '';
@@ -332,10 +333,75 @@ function formatName(seq, nick) {
   return String(seq).padStart(3, '0') + '-' + nick.trim();
 }
 
-function currentTier(totalQty) {
-  if (totalQty >= 300) return { label: '已到满 300 个档', silent: 25, sound: 25.5 };
-  if (totalQty >= 100) return { label: '已到满 100 个档', silent: 29, sound: 29.5 };
-  return null;
+function tierForVariant(totalQty, kind) {
+  const base = totalQty >= 300 ? 25 : totalQty >= 100 ? 29 : null;
+  if (base == null) return null;
+  return {
+    label: totalQty >= 300 ? '已到满 300 个档' : '已到满 100 个档',
+    unit: kind === 'sound' ? base + 0.5 : base
+  };
+}
+
+function getCombinedTierLabel(soundTotal, silentTotal) {
+  const soundTier = tierForVariant(soundTotal, 'sound');
+  const silentTier = tierForVariant(silentTotal, 'silent');
+  const soundLabel = '发声版' + (soundTier ? soundTier.label : '未到 100 个档');
+  const silentLabel = '不发声版' + (silentTier ? silentTier.label : '未到 100 个档');
+  return soundLabel + ' · ' + silentLabel;
+}
+
+function estimateOrderText(orderSound, orderSilent, soundTotal, silentTotal) {
+  const soundTier = tierForVariant(soundTotal, 'sound');
+  const silentTier = tierForVariant(silentTotal, 'silent');
+  const parts = [];
+  let knownTotal = 0;
+
+  if (orderSound > 0) {
+    if (soundTier) knownTotal += orderSound * soundTier.unit;
+    else parts.push('发声版待定');
+  }
+  if (orderSilent > 0) {
+    if (silentTier) knownTotal += orderSilent * silentTier.unit;
+    else parts.push('不发声版待定');
+  }
+  if (knownTotal > 0) parts.unshift('¥' + knownTotal.toFixed(2));
+  return parts.length ? parts.join(' + ') : '待定';
+}
+
+async function reserveNextSeq() {
+  const maxUsed = Object.keys(allOrders).reduce((max, name) => Math.max(max, parseSeq(name)), 0);
+  const fallbackBase = maxUsed + 1;
+
+  for (let i = 0; i < 8; i += 1) {
+    const { data: row, error: readError } = await sb.from('settings').select('key,value').eq('key', NEXT_SEQ_KEY).maybeSingle();
+    if (readError) throw readError;
+
+    const rawCurrent = row ? parseInt(row.value, 10) : NaN;
+    const current = Number.isFinite(rawCurrent) && rawCurrent > 0 ? rawCurrent : fallbackBase;
+    const candidate = Math.max(current, fallbackBase);
+    const nextValue = String(candidate + 1);
+
+    if (row) {
+      const { data: updated, error: updateError } = await sb
+        .from('settings')
+        .update({ value: nextValue, updated_at: new Date().toISOString() })
+        .eq('key', NEXT_SEQ_KEY)
+        .eq('value', row.value)
+        .select('key');
+      if (updateError) throw updateError;
+      if (updated && updated.length) return candidate;
+    } else {
+      const { error: insertError } = await sb
+        .from('settings')
+        .upsert({ key: NEXT_SEQ_KEY, value: nextValue, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      if (!insertError) return candidate;
+    }
+  }
+
+  let seq = fallbackBase;
+  const used = new Set(Object.keys(allOrders).map(parseSeq));
+  while (used.has(seq)) seq += 1;
+  return seq;
 }
 
 function getOrder(name) {
@@ -407,17 +473,13 @@ function syncForm() {
   document.getElementById('cardSound').classList.toggle('active', soundQty > 0);
   document.getElementById('cardSilent').classList.toggle('active', silentQty > 0);
 
-  const totalQty = Object.values(allOrders).reduce((sum, order) => sum + order.soundQty + order.silentQty, 0);
-  const tier = currentTier(totalQty);
-  if (tier) {
-    document.getElementById('silentPriceText').textContent = '当前 ¥' + tier.silent.toFixed(2) + ' / 个';
-    document.getElementById('soundPriceText').textContent = '当前 ¥' + tier.sound.toFixed(2) + ' / 个';
-    document.getElementById('summaryTotal').textContent = '¥' + ((silentQty * tier.silent) + (soundQty * tier.sound)).toFixed(2);
-  } else {
-    document.getElementById('silentPriceText').textContent = '未到 100 个档';
-    document.getElementById('soundPriceText').textContent = '未到 100 个档';
-    document.getElementById('summaryTotal').textContent = '待到 100 个后显示';
-  }
+  const totalSound = Object.values(allOrders).reduce((sum, order) => sum + order.soundQty, 0);
+  const totalSilent = Object.values(allOrders).reduce((sum, order) => sum + order.silentQty, 0);
+  const soundTier = tierForVariant(totalSound, 'sound');
+  const silentTier = tierForVariant(totalSilent, 'silent');
+  document.getElementById('silentPriceText').textContent = silentTier ? ('当前 ¥' + silentTier.unit.toFixed(2) + ' / 个') : '当前未到 100 个档';
+  document.getElementById('soundPriceText').textContent = soundTier ? ('当前 ¥' + soundTier.unit.toFixed(2) + ' / 个') : '当前未到 100 个档';
+  document.getElementById('summaryTotal').textContent = estimateOrderText(soundQty, silentQty, totalSound, totalSilent);
 }
 
 function sortedEntries() {
@@ -429,10 +491,9 @@ function sortedEntries() {
 function recalc() {
   const entries = sortedEntries();
   const totalMembers = entries.length;
-  const totalQty = entries.reduce((sum, [, order]) => sum + order.soundQty + order.silentQty, 0);
   const totalSound = entries.reduce((sum, [, order]) => sum + order.soundQty, 0);
   const totalSilent = entries.reduce((sum, [, order]) => sum + order.silentQty, 0);
-  const tier = currentTier(totalQty);
+  const totalQty = totalSound + totalSilent;
 
   document.getElementById('statMembers').textContent = totalMembers;
   document.getElementById('statTotalQty').textContent = totalQty;
@@ -440,8 +501,8 @@ function recalc() {
   document.getElementById('statSilentQty').textContent = totalSilent;
   document.getElementById('statSoundPct').textContent = totalQty ? ('占总数量 ' + Math.round(totalSound / totalQty * 100) + '%') : '还没有记录';
   document.getElementById('statSilentPct').textContent = totalQty ? ('占总数量 ' + Math.round(totalSilent / totalQty * 100) + '%') : '还没有记录';
-  document.getElementById('grandInfo').textContent = (tier ? tier.label : '当前未到 100 个档') + ' · 全体发声版额外加价 ¥' + (totalSound * 0.5).toFixed(2);
-  document.getElementById('tierTag').textContent = tier ? tier.label : '当前未到 100 个档';
+  document.getElementById('grandInfo').textContent = getCombinedTierLabel(totalSound, totalSilent) + ' · 发声版额外加价 ¥' + (totalSound * 0.5).toFixed(2);
+  document.getElementById('tierTag').textContent = getCombinedTierLabel(totalSound, totalSilent);
 
   const tbody = document.getElementById('tbody');
   if (!entries.length) {
@@ -452,7 +513,7 @@ function recalc() {
     const seq = String(parseSeq(name)).padStart(3, '0');
     const nick = parseNick(name);
     const total = order.soundQty + order.silentQty;
-    const estimated = tier ? '¥' + ((order.soundQty * tier.sound) + (order.silentQty * tier.silent)).toFixed(2) : '待定';
+    const estimated = estimateOrderText(order.soundQty, order.silentQty, totalSound, totalSilent);
     return '<tr>'
       + '<td>' + seq + '</td>'
       + '<td title="' + esc(nick) + '"><span class="nick-text">' + esc(nick) + '</span>' + (name === myName ? ' <span style="color:var(--primary);font-weight:700">(我)</span>' : '') + '</td>'
@@ -503,10 +564,6 @@ function subscribeRealtime() {
     .subscribe(status => setConnected(status === 'SUBSCRIBED'));
 }
 
-function nextSeq() {
-  return Object.keys(allOrders).reduce((max, name) => Math.max(max, parseSeq(name)), 0) + 1;
-}
-
 function switchAuthTab(mode) {
   authMode = mode;
   document.getElementById('tabRegister').classList.toggle('active', mode === 'register');
@@ -548,7 +605,7 @@ async function doRegister() {
   const nick = document.getElementById('nickInput').value.trim();
   const pin = document.getElementById('pinInput').value.trim();
   if (!nick || pin.length !== 6) return;
-  const seq = nextSeq();
+  const seq = await reserveNextSeq();
   const fullName = formatName(seq, nick);
   const { error } = await sb.from('orders').upsert(
     { name: fullName, sticker_id: NS_PIN, quantity: parseInt(pin, 10), updated_at: new Date().toISOString() },
