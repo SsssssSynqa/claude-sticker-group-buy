@@ -181,10 +181,10 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
 
 <header>
   <h1><span class="hero-dot"></span>Clawd 毛绒挂件统计 <span class="conn-dot" id="connDot" title="连接状态"></span></h1>
-  <div class="header-sub">每人注册时自动分配编号。发声版和不发声版可以同时填；两个版本分别按各自总数量成团计价：满 100 个 ¥29 / 个，满 300 个 ¥25 / 个，发声版每件额外 +¥0.50。</div>
+  <div class="header-sub">每人注册时自动分配编号。发声版和不发声版可以同时填；当前价格已经定为不发声版 ¥26 / 个，发声版 ¥26.5 / 个。</div>
   <div class="settings">
     <span class="tag editable" id="nickTag" title="点击修改昵称">未设置账号</span>
-    <span class="tag" id="tierTag">当前未到 100 个档</span>
+    <span class="tag" id="tierTag">当前固定价：不发声 ¥26 / 发声 ¥26.5</span>
     <span class="grand-info" id="grandInfo">当前全体额外加价：¥0.00</span>
   </div>
 </header>
@@ -193,11 +193,11 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
   <section class="section hero-card">
     <div class="hero-copy">
       <h2>Clawd 毛绒小挂件拼团登记</h2>
-      <p>这一页支持同时填写两种版本。你可以只要发声版、只要不发声版，也可以两个都要。系统会按总数量自动切换价格档，方便大家一起看现在处在哪一档。</p>
+      <p>这一页支持同时填写两种版本。你可以只要发声版、只要不发声版，也可以两个都要。当前价格已经固定，直接按件数统计和汇总。</p>
       <div class="hero-meta">
-        <span class="pill orange">各版本满 100 个后 ¥29 / 个</span>
-        <span class="pill gold">各版本满 300 个后 ¥25 / 个</span>
-        <span class="pill green">发声版每件再 +¥0.50</span>
+        <span class="pill orange">不发声版 ¥26 / 个</span>
+        <span class="pill gold">发声版 ¥26.5 / 个</span>
+        <span class="pill green">两种版本都可以同时填写</span>
       </div>
     </div>
     <div class="hero-media">
@@ -244,7 +244,7 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
             <div class="variant-card" id="cardSound">
               <div class="variant-title">捏捏发声版</div>
               <div class="variant-price" id="soundPriceText">当前 ¥-- / 个</div>
-              <div class="variant-desc">在当前价格档基础上，每件额外加 ¥0.50。</div>
+              <div class="variant-desc">发声版固定按 ¥26.50 / 个计算，比普通版每件多 ¥0.50。</div>
               <div class="qty-box">
                 <button class="qty-btn" id="soundMinus" type="button">−</button>
                 <div class="qty-val" id="soundQtyVal">0</div>
@@ -268,7 +268,7 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
           <div class="order-summary-row"><span>捏捏发声版</span><strong id="summarySoundQty">0 个</strong></div>
           <div class="order-summary-row"><span>不发声版</span><strong id="summarySilentQty">0 个</strong></div>
           <div class="order-summary-row"><span>总数量</span><strong id="summaryQty">0 个</strong></div>
-          <div class="order-summary-row"><span>预计总价</span><strong id="summaryTotal">待到 100 个后显示</strong></div>
+          <div class="order-summary-row"><span>预计总价</span><strong id="summaryTotal">¥0.00</strong></div>
           <div class="order-summary-row"><span>相对基准额外增加</span><strong id="summaryExtra">¥0.00</strong></div>
         </div>
 
@@ -326,6 +326,8 @@ const DISPLAY_KEY = 'plush_display_nick';
 const DRAFT_KEY = 'plush_pending_draft';
 const NEXT_SEQ_KEY = 'plush_next_seq';
 const TAOBAO_TEXT = '【淘宝】退货运费险 https://e.tb.cn/h.ijTf1bnJv05FYln?tk=poSE5cNeE3D MF937 「章鱼小挂件 只包含毛绒小挂件和橙色钥匙圈钥匙链」 点击链接直接打开 或者 淘宝搜索直接打开';
+const SILENT_UNIT_PRICE = 26;
+const SOUND_UNIT_PRICE = 26.5;
 
 let sb = null;
 let myName = localStorage.getItem(MEMBER_KEY) || '';
@@ -396,39 +398,9 @@ function formatName(seq, nick) {
   return String(seq).padStart(3, '0') + '-' + nick.trim();
 }
 
-function tierForVariant(totalQty, kind) {
-  const base = totalQty >= 300 ? 25 : totalQty >= 100 ? 29 : null;
-  if (base == null) return null;
-  return {
-    label: totalQty >= 300 ? '已到满 300 个档' : '已到满 100 个档',
-    unit: kind === 'sound' ? base + 0.5 : base
-  };
-}
-
-function getCombinedTierLabel(soundTotal, silentTotal) {
-  const soundTier = tierForVariant(soundTotal, 'sound');
-  const silentTier = tierForVariant(silentTotal, 'silent');
-  const soundLabel = '发声版' + (soundTier ? soundTier.label : '未到 100 个档');
-  const silentLabel = '不发声版' + (silentTier ? silentTier.label : '未到 100 个档');
-  return soundLabel + ' · ' + silentLabel;
-}
-
-function estimateOrderText(orderSound, orderSilent, soundTotal, silentTotal) {
-  const soundTier = tierForVariant(soundTotal, 'sound');
-  const silentTier = tierForVariant(silentTotal, 'silent');
-  const parts = [];
-  let knownTotal = 0;
-
-  if (orderSound > 0) {
-    if (soundTier) knownTotal += orderSound * soundTier.unit;
-    else parts.push('发声版待定');
-  }
-  if (orderSilent > 0) {
-    if (silentTier) knownTotal += orderSilent * silentTier.unit;
-    else parts.push('不发声版待定');
-  }
-  if (knownTotal > 0) parts.unshift('¥' + knownTotal.toFixed(2));
-  return parts.length ? parts.join(' + ') : '待定';
+function estimateOrderText(orderSound, orderSilent) {
+  const total = orderSound * SOUND_UNIT_PRICE + orderSilent * SILENT_UNIT_PRICE;
+  return total > 0 ? ('¥' + total.toFixed(2)) : '¥0.00';
 }
 
 async function reserveNextSeq() {
@@ -536,13 +508,9 @@ function syncForm() {
   document.getElementById('cardSound').classList.toggle('active', soundQty > 0);
   document.getElementById('cardSilent').classList.toggle('active', silentQty > 0);
 
-  const totalSound = Object.values(allOrders).reduce((sum, order) => sum + order.soundQty, 0);
-  const totalSilent = Object.values(allOrders).reduce((sum, order) => sum + order.silentQty, 0);
-  const soundTier = tierForVariant(totalSound, 'sound');
-  const silentTier = tierForVariant(totalSilent, 'silent');
-  document.getElementById('silentPriceText').textContent = silentTier ? ('当前 ¥' + silentTier.unit.toFixed(2) + ' / 个') : '当前未到 100 个档';
-  document.getElementById('soundPriceText').textContent = soundTier ? ('当前 ¥' + soundTier.unit.toFixed(2) + ' / 个') : '当前未到 100 个档';
-  document.getElementById('summaryTotal').textContent = estimateOrderText(soundQty, silentQty, totalSound, totalSilent);
+  document.getElementById('silentPriceText').textContent = '当前 ¥' + SILENT_UNIT_PRICE.toFixed(2) + ' / 个';
+  document.getElementById('soundPriceText').textContent = '当前 ¥' + SOUND_UNIT_PRICE.toFixed(2) + ' / 个';
+  document.getElementById('summaryTotal').textContent = estimateOrderText(soundQty, silentQty);
 }
 
 function sortedEntries() {
@@ -564,8 +532,8 @@ function recalc() {
   document.getElementById('statSilentQty').textContent = totalSilent;
   document.getElementById('statSoundPct').textContent = totalQty ? ('占总数量 ' + Math.round(totalSound / totalQty * 100) + '%') : '还没有记录';
   document.getElementById('statSilentPct').textContent = totalQty ? ('占总数量 ' + Math.round(totalSilent / totalQty * 100) + '%') : '还没有记录';
-  document.getElementById('grandInfo').textContent = getCombinedTierLabel(totalSound, totalSilent) + ' · 发声版额外加价 ¥' + (totalSound * 0.5).toFixed(2);
-  document.getElementById('tierTag').textContent = getCombinedTierLabel(totalSound, totalSilent);
+  document.getElementById('grandInfo').textContent = '发声版总额外加价：¥' + (totalSound * 0.5).toFixed(2);
+  document.getElementById('tierTag').textContent = '当前固定价：不发声 ¥26 / 发声 ¥26.5';
 
   const tbody = document.getElementById('tbody');
   if (!entries.length) {
@@ -576,7 +544,7 @@ function recalc() {
     const seq = String(parseSeq(name)).padStart(3, '0');
     const nick = parseNick(name);
     const total = order.soundQty + order.silentQty;
-    const estimated = estimateOrderText(order.soundQty, order.silentQty, totalSound, totalSilent);
+    const estimated = estimateOrderText(order.soundQty, order.silentQty);
     return '<tr>'
       + '<td>' + seq + '</td>'
       + '<td title="' + esc(nick) + '"><span class="nick-text">' + esc(nick) + '</span>' + (name === myName ? ' <span style="color:var(--primary);font-weight:700">(我)</span>' : '') + '</td>'
