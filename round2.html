@@ -131,6 +131,8 @@ section{padding:14px}
 .card-price-cny{font-size:11px}
 .qty-btn{width:40px;height:40px;font-size:20px}
 .qty-val{font-size:15px;min-width:40px}
+.pay-action-bar{display:grid;grid-template-columns:1fr;gap:10px;max-width:none}
+.btn-my-export,.btn-pay-qr,.btn-pay-confirm{width:100%;padding:12px 14px;font-size:13px;line-height:1.35;white-space:normal;text-align:center}
 .table-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .table-controls .btn{width:100%;padding:10px 8px;font-size:12px}
 .team-select{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -2082,7 +2084,7 @@ function renderTable() {
       const detailArg = JSON.stringify(name).replace(/"/g, '&quot;');
       h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-name="' + esc(name) + '">';
       h += '<td class="col-idx">' + (seqMap[name] || '') + '</td>';
-      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + detailArg + ')" title="查看订单详情">📋</button>' + (isMe ? ' <button class="del-btn" onclick="clearMyOrders()" title="清空我的订单">清空</button>' : '') + '</td>';
+      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + detailArg + ')" title="查看订单详情">📋</button></td>';
       S.forEach(s => {
         const v = orders[s.id] || 0;
         if (isMe) {
