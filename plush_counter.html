@@ -39,6 +39,16 @@ main{padding:20px 24px 110px;max-width:1180px;margin:0 auto}
 .pill.gold{background:var(--gold-lt);color:var(--gold)}
 .hero-media{display:inline-grid;place-items:center;justify-self:center;align-self:center;width:auto;max-width:100%;background:linear-gradient(145deg,#FFFDFB,#FFF5EE);border:1px solid #F0E2D8;border-radius:18px;padding:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.75)}
 .hero-media img{display:block;width:280px;max-width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:18px;box-shadow:0 10px 24px rgba(134,96,66,.1)}
+.purchase-card{background:linear-gradient(135deg,#FFF2E8 0%,#FFF8F2 100%);border:1px solid #F2D5C3;border-radius:18px;padding:16px 18px;box-shadow:var(--shadow-sm);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center}
+.purchase-copy h3{font-size:16px;font-weight:800;color:var(--primary);margin-bottom:6px}
+.purchase-copy p{font-size:13px;color:var(--text2);margin-bottom:10px}
+.purchase-linkbox{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.72);border:1px solid #F0DACC;font-size:13px;color:var(--text);line-height:1.6;word-break:break-all}
+.purchase-linkbox strong{color:var(--primary)}
+.purchase-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.btn-outline{background:#FFFDFB;color:var(--primary);border:1px solid #F0D2C2}
+.btn-outline:hover{background:#FFF5EE}
+.copy-hint{font-size:12px;color:var(--green);margin-top:8px;display:none}
+.copy-hint.show{display:block}
 
 .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .stat-card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px 16px 14px;box-shadow:var(--shadow-sm)}
@@ -118,6 +128,8 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
 @media (max-width: 900px){
   .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .hero-card,.content-grid{grid-template-columns:1fr}
+  .purchase-card{grid-template-columns:1fr}
+  .purchase-actions{justify-content:flex-start}
   .content-grid{display:block}
   .content-grid>.panel{width:100%}
   .content-grid>.panel + .panel{margin-top:16px}
@@ -134,6 +146,9 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
   .hero-media{padding:10px}
   .hero-media{justify-self:center}
   .hero-media img{width:min(100%,260px)}
+  .purchase-card{padding:14px}
+  .purchase-copy h3{font-size:15px}
+  .purchase-linkbox{font-size:12px}
   .panel{padding:14px}
   .panel-title{font-size:16px}
   th,td{padding:10px 10px}
@@ -187,6 +202,22 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
     </div>
     <div class="hero-media">
       <img src="./assets/plush-clawd.png" alt="Clawd 毛绒挂件">
+    </div>
+  </section>
+
+  <section class="section purchase-card">
+    <div class="purchase-copy">
+      <h3>淘宝原商品链接</h3>
+      <p>想直接跳到淘宝原链接看商品详情的话，可以用这里。复制后也能直接发给别人。</p>
+      <div class="purchase-linkbox" id="taobaoLinkText">
+        <strong>【淘宝】</strong>
+        <span>退货运费险 https://e.tb.cn/h.ijTf1bnJv05FYln?tk=poSE5cNeE3D MF937 「章鱼小挂件 只包含毛绒小挂件和橙色钥匙圈钥匙链」 点击链接直接打开 或者 淘宝搜索直接打开</span>
+      </div>
+      <div class="copy-hint" id="copyHint">已复制淘宝链接。</div>
+    </div>
+    <div class="purchase-actions">
+      <a class="btn btn-outline" href="https://e.tb.cn/h.ijTf1bnJv05FYln?tk=poSE5cNeE3D" target="_blank" rel="noopener noreferrer">打开淘宝</a>
+      <button class="btn btn-primary" id="copyTaobaoBtn" type="button">一键复制</button>
     </div>
   </section>
 
@@ -294,6 +325,7 @@ const MEMBER_KEY = 'plush_member_name';
 const DISPLAY_KEY = 'plush_display_nick';
 const DRAFT_KEY = 'plush_pending_draft';
 const NEXT_SEQ_KEY = 'plush_next_seq';
+const TAOBAO_TEXT = '【淘宝】退货运费险 https://e.tb.cn/h.ijTf1bnJv05FYln?tk=poSE5cNeE3D MF937 「章鱼小挂件 只包含毛绒小挂件和橙色钥匙圈钥匙链」 点击链接直接打开 或者 淘宝搜索直接打开';
 
 let sb = null;
 let myName = localStorage.getItem(MEMBER_KEY) || '';
@@ -304,6 +336,34 @@ let silentQty = 0;
 let allOrders = {};
 let pending = {};
 let authMode = 'register';
+
+function fallbackCopyText(text) {
+  const input = document.createElement('textarea');
+  input.value = text;
+  input.setAttribute('readonly', '');
+  input.style.position = 'fixed';
+  input.style.opacity = '0';
+  document.body.appendChild(input);
+  input.select();
+  document.execCommand('copy');
+  document.body.removeChild(input);
+}
+
+async function copyTaobaoText() {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(TAOBAO_TEXT);
+    } else {
+      fallbackCopyText(TAOBAO_TEXT);
+    }
+    const hint = document.getElementById('copyHint');
+    hint.classList.add('show');
+    clearTimeout(copyTaobaoText._timer);
+    copyTaobaoText._timer = setTimeout(() => hint.classList.remove('show'), 1800);
+  } catch (err) {
+    alert('复制失败了，可以先手动长按复制这段淘宝链接。');
+  }
+}
 
 function setConnected(on) {
   const dot = document.getElementById('connDot');
@@ -742,6 +802,7 @@ function bindEvents() {
   document.getElementById('tabLogin').addEventListener('click', () => switchAuthTab('login'));
   ['nickInput', 'pinInput', 'authNoInput'].forEach(id => document.getElementById(id).addEventListener('input', validateAuth));
   document.getElementById('authBtn').addEventListener('click', submitAuth);
+  document.getElementById('copyTaobaoBtn').addEventListener('click', copyTaobaoText);
 
   document.getElementById('inlineNickInput').addEventListener('input', (e) => {
     draftNick = e.target.value;
