@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clawd 金属徽章统计</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#FFF8F0;--card:#FFF;--primary:#E8714A;--primary-lt:#FDEEE8;--primary-ink:#D4623E;
+  --green:#5BA87D;--green-lt:#E8F7EF;--gold:#B5960F;--gold-lt:#FDF6E3;--text:#3D3D3D;--text2:#8E8A85;
+  --border:#E8E0D8;--danger:#D94040;--danger-lt:#FDEAEA;--shadow:0 10px 28px rgba(134,96,66,.08);--shadow-sm:0 4px 14px rgba(134,96,66,.06);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+header{background:linear-gradient(135deg,#FDE8DC 0%,#FDF1EA 45%,#FFF6F1 100%);padding:20px 24px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+header h1{font-size:24px;font-weight:800;color:var(--primary);display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.hero-dot{width:12px;height:12px;border-radius:999px;background:var(--primary);box-shadow:0 0 0 6px rgba(232,113,74,.12)}
+.header-sub{font-size:13px;color:var(--text2);margin-bottom:12px}
+.settings{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px}
+.tag{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:999px;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow-sm);font-weight:600}
+.tag.editable{cursor:pointer}
+.tag.editable:hover{border-color:#E6C6B7;background:#FFFDFB}
+.grand-info{font-weight:700;color:var(--primary)}
+.conn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc}
+.conn-dot.on{background:var(--green)}
+.conn-dot.off{background:var(--danger)}
+main{padding:20px 24px 110px;max-width:1280px;margin:0 auto}
+.section{margin-bottom:18px}
+.hero-card,.panel{background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow)}
+.hero-card{padding:18px;display:grid;grid-template-columns:minmax(0,1.25fr) max-content;gap:18px;align-items:center}
+.hero-copy h2{font-size:21px;font-weight:800;color:var(--text);margin-bottom:8px}
+.hero-copy p{font-size:14px;color:var(--text2)}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.pill.orange{background:var(--primary-lt);color:var(--primary)}
+.pill.green{background:var(--green-lt);color:var(--green)}
+.pill.gold{background:var(--gold-lt);color:var(--gold)}
+.hero-media{display:inline-grid;place-items:center;justify-self:center;background:linear-gradient(145deg,#FFFDFB,#FFF5EE);border:1px solid #F0E2D8;border-radius:18px;padding:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.75)}
+.hero-media img{display:block;width:240px;max-width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:18px;box-shadow:0 10px 24px rgba(134,96,66,.1)}
+.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px 16px 14px;box-shadow:var(--shadow-sm)}
+.stat-label{font-size:12px;color:var(--text2);margin-bottom:6px}
+.stat-value{font-size:28px;font-weight:800;line-height:1;color:var(--text)}
+.stat-sub{font-size:12px;color:var(--text2);margin-top:8px}
+.content-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(340px,.95fr);gap:16px;align-items:start}
+.panel{padding:16px;min-width:0}
+.panel-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:12px}
+.panel-sub{font-size:12px;color:var(--text2);margin-top:-6px;margin-bottom:12px}
+.products-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.product-card{border:1px solid var(--border);border-radius:18px;background:#FFFDFB;padding:12px;box-shadow:var(--shadow-sm);min-width:0}
+.product-art{width:100%;aspect-ratio:1/1;background:linear-gradient(145deg,#FFF7F1,#FFFDFB);border:1px solid #F1E4D7;border-radius:16px;display:grid;place-items:center;overflow:hidden;margin-bottom:10px}
+.product-art img{width:100%;height:100%;object-fit:contain}
+.product-name{font-size:14px;font-weight:700;color:var(--text);line-height:1.35;min-height:38px}
+.product-meta{font-size:12px;color:var(--text2);margin-top:4px}
+.product-tier{font-size:12px;color:var(--primary);font-weight:700;margin-top:6px}
+.qty-box{display:flex;align-items:center;gap:0;border:2px solid var(--border);border-radius:14px;overflow:hidden;background:#FFFDFB;margin-top:10px}
+.qty-btn{width:40px;height:40px;border:none;background:#FFF4EC;color:var(--primary);font-size:22px;font-weight:700;cursor:pointer}
+.qty-val{flex:1;text-align:center;font-size:18px;font-weight:800;color:var(--text)}
+.order-summary{padding:12px 14px;border-radius:14px;background:#FFF8F4;border:1px dashed #F0D3C3}
+.order-summary-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:4px 0}
+.order-summary-row strong{color:var(--primary)}
+.member-card{padding:12px 14px;border-radius:16px;background:#FFFDFB;border:1px solid var(--border);box-shadow:var(--shadow-sm);margin-bottom:10px}
+.member-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:6px}
+.member-name{font-size:15px;font-weight:800;color:var(--text)}
+.member-seq{font-size:12px;color:var(--text2)}
+.member-total{font-size:14px;font-weight:800;color:var(--primary)}
+.member-list{font-size:12px;color:var(--text2);display:flex;flex-wrap:wrap;gap:6px}
+.mini-pill{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:var(--primary-lt);color:var(--primary);font-weight:700}
+.auth-overlay{position:fixed;inset:0;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:16px;z-index:2000}
+.auth-popup{background:#fff;border-radius:20px;max-width:400px;width:100%;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.22)}
+.auth-popup h3{font-size:20px;font-weight:800;color:var(--primary);margin-bottom:8px}
+.auth-popup p{font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.7}
+.auth-tabs{display:flex;border:2px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.auth-tab{flex:1;padding:9px 10px;border:none;background:#FFF8F0;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer}
+.auth-tab.active{background:var(--primary);color:#fff}
+.input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;background:#FFFDFB;font-size:15px;color:var(--text);margin-bottom:12px}
+.input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-lt)}
+.auth-tip{font-size:12px;color:var(--text2);margin-top:-2px;margin-bottom:12px}
+.auth-error,.auth-tip-error{font-size:12px;color:var(--danger);display:none}
+.auth-error.show,.auth-tip-error.show{display:block}
+.submit-bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(120%);width:min(760px,calc(100% - 28px));background:linear-gradient(135deg,#FDE8DC,#FDF3EC);border:1px solid #F0D2C2;border-radius:16px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:14px;box-shadow:0 14px 34px rgba(134,96,66,.16);transition:transform .25s cubic-bezier(.4,0,.2,1);z-index:120}
+.submit-bar.show{transform:translateX(-50%) translateY(0)}
+.submit-copy{font-size:13px;color:var(--text)}
+.submit-copy strong{color:var(--primary)}
+.submit-btns{display:flex;gap:8px}
+.btn{border:none;border-radius:12px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-ink)}
+.btn-soft{background:#F4ECE4;color:var(--text2)}
+.btn-soft:hover{background:#ECDDCE;color:var(--text)}
+.btn-danger{background:var(--danger-lt);color:var(--danger)}
+.btn-danger:hover{background:#F9D6D2}
+footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
+@media (max-width: 1024px){
+  .content-grid,.hero-card{grid-template-columns:1fr}
+  .products-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width: 720px){
+  header{padding:18px 14px 16px}
+  main{padding:14px 14px 120px}
+  .stats-grid,.products-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hero-copy h2{font-size:18px}
+  .hero-copy p{font-size:13px}
+  .hero-media img{width:min(100%,220px)}
+  .panel{padding:14px}
+  .submit-bar{padding:12px;align-items:stretch;flex-direction:column}
+  .submit-btns{width:100%}
+  .submit-btns .btn{flex:1}
+}
+</style>
+</head>
+<body>
+
+<div class="auth-overlay" id="authOverlay" style="display:none">
+  <div class="auth-popup">
+    <h3>Clawd 金属徽章统计</h3>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabRegister" type="button">新用户注册</button>
+      <button class="auth-tab" id="tabLogin" type="button">已有账号</button>
+    </div>
+    <p id="authHint">首次进入会自动分配编号。请填写你的小红书昵称，并设置一个 6 位数字密码。</p>
+    <input class="input" id="authNoInput" type="text" inputmode="numeric" maxlength="3" placeholder="编号（登录时填写）" style="display:none">
+    <input class="input" id="nickInput" type="text" maxlength="30" placeholder="请输入你的小红书昵称">
+    <input class="input" id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="设置 6 位数字密码">
+    <div class="auth-tip" id="authTip">之后换设备时，输入编号、昵称和密码就能找回自己的记录。</div>
+    <div class="auth-tip-error" id="authInlineError">密码需要 6 位数字。</div>
+    <div class="auth-error" id="authError"></div>
+    <button class="btn btn-primary" style="width:100%" id="authBtn" disabled>注册并进入</button>
+  </div>
+</div>
+
+<header>
+  <h1><span class="hero-dot"></span>Clawd 金属徽章统计 <span class="conn-dot" id="connDot" title="连接状态"></span></h1>
+  <div class="header-sub">每人注册时自动分配编号。每款徽章单独统计，满 200 个成团，固定 ¥5.5 / 个。后续新增款式可以继续往这页加。</div>
+  <div class="settings">
+    <span class="tag editable" id="nickTag" title="点击修改昵称">未设置账号</span>
+    <span class="tag" id="tierTag">每款满 200 个成团</span>
+    <span class="grand-info" id="grandInfo">固定单价：¥5.5 / 个</span>
+  </div>
+</header>
+
+<main>
+  <section class="section hero-card">
+    <div class="hero-copy">
+      <h2>Clawd 金属徽章数调</h2>
+      <p>先用贴纸团里现有的 Clawd 款式起第一版。每款徽章分别统计数量，满 200 个就算成团。你可以多款一起填，系统会自动汇总自己的总件数和总价。</p>
+      <div class="hero-meta">
+        <span class="pill orange">每款单独统计</span>
+        <span class="pill gold">每款满 200 个成团</span>
+        <span class="pill green">固定 ¥5.5 / 个</span>
+      </div>
+    </div>
+    <div class="hero-media">
+      <img src="https://storage.googleapis.com/sm-artworks/d3c8ea82-59f0-4606-97fa-88acd0bf21a0/large.png" alt="Clawd 徽章示意图">
+    </div>
+  </section>
+
+  <section class="section stats-grid">
+    <div class="stat-card"><div class="stat-label">参与人数</div><div class="stat-value" id="statMembers">0</div><div class="stat-sub">已填写数量的人数</div></div>
+    <div class="stat-card"><div class="stat-label">总件数</div><div class="stat-value" id="statTotalQty">0</div><div class="stat-sub">所有款式加起来的件数</div></div>
+    <div class="stat-card"><div class="stat-label">已成团款数</div><div class="stat-value" id="statReadyCount">0</div><div class="stat-sub">达到 200 个的款式</div></div>
+    <div class="stat-card"><div class="stat-label">预计总额</div><div class="stat-value" id="statGrandTotal">¥0</div><div class="stat-sub">按固定单价估算</div></div>
+  </section>
+
+  <section class="section content-grid">
+    <div class="panel">
+      <div class="panel-title">填写我的需求</div>
+      <div class="panel-sub">每款都可以单独填数量。改完记得保存。</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>我的小红书昵称</label>
+          <input class="input" id="inlineNickInput" type="text" maxlength="30" placeholder="请输入你的小红书昵称">
+        </div>
+        <div class="products-grid" id="productsGrid"></div>
+        <div class="order-summary">
+          <div class="order-summary-row"><span>我选择的款数</span><strong id="summaryKinds">0 款</strong></div>
+          <div class="order-summary-row"><span>我的总件数</span><strong id="summaryQty">0 个</strong></div>
+          <div class="order-summary-row"><span>预计总价</span><strong id="summaryTotal">¥0.00</strong></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="saveBtn" type="button">保存我的选择</button>
+          <button class="btn btn-danger" id="clearBtn" type="button">清空我的记录</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">当前统计表</div>
+      <div class="panel-sub">编号注册后固定。这里只显示有填写数量的人。</div>
+      <div id="memberList"></div>
+    </div>
+  </section>
+</main>
+
+<div class="submit-bar" id="submitBar">
+  <div class="submit-copy">你有 <strong id="submitCount">0</strong> 项修改还没保存</div>
+  <div class="submit-btns">
+    <button class="btn btn-soft" type="button" id="discardBtn">撤销修改</button>
+    <button class="btn btn-primary" type="button" id="submitBtn">保存</button>
+  </div>
+</div>
+
+<footer>Clawd Badge Counter · 与贴纸团 / 毛绒页数据隔离，使用独立 `badge__*` 命名空间</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
+const BADGE_PIN = 'badge__pin';
+const MEMBER_KEY = 'badge_member_name';
+const DISPLAY_KEY = 'badge_display_nick';
+const DRAFT_KEY = 'badge_pending_draft';
+const NEXT_SEQ_KEY = 'badge_next_seq';
+const UNIT_PRICE = 5.5;
+const GROUP_TARGET = 200;
+const BADGES = [
+  { id:'badge_clawd', name:'Clawd', img:'https://storage.googleapis.com/sm-artworks/5719926a-04ae-4afb-9925-f1f4521d38ce/large.png?cacheFor=b1c948c6194db63359b0f8564d4a7eed' },
+  { id:'badge_ultrathink', name:'ultrathink', img:'https://storage.googleapis.com/sm-artworks/0006ba04-0f46-4c86-930b-1b41a9480f14/large.png?cacheFor=f7003b57a2fc7bafc920f3ed2acb368a' },
+  { id:'badge_clawd_happy', name:'Clawd happy', img:'https://storage.googleapis.com/sm-artworks/be75b541-e429-4b61-a058-6a04bc35f712/large.png?cacheFor=26b5d38b95c02b9de101edd57a5846a9' },
+  { id:'badge_vibing_dc', name:'Vibing', img:'https://storage.googleapis.com/sm-artworks/c6e41ee6-4500-403f-a36c-3e6e72596e3a/large.png?cacheFor=e67ba358b1881dbc5ebedc5943e67dcb' },
+  { id:'badge_clawd_shiny', name:'Clawd shiny', img:'https://storage.googleapis.com/sm-artworks/1c69d7fd-a6de-42a8-99be-3edc7b32c8f1/large.png?cacheFor=31a4293c9f5cc540655eb3642dd66c15' },
+  { id:'badge_claudecode', name:'claudecode', img:'https://storage.googleapis.com/sm-artworks/1a18c149-6820-437c-83a3-4053259f28d5/large.png?cacheFor=5d8dcc208c6c3caee71731b8daf13233' },
+  { id:'badge_vibing_holo', name:'Vibing holo', img:'https://storage.googleapis.com/sm-artworks/d85490fc-cd48-4248-b208-0bda8dad0e59/large.png?cacheFor=7ba69e81720e19d7d1fbb48a8163cbd9' },
+  { id:'badge_reticulating', name:'reticulating', img:'https://storage.googleapis.com/sm-artworks/3133e32f-64d5-48ee-9215-be6453365d8b/large.png?cacheFor=666df05e24c335393669a33fa071c47c' },
+  { id:'badge_shipping', name:'Shipping', img:'https://storage.googleapis.com/sm-artworks/4296af64-9d1c-4e87-889f-e5397b680e4a/large.png?cacheFor=ed5d463f001823bf25db91888595a687' },
+  { id:'badge_manifesting_holo', name:'Manifesting holo', img:'https://storage.googleapis.com/sm-artworks/7c5cd395-b662-440f-a668-bf9052c8aafc/large.png?cacheFor=1f302fa314f6fee5ed260ed773250db6' },
+  { id:'badge_baking', name:'Baking', img:'https://storage.googleapis.com/sm-artworks/32774d7b-adab-48ca-8fc4-18fb0b0ec1c2/large.png?cacheFor=3bd97a513abf6349abb718b2cbdc00a7' },
+  { id:'badge_clawd_wave', name:'Clawd wave', img:'https://storage.googleapis.com/sm-artworks/f1ec9028-203f-4d6f-a360-5eea91e9723e/large.png?cacheFor=73d7616389ce26a3ea44a9d279ca3ed9' },
+  { id:'badge_manifesting_glt', name:'Manifesting glt', img:'https://storage.googleapis.com/sm-artworks/15c2280e-7a5f-46d8-ba05-86073c9d0b09/large.png?cacheFor=1fa9c7949a091c06af06347102479bea' },
+  { id:'badge_clawd_heart', name:'clawd heart', img:'https://storage.googleapis.com/sm-artworks/d3c8ea82-59f0-4606-97fa-88acd0bf21a0/large.png' },
+  { id:'badge_clawd_headphones', name:'Clawd Headphones', img:'https://storage.googleapis.com/sm-artworks/d683c1c3-a865-4797-a5d3-7b1f82b90e86/large.png' },
+  { id:'badge_clawd_wand', name:'Clawd Wand', img:'https://storage.googleapis.com/sm-artworks/297554b5-c858-4e1d-8c96-86eb18496131/large.png' },
+  { id:'badge_clawd_bubble', name:'Clawd Bubble', img:'https://storage.googleapis.com/sm-artworks/15cfce1b-f09f-46c4-9b1c-6da9d0d157d6/large.png' },
+  { id:'badge_clawd_coffee', name:'Clawd Coffee', img:'https://storage.googleapis.com/sm-artworks/a751fc7b-1ef4-4ae6-9ae4-f0a92e428c33/large.png' },
+  { id:'badge_clawd_skateboard', name:'Clawd Skateboard', img:'https://storage.googleapis.com/sm-artworks/298ed85d-dfc2-497d-a7c1-0bef98f77c02/large.png' },
+  { id:'badge_clawd_book', name:'Clawd Book', img:'https://storage.googleapis.com/sm-artworks/9d8d9dac-a077-4ad3-b60b-969b18dfa8a3/large.png' },
+  { id:'badge_clawd_cape', name:'Clawd Cape', img:'https://storage.googleapis.com/sm-artworks/7046cd5f-a1e1-466c-a211-7b49671d23ab/large.png' },
+  { id:'badge_clawd_dizzy', name:'Clawd Dizzy', img:'https://storage.googleapis.com/sm-artworks/5df191cb-99cf-421a-b5ef-818977b487b8/large.png' },
+  { id:'badge_clawd_kite', name:'Clawd Kite', img:'https://storage.googleapis.com/sm-artworks/3f521137-f17f-4119-9039-91e433c269c4/large.png' },
+  { id:'badge_clawd_lightbulb', name:'Clawd Lightbulb', img:'https://storage.googleapis.com/sm-artworks/966c86c2-9273-4064-9951-ab56fecd27bb/large.png' },
+  { id:'badge_clawd_magnifier', name:'Clawd Magnifier', img:'https://storage.googleapis.com/sm-artworks/b604152e-1a17-444d-846e-c0fe257bda95/large.png' }
+];
+let sb = null;
+let myName = localStorage.getItem(MEMBER_KEY) || '';
+let myDisplayNick = localStorage.getItem(DISPLAY_KEY) || '';
+let draftNick = myDisplayNick || '';
+let allOrders = {};
+let pending = {};
+let authMode = 'register';
+let currentQty = Object.fromEntries(BADGES.map(b => [b.id, 0]));
+
+function setConnected(on){const dot=document.getElementById('connDot');dot.classList.toggle('on',!!on);dot.classList.toggle('off',!on)}
+function initSupabase(){if(!window.supabase) return false; sb=window.supabase.createClient(SUPA_URL,SUPA_KEY); return true;}
+function esc(str){const d=document.createElement('div');d.textContent=str||'';return d.innerHTML;}
+function parseSeq(name){const m=String(name||'').match(/^(\d+)-/);return m?parseInt(m[1],10):0;}
+function parseNick(name){return String(name||'').replace(/^\d+-/,'');}
+function formatName(seq,nick){return String(seq).padStart(3,'0')+'-'+nick.trim();}
+function getOrder(name){return allOrders[name] || { qtyByBadge:{}, pin:null, updatedAt:'' }; }
+function getMemberTotal(order){return BADGES.reduce((sum,b)=>sum + (order.qtyByBadge?.[b.id] || 0),0);}
+function getBadgeTotal(id){return Object.values(allOrders).reduce((sum,order)=>sum + (order.qtyByBadge?.[id] || 0),0);}
+function estimateMine(){return BADGES.reduce((sum,b)=>sum + (currentQty[b.id]||0)*UNIT_PRICE,0);}
+function loadDraft(){try{const data=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'); if(data&&data.name===myName) return data;}catch(e){} return null;}
+function saveDraft(){if(!myName) return; localStorage.setItem(DRAFT_KEY,JSON.stringify({name:myName,nick:draftNick,qtyByBadge:currentQty}));}
+function clearDraft(){localStorage.removeItem(DRAFT_KEY);}
+function markDirty(){pending={nick:draftNick,qtyByBadge:{...currentQty}}; saveDraft(); updateSubmitBar();}
+function clearDirty(){pending={}; clearDraft(); updateSubmitBar();}
+function updateSubmitBar(){const count=Object.keys(pending).length; document.getElementById('submitCount').textContent=count; document.getElementById('submitBar').classList.toggle('show', count>0);}
+function setIdentity(fullName){myName=fullName; myDisplayNick=parseNick(fullName); draftNick=myDisplayNick; localStorage.setItem(MEMBER_KEY,myName); localStorage.setItem(DISPLAY_KEY,myDisplayNick); document.getElementById('nickTag').textContent=myName; document.getElementById('inlineNickInput').value=myDisplayNick;}
+function readDraftOrSaved(){const saved=getOrder(myName); const draft=loadDraft(); draftNick=myDisplayNick||parseNick(myName)||''; currentQty=Object.fromEntries(BADGES.map(b=>[b.id, saved.qtyByBadge?.[b.id] || 0])); if(draft?.qtyByBadge){for(const b of BADGES) currentQty[b.id]=draft.qtyByBadge[b.id] || 0;} if(draft?.nick) draftNick=draft.nick;}
+async function reserveNextSeq(){
+  const maxUsed = Object.keys(allOrders).reduce((max, name) => Math.max(max, parseSeq(name)), 0);
+  const fallbackBase = maxUsed + 1;
+  for(let i=0;i<8;i+=1){
+    const {data:row,error:readError}=await sb.from('settings').select('key,value').eq('key',NEXT_SEQ_KEY).maybeSingle();
+    if(readError) throw readError;
+    const rawCurrent=row?parseInt(row.value,10):NaN;
+    const current=Number.isFinite(rawCurrent)&&rawCurrent>0?rawCurrent:fallbackBase;
+    const candidate=Math.max(current,fallbackBase);
+    const nextValue=String(candidate+1);
+    if(row){
+      const {data:updated,error:updateError}=await sb.from('settings').update({value:nextValue,updated_at:new Date().toISOString()}).eq('key',NEXT_SEQ_KEY).eq('value',row.value).select('key');
+      if(updateError) throw updateError;
+      if(updated&&updated.length) return candidate;
+    } else {
+      const {error:insertError}=await sb.from('settings').upsert({key:NEXT_SEQ_KEY,value:nextValue,updated_at:new Date().toISOString()},{onConflict:'key'});
+      if(!insertError) return candidate;
+    }
+  }
+  let seq=fallbackBase; const used=new Set(Object.keys(allOrders).map(parseSeq)); while(used.has(seq)) seq+=1; return seq;
+}
+function renderProducts(){
+  const grid=document.getElementById('productsGrid');
+  grid.innerHTML = BADGES.map(b=>{
+    const qty=currentQty[b.id]||0;
+    const total=getBadgeTotal(b.id);
+    const rest=Math.max(0, GROUP_TARGET-total);
+    return `<div class="product-card">
+      <div class="product-art"><img src="${b.img}" alt="${esc(b.name)}"></div>
+      <div class="product-name">${esc(b.name)}</div>
+      <div class="product-meta">固定 ¥5.5 / 个</div>
+      <div class="product-tier">${total >= GROUP_TARGET ? '已成团' : '还差 ' + rest + ' 个成团'}</div>
+      <div class="qty-box">
+        <button class="qty-btn" data-act="minus" data-id="${b.id}" type="button">−</button>
+        <div class="qty-val">${qty}</div>
+        <button class="qty-btn" data-act="plus" data-id="${b.id}" type="button">+</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function renderSummary(){
+  document.getElementById('inlineNickInput').value = draftNick || '';
+  const kinds = BADGES.filter(b => (currentQty[b.id]||0) > 0).length;
+  const qty = BADGES.reduce((sum,b)=>sum + (currentQty[b.id]||0), 0);
+  document.getElementById('summaryKinds').textContent = kinds + ' 款';
+  document.getElementById('summaryQty').textContent = qty + ' 个';
+  document.getElementById('summaryTotal').textContent = '¥' + estimateMine().toFixed(2);
+}
+function renderStats(){
+  const entries = Object.entries(allOrders).filter(([,order]) => getMemberTotal(order) > 0).sort((a,b)=>parseSeq(a[0])-parseSeq(b[0]));
+  const memberCount=entries.length;
+  const totalQty=entries.reduce((sum,[,order])=>sum+getMemberTotal(order),0);
+  const readyCount=BADGES.filter(b=>getBadgeTotal(b.id) >= GROUP_TARGET).length;
+  document.getElementById('statMembers').textContent = memberCount;
+  document.getElementById('statTotalQty').textContent = totalQty;
+  document.getElementById('statReadyCount').textContent = readyCount;
+  document.getElementById('statGrandTotal').textContent = '¥' + (totalQty * UNIT_PRICE).toFixed(2);
+  const list=document.getElementById('memberList');
+  if(!entries.length){ list.innerHTML='<div class="member-card" style="text-align:center;color:var(--text2)">还没有人登记，先来填第一份吧。</div>'; return; }
+  list.innerHTML = entries.map(([name, order])=>{
+    const seq=String(parseSeq(name)).padStart(3,'0');
+    const nick=parseNick(name);
+    const chosen = BADGES.filter(b => (order.qtyByBadge?.[b.id]||0) > 0).map(b => `<span class="mini-pill">${esc(b.name)} × ${order.qtyByBadge[b.id]}</span>`).join('');
+    return `<div class="member-card">
+      <div class="member-head">
+        <div>
+          <div class="member-name">${esc(nick)}${name===myName?' <span style="color:var(--primary)">(我)</span>':''}</div>
+          <div class="member-seq">编号 ${seq}</div>
+        </div>
+        <div class="member-total">${getMemberTotal(order)} 个 · ¥${(getMemberTotal(order)*UNIT_PRICE).toFixed(2)}</div>
+      </div>
+      <div class="member-list">${chosen || '<span style="color:var(--text2)">未填写</span>'}</div>
+    </div>`;
+  }).join('');
+}
+function render(){ renderProducts(); renderSummary(); renderStats(); }
+async function loadAll(){
+  const stickerIds = BADGES.map(b=>b.id).concat([BADGE_PIN]);
+  const {data,error} = await sb.from('orders').select('name,sticker_id,quantity,updated_at').in('sticker_id', stickerIds).order('updated_at', {ascending:false});
+  if(error) throw error;
+  allOrders={};
+  (data||[]).forEach(row=>{
+    if(!row.name.startsWith('0') && !/^\d+-/.test(row.name)) return;
+    if(!allOrders[row.name]) allOrders[row.name] = { qtyByBadge:{}, pin:null, updatedAt:row.updated_at||'' };
+    if(row.sticker_id===BADGE_PIN) allOrders[row.name].pin = Number(row.quantity) || null;
+    else allOrders[row.name].qtyByBadge[row.sticker_id] = Number(row.quantity) || 0;
+    if(row.updated_at && row.updated_at > allOrders[row.name].updatedAt) allOrders[row.name].updatedAt = row.updated_at;
+  });
+}
+function subscribeRealtime(){
+  sb.channel('badge-orders')
+    .on('postgres_changes',{event:'*',schema:'public',table:'orders'}, payload=>{
+      const row = payload.new || payload.old;
+      if(!row || !BADGES.map(b=>b.id).concat([BADGE_PIN]).includes(row.sticker_id)) return;
+      if(!allOrders[row.name]) allOrders[row.name] = { qtyByBadge:{}, pin:null, updatedAt:row.updated_at||'' };
+      if(payload.eventType !== 'DELETE'){
+        if(row.sticker_id===BADGE_PIN) allOrders[row.name].pin = Number(row.quantity) || null;
+        else allOrders[row.name].qtyByBadge[row.sticker_id] = Number(row.quantity) || 0;
+        allOrders[row.name].updatedAt = row.updated_at || new Date().toISOString();
+      }
+      render();
+    }).subscribe(status=>setConnected(status==='SUBSCRIBED'));
+}
+function switchAuthTab(mode){
+  authMode=mode;
+  document.getElementById('tabRegister').classList.toggle('active', mode==='register');
+  document.getElementById('tabLogin').classList.toggle('active', mode==='login');
+  document.getElementById('authNoInput').style.display = mode==='login' ? '' : 'none';
+  document.getElementById('authHint').textContent = mode==='register' ? '首次进入会自动分配编号。请填写你的小红书昵称，并设置一个 6 位数字密码。' : '换设备时请输入编号、昵称和 6 位数字密码。';
+  document.getElementById('authTip').textContent = mode==='register' ? '注册成功后会拿到一个编号。以后请记住自己的编号和密码。' : '编号和昵称都要对应，密码必须是 6 位数字。';
+  document.getElementById('authBtn').textContent = mode==='register' ? '注册并进入' : '登录并进入';
+  validateAuth();
+}
+function showAuthError(msg){const el=document.getElementById('authError'); el.textContent=msg; el.classList.add('show');}
+function clearAuthError(){document.getElementById('authError').classList.remove('show');}
+function validateAuth(){
+  const nick=document.getElementById('nickInput').value.trim();
+  const pin=document.getElementById('pinInput').value.replace(/\D/g,'').slice(0,6);
+  document.getElementById('pinInput').value=pin;
+  const no=document.getElementById('authNoInput').value.replace(/\D/g,'').slice(0,3);
+  document.getElementById('authNoInput').value=no;
+  document.getElementById('authInlineError').classList.toggle('show', pin.length>0 && pin.length<6);
+  const ok = authMode==='register' ? !!nick && pin.length===6 : !!nick && pin.length===6 && !!no;
+  document.getElementById('authBtn').disabled = !ok;
+}
+async function doRegister(){
+  const nick=document.getElementById('nickInput').value.trim();
+  const pin=document.getElementById('pinInput').value.trim();
+  if(!nick || pin.length!==6) return;
+  const seq=await reserveNextSeq();
+  const fullName=formatName(seq,nick);
+  const {error}=await sb.from('orders').upsert({name:fullName, sticker_id:BADGE_PIN, quantity:parseInt(pin,10), updated_at:new Date().toISOString()},{onConflict:'name,sticker_id'}).select();
+  if(error) throw error;
+  setIdentity(fullName);
+  if(!allOrders[fullName]) allOrders[fullName] = { qtyByBadge:{}, pin:parseInt(pin,10), updatedAt:new Date().toISOString() };
+  document.getElementById('authOverlay').style.display='none';
+}
+async function doLogin(){
+  const no=document.getElementById('authNoInput').value.trim();
+  const nick=document.getElementById('nickInput').value.trim();
+  const pin=parseInt(document.getElementById('pinInput').value.trim(),10);
+  const fullName=formatName(parseInt(no,10),nick);
+  const {data,error}=await sb.from('orders').select('quantity').eq('name',fullName).eq('sticker_id',BADGE_PIN).limit(1);
+  if(error) throw error;
+  if(!data || !data.length || Number(data[0].quantity)!==pin) throw new Error('编号、昵称或密码不对');
+  setIdentity(fullName);
+  document.getElementById('authOverlay').style.display='none';
+}
+async function submitAuth(){clearAuthError(); try{if(!sb) throw new Error('还没连上服务器，请稍后再试'); if(authMode==='register') await doRegister(); else await doLogin(); readDraftOrSaved(); render();} catch(e){showAuthError(e.message || '操作失败，请重试');}}
+async function submitOrder(){
+  if(!sb) return;
+  if(!myName){document.getElementById('authOverlay').style.display='flex'; return;}
+  const cleanNick=draftNick.trim();
+  if(!cleanNick) return;
+  const submitBtn=document.getElementById('submitBtn');
+  submitBtn.disabled=true; submitBtn.textContent='保存中...';
+  try{
+    if(cleanNick !== myDisplayNick){
+      const renamed = formatName(parseSeq(myName), cleanNick);
+      const ids = BADGES.map(b=>b.id).concat([BADGE_PIN]);
+      const {error:renameError} = await sb.from('orders').update({name:renamed, updated_at:new Date().toISOString()}).eq('name',myName).in('sticker_id', ids);
+      if(renameError) throw renameError;
+      if(allOrders[myName]){ allOrders[renamed]=allOrders[myName]; delete allOrders[myName]; }
+      setIdentity(renamed);
+    }
+    const rows = BADGES.map(b=>({name:myName, sticker_id:b.id, quantity:currentQty[b.id]||0, updated_at:new Date().toISOString()}));
+    const {error}=await sb.from('orders').upsert(rows,{onConflict:'name,sticker_id'}).select();
+    if(error) throw error;
+    if(!allOrders[myName]) allOrders[myName]={qtyByBadge:{}, pin:null, updatedAt:''};
+    for(const b of BADGES) allOrders[myName].qtyByBadge[b.id] = currentQty[b.id] || 0;
+    allOrders[myName].updatedAt = new Date().toISOString();
+    clearDirty(); render();
+    submitBtn.textContent='已保存 ✓';
+    setTimeout(()=>{submitBtn.disabled=false; submitBtn.textContent='保存';},1200);
+  }catch(e){console.error('badge submit failed:', e); submitBtn.disabled=false; submitBtn.textContent='保存失败，重试';}
+}
+async function clearMyOrder(){
+  if(!myName || !sb) return;
+  currentQty = Object.fromEntries(BADGES.map(b=>[b.id,0]));
+  markDirty(); render();
+  try{
+    const rows = BADGES.map(b=>({name:myName, sticker_id:b.id, quantity:0, updated_at:new Date().toISOString()}));
+    const {error}=await sb.from('orders').upsert(rows,{onConflict:'name,sticker_id'}).select();
+    if(error) throw error;
+    if(!allOrders[myName]) allOrders[myName]={qtyByBadge:{}, pin:null, updatedAt:''};
+    for(const b of BADGES) allOrders[myName].qtyByBadge[b.id]=0;
+    clearDirty(); render();
+  }catch(e){console.error('badge clear failed:', e);}
+}
+function bindEvents(){
+  document.getElementById('tabRegister').addEventListener('click',()=>switchAuthTab('register'));
+  document.getElementById('tabLogin').addEventListener('click',()=>switchAuthTab('login'));
+  ['nickInput','pinInput','authNoInput'].forEach(id=>document.getElementById(id).addEventListener('input',validateAuth));
+  document.getElementById('authBtn').addEventListener('click',submitAuth);
+  document.getElementById('inlineNickInput').addEventListener('input',(e)=>{draftNick=e.target.value; markDirty();});
+  document.getElementById('nickTag').addEventListener('click',()=>{
+    document.getElementById('authOverlay').style.display='flex';
+    switchAuthTab('login');
+    document.getElementById('authNoInput').value=String(parseSeq(myName)).padStart(3,'0');
+    document.getElementById('nickInput').value=myDisplayNick;
+    document.getElementById('pinInput').value='';
+    validateAuth();
+  });
+  document.getElementById('productsGrid').addEventListener('click',(e)=>{
+    const btn=e.target.closest('button[data-id]');
+    if(!btn) return;
+    const id=btn.dataset.id;
+    const act=btn.dataset.act;
+    currentQty[id] = Math.max(0, (currentQty[id]||0) + (act==='plus' ? 1 : -1));
+    markDirty(); render();
+  });
+  document.getElementById('saveBtn').addEventListener('click',submitOrder);
+  document.getElementById('submitBtn').addEventListener('click',submitOrder);
+  document.getElementById('clearBtn').addEventListener('click',clearMyOrder);
+  document.getElementById('discardBtn').addEventListener('click',()=>{readDraftOrSaved(); clearDirty(); render();});
+}
+async function boot(){
+  bindEvents();
+  render();
+  if(!initSupabase()){ setConnected(false); document.getElementById('authOverlay').style.display='flex'; return; }
+  try{ await loadAll(); subscribeRealtime(); setConnected(true); } catch(e){ console.error('badge init failed:',e); setConnected(false); }
+  if(myName){ setIdentity(myName); readDraftOrSaved(); render(); } else { document.getElementById('authOverlay').style.display='flex'; switchAuthTab('register'); }
+}
+boot();
+</script>
+</body>
+</html>
