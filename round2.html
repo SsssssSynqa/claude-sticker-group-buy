@@ -993,9 +993,10 @@ async function toggleLock() {
   const lockBtn = document.getElementById('lockBtn');
   if (lockBtn) { lockBtn.disabled = true; lockBtn.textContent = '处理中...'; }
   try {
-    const {error} = await sb.from('settings').update(
-      {value: newVal, updated_at: new Date().toISOString()}
-    ).eq('key', 'r2_locked');
+    const {error} = await sb.from('settings').upsert(
+      {key: 'r2_locked', value: newVal, updated_at: new Date().toISOString()},
+      {onConflict: 'key'}
+    );
     if (error) throw error;
     isLocked = !isLocked;
     applyLockState();
