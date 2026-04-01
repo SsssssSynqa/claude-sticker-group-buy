@@ -2451,23 +2451,17 @@ function exportMyOrder() {
   const seq = globalSeqMap[myName] || '?';
   const teamLabel = myTeam > 0 ? '团' + myTeam : '未分组';
   const orders = allOrders[myName] || {};
-  const data = {};
-  S.forEach(s => {
-    let totalQty = 0;
-    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
-    data[s.id] = {unitPrice: unitPrice(s, totalQty)};
-  });
   const lines = ['Claude Code 贴纸拼团 - 订单详情', '序号：#' + seq, '昵称：' + myName, '分团：' + teamLabel, ''];
   let totalItems = 0, totalUSD = 0;
   const details = [];
   S.forEach(s => {
     const q = orders[s.id] || 0;
     if (q > 0) {
-      const up = data[s.id].unitPrice;
+      const up = cachedStickerData[s.id]?.unitPrice || 0;
       const sub = r2(q * up);
       details.push(s.name + '(' + TYPE_LABEL[s.type] + ') x' + q + ' = $' + sub.toFixed(2));
       totalItems += q;
-      totalUSD += sub;
+      totalUSD += r2(sub);
     }
   });
   if (details.length === 0) {
@@ -2514,21 +2508,15 @@ function showOrderDetail(name) {
   const seq = globalSeqMap[name] || '?';
   const teamNum = allTeams[name] || '?';
   const orders = allOrders[name] || {};
-  const priceData = {};
-  S.forEach(s => {
-    let totalQty = 0;
-    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
-    priceData[s.id] = unitPrice(s, totalQty);
-  });
   let items = '';
   let totalItems = 0, totalUSD = 0;
   S.forEach(s => {
     const q = orders[s.id] || 0;
     if (q > 0) {
-      const up = priceData[s.id];
+      const up = cachedStickerData[s.id]?.unitPrice || 0;
       const sub = r2(q * up);
       totalItems += q;
-      totalUSD += sub;
+      totalUSD += r2(sub);
       const typeCls = TYPE_CLS[s.type] || '';
       items += '<div class="od-item"><div><span class="od-item-name">' + esc(s.name) + '</span><span class="od-item-type ' + typeCls + '">' + TYPE_LABEL[s.type] + '</span></div><div class="od-item-right"><div class="od-item-qty">x' + q + '</div></div></div>';
     }
