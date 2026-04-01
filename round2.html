@@ -1820,11 +1820,15 @@ function showPaymentQR() {
     amountHTML = '<div style="background:#f5f5f5;border-radius:10px;padding:12px;margin:10px 0;color:#999;font-size:13px">你还没有选购贴纸</div>';
   }
 
+  const mySeq = allJoinOrder[myName] || '?';
   document.getElementById('payQrHint').innerHTML = amountHTML
     + '<strong>付款说明</strong><br>'
-    + '1. 请按上方金额向团长转账<br>'
+    + '<div style="background:#FDEAEA;border:2px solid #E74C3C;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:13px;color:#C0392B;font-weight:600">'
+    + '\u26a0\ufe0f 转账时必须备注：<span style="font-size:16px">#' + mySeq + ' ' + esc(myName) + '</span><br>'
+    + '<span style="font-weight:400;font-size:12px;color:#999">（编号 + 昵称，方便团长核账）</span></div>'
+    + '1. 请按上方金额向团长转账，<b>备注编号和昵称</b><br>'
     + '2. 完成转账后，将<b>导出的订单详情</b>和<b>付款截图</b>一起发到群里<br>'
-    + '3. 回到本页点击「💰 我已完成付款」确认';
+    + '3. 回到本页点击「\ud83d\udcb0 我已完成付款」确认';
   document.getElementById('payQrOverlay').classList.add('on');
 }
 
