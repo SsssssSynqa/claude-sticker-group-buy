@@ -99,8 +99,9 @@ td input[type="number"]:focus{outline:none;border-color:var(--primary);backgroun
 .del-btn{border:1px solid #e0d6d6;border-radius:6px;background:#faf5f5;color:#c49;cursor:pointer;font-size:11px;padding:2px 8px;margin-left:6px;transition:all .15s;vertical-align:middle}
 .del-btn:hover{background:#FDEAEA;color:#fff;background:var(--danger);border-color:var(--danger)}
 .pt-items{font-weight:600;font-size:11px}
-.pt-usd{font-weight:600;font-size:11px;color:var(--primary)}
-.pt-cny{font-weight:600;font-size:11px;color:#8B6EAE}
+.pt-usd{font-weight:600;font-size:11px;color:#333}
+.pt-cny{font-weight:600;font-size:11px;color:#333}
+.pt-actual{font-weight:700;font-size:11px;color:#D4623E;background:linear-gradient(135deg,#FFF5F0,#FDEAE0);border-radius:4px}
 
 .modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.35);z-index:1000;align-items:center;justify-content:center}
 .modal-bg.on{display:flex}
@@ -477,7 +478,7 @@ const ADMIN_NAMES = ['鹅鹅', '鹅'];
 const TEAM_LEADERS = {1: '豆沙', 2: '豆沙', 3: 'G', 4: 'シンヤ_r2', 5: '鹅鹅'};
 const TEAM_QR = {1: 'r2-pay-12.jpg', 2: 'r2-pay-12.jpg', 3: 'r2-pay-3.jpg', 4: 'r2-pay-4.png', 5: 'r2-pay-5.png'};
 const ROUND2_TEAMS = [1, 2, 3, 4, 5];
-const PAYMENT_FEATURES_ENABLED = false;  // 锁单后先不开放付款码，等SM价格确定后改true再推
+const PAYMENT_FEATURES_ENABLED = true;
 
 // ============ STICKER DATA ============
 const S = [
@@ -2026,7 +2027,7 @@ function renderTable() {
   S.forEach(s => {
     h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
   });
-  h += '<th>总件数</th><th>USD（预估）</th><th>CNY（预估）</th><th>手续费</th><th>关税</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应收</th><th>应退</th>';
+  h += '<th>总件数</th><th>USD（预估）</th><th>USD（应付）</th><th>手续费</th><th>关税</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应收</th><th>应退</th>';
   if (PAYMENT_FEATURES_ENABLED) {
     h += '<th class="col-pay">付款</th><th class="col-pay">运费</th><th class="col-pay">发货</th>';
   }
@@ -2286,7 +2287,8 @@ function recalculate() {
       if (piEl) piEl.textContent = items;
       if (puEl) puEl.textContent = items > 0 ? '$' + usd.toFixed(2) : '\u2014';
       if (paEl) paEl.textContent = (personActual > 0) ? '\u00A5' + personActual.toFixed(2) : '\u2014';
-      if (pcEl) pcEl.textContent = items > 0 ? '\u00A5' + cny.toFixed(2) : '\u2014';
+      const personActualUSD = (discountRatio > 0 && items > 0) ? r2(usd * discountRatio) : 0;
+      if (pcEl) pcEl.textContent = personActualUSD > 0 ? '$' + personActualUSD.toFixed(2) : '\u2014';
       if (pfEl) pfEl.textContent = items > 0 ? '\u00A5' + fee.toFixed(2) : '\u2014';
       if (pxEl) pxEl.textContent = personTax > 0 ? '\u00A5' + personTax.toFixed(2) : '\u2014';
       if (pxEl && personTax > 0) pxEl.style.color = '#E74C3C';
@@ -2332,7 +2334,8 @@ function recalculate() {
     if (tsiEl) tsiEl.textContent = teamItems;
     if (tsuEl) tsuEl.textContent = teamItems > 0 ? '$' + teamUSD.toFixed(2) : '\u2014';
     if (tsaEl) tsaEl.textContent = teamActualCNY > 0 ? '\u00A5' + teamActualCNY.toFixed(2) : '\u2014';
-    if (tscEl) tscEl.textContent = teamItems > 0 ? '\u00A5' + teamCNY.toFixed(2) : '\u2014';
+    const teamActualUSD = (discountRatio > 0 && teamItems > 0) ? r2(teamUSD * discountRatio) : 0;
+    if (tscEl) tscEl.textContent = teamActualUSD > 0 ? '$' + teamActualUSD.toFixed(2) : '\u2014';
     if (tsfEl) tsfEl.textContent = teamItems > 0 ? '\u00A5' + teamFee.toFixed(2) : '\u2014';
     const tsxEl = document.getElementById('tsx-' + g.team);
     if (tsxEl) tsxEl.textContent = teamTax > 0 ? '\u00A5' + teamTax.toFixed(2) : '\u2014';
@@ -2368,7 +2371,7 @@ function recalculate() {
   const sgX = document.getElementById('st-grand-tax');
   if (sgU) sgU.textContent = '$' + grandUSD.toFixed(2);
   if (sgA) sgA.textContent = grandActualCNY > 0 ? '\u00A5' + grandActualCNY.toFixed(2) : '\u2014';
-  if (sgC) sgC.textContent = '\u00A5' + grandCNY.toFixed(2);
+  if (sgC) sgC.textContent = actualUSD > 0 ? '$' + actualUSD.toFixed(2) : '\u2014';
   if (sgF) sgF.textContent = '\u00A5' + grandFee.toFixed(2);
   if (sgX) { sgX.textContent = taxCNY > 0 ? '\u00A5' + taxCNY.toFixed(2) : '\u2014'; if (taxCNY > 0) sgX.style.color = '#E74C3C'; }
 
@@ -2386,7 +2389,8 @@ function recalculate() {
   if (gtiEl) gtiEl.textContent = gtItems;
   if (gtuEl) gtuEl.textContent = gtItems > 0 ? '$' + gtUSD.toFixed(2) : '\u2014';
   if (gtaEl) gtaEl.textContent = gtActual > 0 ? '\u00A5' + gtActual.toFixed(2) : '\u2014';
-  if (gtcEl) gtcEl.textContent = gtItems > 0 ? '\u00A5' + gtCNY.toFixed(2) : '\u2014';
+  const gtActualUSD = (discountRatio > 0 && gtItems > 0) ? r2(gtUSD * discountRatio) : 0;
+  if (gtcEl) gtcEl.textContent = gtActualUSD > 0 ? '$' + gtActualUSD.toFixed(2) : '\u2014';
   if (gtfEl) gtfEl.textContent = gtItems > 0 ? '\u00A5' + gtFee.toFixed(2) : '\u2014';
   const gtxEl = document.getElementById('gt-tax');
   if (gtxEl) { gtxEl.textContent = gtTax > 0 ? '\u00A5' + gtTax.toFixed(2) : '\u2014'; if (gtTax > 0) gtxEl.style.color = '#E74C3C'; }
@@ -2557,6 +2561,10 @@ function showOrderDetail(name) {
       else footerHTML += '<div class="od-total" style="color:#3DA06B"><span>已结清</span><span>\u2714</span></div>';
     }
   } else {
+    const exportActualUSD = (discountRatio > 0 && totalUSD > 0) ? r2(totalUSD * discountRatio) : 0;
+    if (exportActualUSD > 0) {
+      footerHTML += '<div class="od-total"><span>USD（应付）</span><span>$' + exportActualUSD.toFixed(2) + '</span></div>';
+    }
     footerHTML += '<div class="od-total"><span>CNY（预估）</span><span>\u00a5' + r2(estCNY + estFee).toFixed(2) + '</span></div>';
   }
   const overlay = document.createElement('div');
