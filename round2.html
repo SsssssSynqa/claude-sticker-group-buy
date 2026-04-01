@@ -571,6 +571,8 @@ let allJoinOrder = {}; // {name: minRecordId} — for global join sequence
 let globalSeqMap = {}; // {name: globalSequenceNumber}
 let rate = 7.10;
 let actualUSD = 0; // actual SM cart total in USD (set by admin after checkout)
+let cachedGrandUSD = 0;
+let cachedDiscountRatio = 0;
 let taxCNY = 0; // customs tax total in CNY (set by admin after customs clearance)
 let sb = null;
 let connected = false;
@@ -2230,6 +2232,8 @@ function recalculate() {
   let grandUSD = 0;
   S.forEach(s => { grandUSD += r2(data[s.id].totalQty * data[s.id].unitPrice); });
   const discountRatio = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
+  cachedGrandUSD = grandUSD;
+  cachedDiscountRatio = discountRatio;
   // Per-person totals and per-team subtotals
   let personIdx = 0;
   let gtItems = 0, gtUSD = 0, gtActual = 0, gtCNY = 0, gtFee = 0, gtTax = 0, gtAP = 0, gtRefunded = 0, gtOwe = 0, gtRefund = 0;
