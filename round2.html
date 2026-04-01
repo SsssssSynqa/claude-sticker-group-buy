@@ -218,8 +218,9 @@ section{padding:14px}
 .team-select label{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;padding:8px 16px;border:2px solid var(--border);border-radius:10px;transition:all .15s}
 .team-select label:has(input:checked){border-color:var(--primary);background:var(--primary-lt)}
 .team-select input[type="radio"]{accent-color:var(--primary)}
-.team-tag{font-size:12px;color:#8B6EAE;cursor:pointer;padding:3px 8px;border-radius:6px;background:var(--purple-lt)}
-.team-tag:hover{background:#E0D6EC}
+.team-tag{font-size:13px;color:#fff;cursor:pointer;padding:5px 12px;border-radius:8px;background:linear-gradient(135deg,#9B6EAE,#8B5E9E);font-weight:600;box-shadow:0 2px 8px rgba(139,110,174,.3);transition:all .15s;letter-spacing:.3px}
+.team-tag:hover{background:linear-gradient(135deg,#A87EBE,#9B6EAE);transform:translateY(-1px);box-shadow:0 4px 12px rgba(139,110,174,.4)}
+.team-tag::after{content:' ✏️';font-size:11px}
 .pay-action-bar{display:flex;gap:8px;max-width:700px;margin:0 auto 16px;justify-content:center;flex-wrap:wrap}
 .btn-my-export{flex:1;min-width:0;padding:13px 16px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3);transition:all .15s;letter-spacing:.3px;white-space:nowrap}
 .btn-my-export:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,113,74,.4)}
@@ -352,9 +353,10 @@ section{padding:14px}
       <p>五个团统一汇总下单购买，数量越多单价越低；但收款、核账和后续发货按各团分别进行</p>
 
       <h4>流程与时间</h4>
-      <p><span class="tag tag-date">开团中</span> 截团时间<strong>暂未确定</strong>，截团前可随时修改数量</p>
-      <p><span class="tag tag-date">锁单后</span> 页面会锁定数量，团长会再统一通知具体付款方式和时间</p>
-      <p><span class="tag tag-warn">注意</span> 目前先完成登记，付款相关流程会在截团锁单后另行通知</p>
+      <p><span class="tag tag-warn">截团通知</span> <strong>4月1日晚24:00截止登记</strong>，截止后网站会更新付款方式</p>
+      <p><span class="tag tag-date">4月2日起</span> 锁单，<strong>不可再更改数量</strong></p>
+      <p><span class="tag tag-date">4月2日-4日</span> 付款时间，预计<strong>4月4日晚截止付款</strong></p>
+      <p><span class="tag tag-warn">注意</span> 锁单后点击「📱 查看付款码」查看你所在团的团长收款码</p>
 
       <h4>费用说明</h4>
       <p>Round2 当前共开放 <strong>25 款</strong> 贴纸，包含第一批 13 款和今天新增的后 12 款</p>
@@ -367,10 +369,14 @@ section{padding:14px}
       <p>买的人越多单价越低，卡片上的单价和下一档价格会随总量实时变化</p>
       <p>如果你换设备或换浏览器，直接用昵称和密码登录即可恢复订单</p>
 
-      <h4>后续付款说明</h4>
-      <p>截团锁单之后，团长会再统一通知付款方式、付款码、付款截止时间和群内反馈要求</p>
-      <p>当前页面上的付款相关入口暂未开放，请先以登记数量为准</p>
-      <p>页面里的金额会继续实时计算，方便大家提前查看和核对；真正的付款入口会在截团锁单后再开放</p>
+      <h4>💰 锁单后付款流程</h4>
+      <p>1. 锁单后，点击「📱 查看付款码」查看你所在团的团长收款码</p>
+      <p>2. 点击「📋 导出订单详情」保存你的订单明细</p>
+      <p>3. 按页面显示的应付金额向团长扫码转账</p>
+      <p>4. 将<strong>导出的订单详情</strong>和<strong>付款截图</strong>一起发到群里</p>
+      <p>5. 回到本页点击「💰 我已完成付款」标记付款状态</p>
+      <p>6. 团长核实到账后会将你的状态更新为 ✅ 已确认</p>
+      <p><span class="tag tag-warn">重要</span> 付款截止 <strong>4月4日晚</strong>，逾期未付视为放弃</p>
 
       <div class="notice-divider"></div>
 
@@ -388,6 +394,20 @@ section{padding:14px}
 </div>
 
 <div class="lock-banner" id="lockBanner">🔒 已锁单 — 所有贴纸数量已锁定，不可修改</div>
+
+<!-- 每次刷新弹出的提示弹窗 -->
+<div id="reminderOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:3000;display:none;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:28px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center">
+    <div style="font-size:28px;margin-bottom:12px">📢</div>
+    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">重要提醒</h3>
+    <div style="text-align:left;font-size:14px;line-height:1.8;color:#333">
+      <p style="margin:0 0 10px"><strong>⚠️ 不要乱选分团！</strong>在哪个群就选哪个团，左上角紫色按钮可以修改。</p>
+      <p style="margin:0 0 10px"><strong>💰 付款时间：</strong>4月2日 ~ 4月4日</p>
+      <p style="margin:0"><strong>📝 付款时必须备注：</strong><span style="color:#E8714A;font-weight:600">编号 + 昵称</span>（例：#392 シンヤ_r2）</p>
+    </div>
+    <button onclick="document.getElementById('reminderOverlay').style.display='none'" style="margin-top:20px;padding:10px 36px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3)">我知道了</button>
+  </div>
+</div>
 
 <section>
   <div class="section-title">贴纸一览</div>
@@ -454,10 +474,10 @@ section{padding:14px}
 const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
 const ADMIN_NAMES = ['鹅鹅', '鹅'];
-const TEAM_LEADERS = {1: '待定', 2: '待定', 3: '待定', 4: '待定', 5: '待定'};
-const TEAM_QR = {1: '', 2: '', 3: '', 4: '', 5: ''};
+const TEAM_LEADERS = {1: '豆沙', 2: '豆沙', 3: 'G', 4: 'シンヤ_r2', 5: '鹅鹅'};
+const TEAM_QR = {1: 'r2-pay-12.jpg', 2: 'r2-pay-12.jpg', 3: 'r2-pay-3.jpg', 4: 'r2-pay-4.png', 5: 'r2-pay-5.png'};
 const ROUND2_TEAMS = [1, 2, 3, 4, 5];
-const PAYMENT_FEATURES_ENABLED = false;
+const PAYMENT_FEATURES_ENABLED = true;
 
 // ============ STICKER DATA ============
 const S = [
@@ -2709,6 +2729,11 @@ function closeModal() {
   }
   updateNickDisplay();
   restorePendingDraft();
+
+  // 每次刷新弹出提示弹窗
+  if (myName) {
+    document.getElementById('reminderOverlay').style.display = 'flex';
+  }
 
   document.getElementById('rateInput').value = rate;
   renderTable();
