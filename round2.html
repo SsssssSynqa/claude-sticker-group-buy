@@ -2478,14 +2478,9 @@ function exportMyOrder() {
   const estCNY = r2(totalUSD * rate);
   const estFee = r2(estCNY * 0.001);
   const estTotal = r2(estCNY + estFee);
-  // Calculate actual amount with SM multi-design discount (per-sticker totals, stable across transfers)
-  let grandUSD = 0;
-  S.forEach(s => {
-    let totalQty = 0;
-    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
-    grandUSD += r2(totalQty * data[s.id].unitPrice);
-  });
-  const dr = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
+  // Reuse cached values from recalculate()
+  const grandUSD = cachedGrandUSD;
+  const dr = cachedDiscountRatio;
   const myTax = (taxCNY > 0 && grandUSD > 0 && totalUSD > 0) ? r2(totalUSD / grandUSD * taxCNY) : 0;
   lines.push('', '总件数：' + totalItems);
   if (dr > 0 && totalUSD > 0) {
@@ -2541,13 +2536,8 @@ function showOrderDetail(name) {
   if (!items) items = '<div style="padding:20px;text-align:center;color:#999">暂无订购</div>';
   const estCNY = r2(totalUSD * rate);
   const estFee = r2(estCNY * 0.001);
-  let grandUSD = 0;
-  S.forEach(s => {
-    let totalQty = 0;
-    for (const n in allOrders) totalQty += (allOrders[n][s.id] || 0);
-    grandUSD += r2(totalQty * priceData[s.id]);
-  });
-  const dr = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
+  const grandUSD = cachedGrandUSD;
+  const dr = cachedDiscountRatio;
   const myTax = (taxCNY > 0 && grandUSD > 0 && totalUSD > 0) ? r2(totalUSD / grandUSD * taxCNY) : 0;
   let footerHTML = '<div class="od-total"><span>总件数</span><span>' + totalItems + ' 件</span></div>';
   if (dr > 0 && totalUSD > 0) {
