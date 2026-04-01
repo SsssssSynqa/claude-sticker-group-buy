@@ -1739,7 +1739,8 @@ function showPaymentQR() {
 
   // Calculate my total payment amount
   let myUSD = 0;
-  let grandUSD = 0;
+  const grandUSD = cachedGrandUSD;
+  const discountRatio = cachedDiscountRatio;
   const orders = allOrders[myName] || {};
   S.forEach(s => {
     let totalQty = 0;
@@ -1747,15 +1748,12 @@ function showPaymentQR() {
     const up = unitPrice(s, totalQty);
     const q = orders[s.id] || 0;
     if (q > 0) myUSD += r2(q * up);
-    // accumulate grand total based on per-sticker totals (stable across transfers)
-    grandUSD += r2(totalQty * up);
   });
   // Estimated amounts (no discount)
   const myCNY = r2(myUSD * rate);
   const myFee = r2(myCNY * 0.001);
   const myEstTotal = r2(myCNY + myFee);
   // Actual amounts (with SM multi-design discount + tax)
-  const discountRatio = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
   const myTax = (taxCNY > 0 && grandUSD > 0 && myUSD > 0) ? r2(myUSD / grandUSD * taxCNY) : 0;
   let myActualTotal = 0;
   if (discountRatio > 0 && myUSD > 0) {
@@ -2232,7 +2230,6 @@ function recalculate() {
   let grandUSD = 0;
   S.forEach(s => { grandUSD += r2(data[s.id].totalQty * data[s.id].unitPrice); });
   const discountRatio = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
-
   // Per-person totals and per-team subtotals
   let personIdx = 0;
   let gtItems = 0, gtUSD = 0, gtActual = 0, gtCNY = 0, gtFee = 0, gtTax = 0, gtAP = 0, gtRefunded = 0, gtOwe = 0, gtRefund = 0;
