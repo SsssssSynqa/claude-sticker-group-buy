@@ -2663,6 +2663,16 @@ function closeModal() {
 }
 
 // ============ INIT ============
+// 强制清除旧缓存（版本号变更时触发）
+(function forceCacheBust() {
+  const CACHE_VER = '20260402a';
+  if (localStorage.getItem('gb2_cache_ver') !== CACHE_VER) {
+    localStorage.removeItem('gb2_cache');
+    localStorage.removeItem('gb2_pending_changes');
+    localStorage.setItem('gb2_cache_ver', CACHE_VER);
+  }
+})();
+
 (async function init() {
   renderCards();
 
