@@ -611,6 +611,7 @@ async function initSupabase() {
   }
   try {
     await loadAll();
+    saveOffline(); // 用数据库真实数据覆盖本地缓存
     subscribeRealtime();
     setConnected(true);
     updateStatus('已连接');
@@ -2719,7 +2720,12 @@ function closeModal() {
     }
   }
   updateNickDisplay();
-  restorePendingDraft();
+  if (isLocked) {
+    // 锁单后不恢复pending draft——显示数据库真实数据，避免用户看到未保存的幽灵数据
+    clearPendingDraft();
+  } else {
+    restorePendingDraft();
+  }
 
   // 每次刷新弹出提示弹窗
   if (myName) {
