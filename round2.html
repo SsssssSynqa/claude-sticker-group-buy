@@ -213,6 +213,10 @@ section{padding:14px}
 
 .team-header-row td{background:#F0EBF5 !important;color:#8B6EAE;font-weight:700;font-size:13px;padding:8px 6px;border-top:2px solid #D8CCE8}
 .team-header-row td.col-idx,.team-header-row td.col-name{background:#F0EBF5 !important}
+.runaway-header td{background:#FFE5E5 !important;color:#C0392B !important;border-top:2px solid #E74C3C}
+.runaway-header td.col-idx,.runaway-header td.col-name{background:#FFE5E5 !important}
+.runaway-row td{background:#FFF5F5 !important;color:#999}
+.runaway-row td.col-name{text-decoration:line-through;text-decoration-color:#ccc}
 .team-subtotal td{background:#FDF6E3 !important;font-weight:600;font-size:11px;color:#B5960F;border-bottom:2px solid #E8DFC0}
 .team-subtotal td.col-idx,.team-subtotal td.col-name{background:#FDF6E3 !important}
 .team-select{display:flex;gap:16px;justify-content:center;margin-bottom:14px}
@@ -1985,6 +1989,13 @@ function updateCards(data) {
 }
 
 // ============ RENDER TABLE ============
+function isRunaway(name) {
+  // 跑单判定：有贴纸订单但实付金额为0
+  const orders = allOrders[name];
+  if (!orders || Object.values(orders).every(q => q <= 0)) return false;
+  return !allActualPaid[name];
+}
+
 function getTeamsData() {
   const names = new Set(Object.keys(allOrders));
   Object.keys(allTeams).forEach(n => names.add(n));
@@ -1992,10 +2003,15 @@ function getTeamsData() {
   const arr = [...names];
 
   const groups = {1: [], 2: [], 3: [], 4: [], 5: [], 0: []};
+  const runaway = []; // 已跑单
   for (const n of arr) {
     const t = allTeams[n] || 4;
     if (!groups[t]) groups[t] = [];
-    groups[t].push(n);
+    if (n !== myName && isRunaway(n)) {
+      runaway.push({name: n, origTeam: t});
+    } else {
+      groups[t].push(n);
+    }
   }
   for (const t of Object.keys(groups)) {
     groups[t].sort((a, b) => {
@@ -2004,6 +2020,13 @@ function getTeamsData() {
       return (allJoinOrder[a] || Infinity) - (allJoinOrder[b] || Infinity);
     });
   }
+  // 跑单的人按原团号排序，同团内按贴纸数量降序
+  runaway.sort((a, b) => {
+    if (a.origTeam !== b.origTeam) return a.origTeam - b.origTeam;
+    const aQty = Object.values(allOrders[a.name] || {}).reduce((s, v) => s + v, 0);
+    const bQty = Object.values(allOrders[b.name] || {}).reduce((s, v) => s + v, 0);
+    return bQty - aQty;
+  });
 
   const result = [];
   // Put user's team first, then others in order
@@ -2012,6 +2035,8 @@ function getTeamsData() {
     if (t !== myTeam && groups[t] && groups[t].length > 0) result.push({team: t, names: groups[t]});
   }
   if (groups[0] && groups[0].length > 0) result.push({team: 0, names: groups[0]});
+  // 跑单区放在最后
+  if (runaway.length > 0) result.push({team: -1, names: runaway.map(r => r.name), runawayMeta: runaway});
   return result;
 }
 
@@ -2067,15 +2092,22 @@ function renderTable() {
   sortedByJoin.forEach(([name], i) => { seqMap[name] = i + 1; });
   globalSeqMap = seqMap;
 
+  // Build runaway lookup: name -> origTeam
+  const runawayOrigTeam = {};
+  teamsData.forEach(g => {
+    if (g.runawayMeta) g.runawayMeta.forEach(r => { runawayOrigTeam[r.name] = r.origTeam; });
+  });
+
   // Team sections
   let personIdx = 0;
   teamsData.forEach(g => {
-    const teamLabel = g.team > 0 ? '团' + g.team : '未分组';
+    const isRunawaySection = g.team === -1;
+    const teamLabel = isRunawaySection ? '🚫 已跑单' : (g.team > 0 ? '团' + g.team : '未分组');
     const visibleNames = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
     if (visibleNames.length === 0) return; // skip empty teams when filtering
 
     const headerCount = hideEmptyOrders ? visibleNames.length + '/' + g.names.length : '' + g.names.length;
-    h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + teamLabel + '（' + headerCount + ' 人）</td>';
+    h += '<tr class="team-header-row' + (isRunawaySection ? ' runaway-header' : '') + '"><td class="col-idx"></td><td class="col-name">' + teamLabel + '（' + headerCount + ' 人）</td>';
     S.forEach(() => { h += '<td></td>'; });
     h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
     if (PAYMENT_FEATURES_ENABLED) {
@@ -2108,9 +2140,11 @@ function renderTable() {
       const isMe = name === myName;
       const orders = allOrders[name] || {};
       const detailArg = JSON.stringify(name).replace(/"/g, '&quot;');
-      h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-name="' + esc(name) + '">';
+      const isInRunaway = isRunawaySection && runawayOrigTeam[name] !== undefined;
+      h += '<tr class="p-row' + (isMe ? ' my-row' : '') + (isInRunaway ? ' runaway-row' : '') + '" data-name="' + esc(name) + '">';
       h += '<td class="col-idx">' + (seqMap[name] || '') + '</td>';
-      h += '<td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + detailArg + ')" title="查看订单详情">📋</button></td>';
+      const origTeamTag = isInRunaway ? '<small style="color:#999;margin-right:4px">[原团' + runawayOrigTeam[name] + ']</small>' : '';
+      h += '<td class="col-name">' + origTeamTag + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + detailArg + ')" title="查看订单详情">📋</button></td>';
       S.forEach(s => {
         const v = orders[s.id] || 0;
         if (isMe) {
