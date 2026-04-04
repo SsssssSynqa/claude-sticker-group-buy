@@ -482,7 +482,8 @@ const ADMIN_NAMES = ['鹅鹅', '鹅'];
 const TEAM_LEADERS = {1: '豆沙', 2: '豆沙', 3: 'G', 4: 'シンヤ_r2', 5: '鹅鹅'};
 const TEAM_QR = {1: 'r2-pay-12.jpg', 2: 'r2-pay-12.jpg', 3: 'r2-pay-3.jpg', 4: 'r2-pay-4.png', 5: 'r2-pay-5.png'};
 const ROUND2_TEAMS = [1, 2, 3, 4, 5];
-const PAYMENT_FEATURES_ENABLED = false;
+const PAYMENT_FEATURES_ENABLED = true;
+const PAYMENT_QR_ENABLED = false; // 付款码已禁用（拼团结束）
 
 // ============ STICKER DATA ============
 const S = [
@@ -1741,6 +1742,7 @@ async function saveRefunded(memberName, amount) {
 
 function showPaymentQR() {
   if (!PAYMENT_FEATURES_ENABLED) { alert('付款功能暂未开放，截团锁单后会统一通知。'); return; }
+  if (!PAYMENT_QR_ENABLED) { alert('付款码已关闭。'); return; }
   if (!isLocked) { alert('截单后才能查看付款码哦～请等待团长锁单'); return; }
   const team = myTeam;
   const leader = TEAM_LEADERS[team] || '未知';
@@ -1864,6 +1866,11 @@ function updatePaymentBtns() {
       qrBtn.style.pointerEvents = 'none';
     }
     return;
+  }
+  if (!PAYMENT_QR_ENABLED && qrBtn) {
+    qrBtn.textContent = '📱 付款码已关闭';
+    qrBtn.style.opacity = '0.5';
+    qrBtn.style.pointerEvents = 'none';
   }
 
   // Before locking: show disabled state with hint
