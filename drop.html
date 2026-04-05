@@ -244,6 +244,9 @@ section{padding:14px}
 .btn-pay-qr{flex:1;min-width:0;padding:13px 16px;background:#fff;color:var(--primary);border:2px solid var(--primary);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
 .btn-pay-qr:hover{background:var(--primary-lt);transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,113,74,.2)}
 .btn-pay-qr:active{transform:translateY(0)}
+.btn-my-export{flex:1;min-width:0;padding:13px 16px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3);transition:all .15s;white-space:nowrap}
+.btn-my-export:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,113,74,.4)}
+.btn-my-export:active{transform:translateY(0)}
 .btn-pay-confirm{flex:1;min-width:0;padding:13px 16px;background:linear-gradient(135deg,#5BA87D,#4A9B6F);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(91,168,125,.3);transition:all .15s;white-space:nowrap}
 .btn-pay-confirm:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(91,168,125,.4)}
 .btn-pay-confirm:active{transform:translateY(0)}
@@ -253,7 +256,7 @@ section{padding:14px}
 
 @media(max-width:768px){
 .pay-action-bar{display:grid;grid-template-columns:1fr;gap:10px;max-width:none}
-.btn-pay-qr,.btn-pay-confirm{width:100%;padding:12px 14px;font-size:13px;line-height:1.35;white-space:normal;text-align:center}
+.btn-pay-qr,.btn-my-export,.btn-pay-confirm{width:100%;padding:12px 14px;font-size:13px;line-height:1.35;white-space:normal;text-align:center}
 }
 </style>
 </head>
@@ -345,6 +348,7 @@ section{padding:14px}
   <div class="section-title">领取统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
   <div class="pay-action-bar">
     <button class="btn-pay-qr" id="btnPayQR" onclick="showPaymentQR()">📱 查看付款码</button>
+    <button class="btn-my-export" onclick="exportMyOrder()">📋 导出我的订单</button>
     <button class="btn-pay-confirm" id="btnPayConfirm" onclick="handlePayBtnClick()">💰 我已完成付款</button>
   </div>
   <div class="table-controls">
@@ -1111,6 +1115,30 @@ document.getElementById('orderTable').addEventListener('change', function(e) {
     saveActualPaid(memberName, amount);
   }
 });
+
+function exportMyOrder() {
+  if (!myName) { alert('请先输入昵称'); return; }
+  const seq = globalSeqMap[myName] || '?';
+  const teamLabel = myTeam > 0 ? '团' + myTeam : '未分组';
+  const o = allOrders[myName] || {};
+  const lines = ['Clawd贴纸掉落 · 订单详情', '序号：#' + seq, '昵称：' + myName, '分团：' + teamLabel, ''];
+  let totalItems = 0, totalUSD = 0;
+  S.forEach(s => {
+    const did = dropId(s.id), q = o[did] || 0;
+    if (q > 0) {
+      const sub = r2(q * DROP_UNIT_PRICES[s.id]);
+      lines.push(s.name + '(' + TYPE_LABEL[s.type] + ') x' + q + ' = $' + sub.toFixed(2));
+      totalItems += q; totalUSD += sub;
+    }
+  });
+  if (!totalItems) { lines.push('暂无选购'); }
+  const cny = r2(totalUSD * rate), fee = r2(cny * 0.001), tot = r2(cny + fee);
+  lines.push('', '总件数：' + totalItems, 'CNY（含0.1%手续费）：¥' + tot.toFixed(2));
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text)
+    .then(() => alert('已复制到剪贴板，可以直接粘贴到群里！'))
+    .catch(() => { prompt('请手动复制：', text); });
+}
 
 function getOrderText(name) {
   const seq = globalSeqMap[name] || '?', team = allTeams[name] || '?', o = allOrders[name] || {};
