@@ -308,14 +308,14 @@ section{padding:14px}
         <li>注册或登录账号（如果你是 Round2 老用户，可以直接用原昵称和密码登录）</li>
         <li>在贴纸卡片上点 <strong>+/-</strong> 按钮选择想要的数量（不能超过剩余库存）</li>
         <li><strong>改完数量记得点底部的「保存」按钮！</strong></li>
-        <li>保存后联系你所在团的团长付款</li>
+        <li>锁单后点击「查看付款码」扫码付款（统一付给鹅鹅）</li>
       </ol>
 
       <div class="notice-divider"></div>
 
       <h4>注意事项</h4>
       <p><span class="tag tag-warn">重要</span> 库存实时变化，你选的数量在保存前可能被别人抢走。保存时如果库存不足会自动调整。</p>
-      <p>选完贴纸后请尽快联系团长完成付款，长时间不付款的订单可能会被清理。</p>
+      <p>选完贴纸后请尽快完成付款，长时间不付款的订单可能会被清理。</p>
     </div>
   </details>
 </div>
@@ -356,6 +356,19 @@ section{padding:14px}
 <div class="submit-bar" id="submitBar">
   <div class="submit-bar-info">你有 <strong id="submitCount">0</strong> 项修改未保存</div>
   <button class="submit-bar-btn" id="submitBtn" onclick="submitCart()">保存</button>
+</div>
+
+<!-- 每次刷新弹出的选团提示弹窗 -->
+<div id="reminderOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:3000;display:none;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:28px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center">
+    <div style="font-size:28px;margin-bottom:12px">⚠️</div>
+    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">选团提醒</h3>
+    <div style="text-align:left;font-size:14px;line-height:1.8;color:#333">
+      <p style="margin:0 0 10px"><strong>你在哪个群就选哪个团！</strong>掉落的贴纸会和 Round2 的订单一起发货。</p>
+      <p style="margin:0"><strong>选错团会导致发货混乱，请务必确认！</strong></p>
+    </div>
+    <button onclick="document.getElementById('reminderOverlay').style.display='none'" style="margin-top:20px;padding:10px 36px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3)">我知道了</button>
+  </div>
 </div>
 
 <footer>Claude Code Sticker Drop · Made with love by Sylux</footer>
@@ -437,7 +450,7 @@ let allOrders = {}, allTeams = {}, allJoinOrder = {}, globalSeqMap = {};
 let rate = 7.10, sb = null, connected = false, hideEmptyOrders = false, isLocked = false;
 let renderTimer = null, pendingChanges = {};
 const PENDING_DRAFT_KEY = 'drop_pending_changes';
-let allPaySelf = {}, allPayLeader = {};
+let allPaySelf = {}, allPayLeader = {}, allActualPaid = {};
 
 // ============ HELPERS ============
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -477,7 +490,7 @@ async function loadAll() {
     if (data.length < 1000) break;
     from += 1000;
   }
-  allOrders = {}; allTeams = {}; allPaySelf = {}; allPayLeader = {};
+  allOrders = {}; allTeams = {}; allPaySelf = {}; allPayLeader = {}; allActualPaid = {};
   const joinOrd = {};
   for (const row of orders) {
     if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
@@ -485,6 +498,7 @@ async function loadAll() {
     else if (row.sticker_id === 'drop__pin') { /* skip */ }
     else if (row.sticker_id === 'drop__payment_self') { if (row.quantity > 0) allPaySelf[row.name] = true; }
     else if (row.sticker_id === 'drop__payment_leader') { if (row.quantity > 0) allPayLeader[row.name] = true; }
+    else if (row.sticker_id === 'drop__actual_paid') { if (row.quantity > 0) allActualPaid[row.name] = row.quantity / 100; }
     else if (row.quantity > 0) { if (!allOrders[row.name]) allOrders[row.name] = {}; allOrders[row.name][row.sticker_id] = row.quantity; }
   }
   allJoinOrder = joinOrd;
@@ -504,6 +518,7 @@ function subscribeRealtime() {
     if (row.sticker_id === 'drop__team') { if (p.eventType === 'DELETE') delete allTeams[row.name]; else allTeams[p.new.name] = p.new.quantity; scheduleRender(); saveOffline(); return; }
     if (row.sticker_id === 'drop__payment_self') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allPaySelf[row.name]; else if (p.new && p.new.quantity > 0) allPaySelf[p.new.name] = true; scheduleRender(); saveOffline(); return; }
     if (row.sticker_id === 'drop__payment_leader') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allPayLeader[row.name]; else if (p.new && p.new.quantity > 0) allPayLeader[p.new.name] = true; scheduleRender(); saveOffline(); return; }
+    if (row.sticker_id === 'drop__actual_paid') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allActualPaid[row.name]; else if (p.new && p.new.quantity > 0) allActualPaid[p.new.name] = p.new.quantity / 100; scheduleRender(); saveOffline(); return; }
     if (p.eventType === 'DELETE') { if (allOrders[row.name]) { delete allOrders[row.name][row.sticker_id]; if (!Object.keys(allOrders[row.name]).length) delete allOrders[row.name]; } }
     else { const {name, sticker_id, quantity} = p.new; if (!allOrders[name]) allOrders[name] = {}; if (quantity > 0) allOrders[name][sticker_id] = quantity; else { delete allOrders[name][sticker_id]; if (!Object.keys(allOrders[name]).length) delete allOrders[name]; } }
     scheduleRender(); saveOffline();
@@ -543,11 +558,11 @@ async function submitCart() {
 }
 
 // ============ OFFLINE ============
-function saveOffline() { try { localStorage.setItem('drop_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader})); } catch(e) {} }
+function saveOffline() { try { localStorage.setItem('drop_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader, allActualPaid})); } catch(e) {} }
 function savePendingDraft() { try { if (!myName || !Object.keys(pendingChanges).length) { clearPendingDraft(); return; } localStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify({name: myName, changes: pendingChanges})); } catch(e) {} }
 function clearPendingDraft() { try { localStorage.removeItem(PENDING_DRAFT_KEY); } catch(e) {} }
 function restorePendingDraft() { try { const d = JSON.parse(localStorage.getItem(PENDING_DRAFT_KEY)); if (!d || d.name !== myName || !d.changes) return; pendingChanges = d.changes; if (!allOrders[myName]) allOrders[myName] = {}; for (const [sid, qty] of Object.entries(pendingChanges)) { const v = Math.max(0, parseInt(qty) || 0); if (v > 0) allOrders[myName][sid] = v; else delete allOrders[myName][sid]; } } catch(e) {} }
-function loadOffline() { try { const d = JSON.parse(localStorage.getItem('drop_cache')); if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 7.10; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; } } catch(e) {} }
+function loadOffline() { try { const d = JSON.parse(localStorage.getItem('drop_cache')); if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 7.10; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; allActualPaid = d.allActualPaid || {}; } } catch(e) {} }
 
 // ============ UI ============
 function setConnected(on) { connected = on; const d = document.getElementById('connDot'); d.className = 'conn-dot ' + (on ? 'on' : 'off'); d.title = on ? '已连接' : '未连接'; }
@@ -652,14 +667,14 @@ function updateNickDisplay() {
 // ============ PAYMENT ============
 function paymentStatusOf(n) { if (allPayLeader[n]) return 'confirmed'; if (allPaySelf[n]) return 'self'; return 'unpaid'; }
 function paymentCellHTML(name, team) {
-  const st = paymentStatusOf(name), isMe = name === myName, lead = isLeaderOf(myName, team);
+  const st = paymentStatusOf(name), isMe = name === myName, admin = isAdmin(myName);
   let h = st === 'confirmed' ? '<span class="pay-badge pay-confirmed">已确认</span>' : st === 'self' ? '<span class="pay-badge pay-self">待核实</span>' : '<span class="pay-badge pay-unpaid">未付</span>';
   if (!isLocked) return h;
   if (isMe && st === 'unpaid') h += ' <button class="pay-btn" onclick="confirmMyPay()">我已付款</button>';
   if (isMe && st === 'self') h += ' <button class="pay-btn active" onclick="cancelMyPay()">撤销</button>';
-  if (lead && st === 'self') h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
-  if (lead && st === 'confirmed') h += ' <button class="pay-btn" onclick="leaderRevoke(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
-  if (lead && st === 'unpaid' && !isMe) h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
+  if (admin && st === 'self') h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
+  if (admin && st === 'confirmed') h += ' <button class="pay-btn" onclick="leaderRevoke(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
+  if (admin && st === 'unpaid' && !isMe) h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
   return h;
 }
 async function confirmMyPay() {
@@ -676,15 +691,30 @@ async function cancelMyPay() {
 }
 async function leaderConfirm(mem) {
   if (!sb) return;
-  const t = allTeams[mem] || 4; if (!isLeaderOf(myName, t)) return;
+  if (!isAdmin(myName)) return;
   allPayLeader[mem] = true; if (!allPaySelf[mem]) allPaySelf[mem] = true;
   renderTable(); recalculate(); saveOffline();
   await sb.from('orders').upsert([{name: mem, sticker_id: 'drop__payment_leader', quantity: 1, updated_at: new Date().toISOString()},{name: mem, sticker_id: 'drop__payment_self', quantity: 1, updated_at: new Date().toISOString()}], {onConflict: 'name,sticker_id'}).select();
 }
 async function leaderRevoke(mem) {
-  if (!sb || !confirm('撤销 ' + mem + ' 的付款确认？')) return;
+  if (!sb || !isAdmin(myName) || !confirm('撤销 ' + mem + ' 的付款确认？')) return;
   delete allPayLeader[mem]; renderTable(); recalculate(); saveOffline();
   await sb.from('orders').upsert({name: mem, sticker_id: 'drop__payment_leader', quantity: 0, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
+}
+
+// ============ ACTUAL PAID ============
+async function saveActualPaid(memberName, amount) {
+  if (!sb) return;
+  if (!isAdmin(myName)) { alert('只有管理员可以操作'); return; }
+  const cents = Math.round(amount * 100);
+  if (cents > 0) { allActualPaid[memberName] = amount; } else { delete allActualPaid[memberName]; }
+  recalculate(); saveOffline();
+  const {error} = await sb.from('orders').upsert(
+    {name: memberName, sticker_id: 'drop__actual_paid', quantity: cents, updated_at: new Date().toISOString()},
+    {onConflict: 'name,sticker_id'}
+  ).select();
+  if (error) { console.error('Save actual paid failed:', error); alert('保存实付金额失败：' + error.message); }
+  else { updateStatus('已更新 ' + memberName + ' 的实付金额'); }
 }
 
 // ============ LOCK ============
@@ -731,6 +761,7 @@ function applyLockState() {
     b.style.pointerEvents = isLocked ? 'none' : '';
   });
   document.querySelectorAll('#orderTable input[type="number"]').forEach(inp => {
+    if (inp.dataset.ap) return; // actual-paid inputs stay editable after lock
     inp.disabled = isLocked;
     inp.style.opacity = isLocked ? '.5' : '';
   });
@@ -903,7 +934,7 @@ function renderTable() {
 
   let h = '<thead><tr><th class="col-idx">#</th><th class="col-name">昵称</th>';
   S.forEach(s => { h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>'; });
-  h += '<th>总件数</th><th>USD</th><th>CNY</th><th class="col-pay">付款</th></tr></thead><tbody>';
+  h += '<th>总件数</th><th>USD</th><th>CNY</th><th>实付</th><th>应补/应退</th><th class="col-pay">付款</th></tr></thead><tbody>';
 
   const sorted = Object.entries(allJoinOrder).sort((a,b) => a[1] - b[1]);
   const seqMap = {}; sorted.forEach(([n], i) => { seqMap[n] = i + 1; }); globalSeqMap = seqMap;
@@ -915,7 +946,7 @@ function renderTable() {
     if (!vis.length) return;
     h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + label + '（' + vis.length + ' 人）</td>';
     S.forEach(() => { h += '<td></td>'; });
-    h += '<td></td><td></td><td></td><td></td></tr>';
+    h += '<td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
     vis.forEach(name => {
       const isMe = name === myName, o = allOrders[name] || {};
@@ -925,13 +956,22 @@ function renderTable() {
         h += isMe ? '<td><input type="number" min="0" value="' + (v||'') + '" data-si="' + did + '"></td>' : '<td>' + (v||'') + '</td>';
       });
       h += '<td class="pt-items" id="pi-' + pi + '">0</td><td class="pt-usd" id="pu-' + pi + '">\u2014</td><td class="pt-cny" id="pc-' + pi + '">\u2014</td>';
+      // Actual paid column — editable by admin only
+      const apVal = allActualPaid[name];
+      const canEditAP = isAdmin(myName);
+      if (canEditAP) {
+        h += '<td class="pt-ap"><input type="number" min="0" step="0.01" value="' + (apVal !== undefined ? apVal.toFixed(2) : '') + '" data-ap="' + esc(name) + '" placeholder="\u2014" style="width:78px;color:#E8714A"></td>';
+      } else {
+        h += '<td class="pt-ap">' + (apVal !== undefined ? '<span style="color:#E8714A">\u00A5' + apVal.toFixed(2) + '</span>' : '\u2014') + '</td>';
+      }
+      h += '<td class="pt-owe" id="po-' + pi + '">\u2014</td>';
       h += '<td>' + paymentCellHTML(name, g.team) + '</td></tr>';
       pi++;
     });
 
     h += '<tr class="team-subtotal"><td class="col-idx"></td><td class="col-name">' + label + '小计</td>';
     S.forEach(s => { h += '<td id="tsq-' + g.team + '-' + s.id + '"></td>'; });
-    h += '<td id="tsi-' + g.team + '"></td><td id="tsu-' + g.team + '"></td><td id="tsc-' + g.team + '"></td><td></td></tr>';
+    h += '<td id="tsi-' + g.team + '"></td><td id="tsu-' + g.team + '"></td><td id="tsc-' + g.team + '"></td><td id="tsap-' + g.team + '"></td><td id="tsow-' + g.team + '"></td><td></td></tr>';
   });
   h += '</tbody>';
 
@@ -949,7 +989,7 @@ function recalculate() {
   const td = getTeamsData();
   let pi = 0, gItems = 0, gUSD = 0, gCNY = 0;
   td.forEach(g => {
-    let tItems = 0, tUSD = 0, tCNY = 0;
+    let tItems = 0, tUSD = 0, tCNY = 0, tActualPaid = 0;
     const tsq = {}; S.forEach(s => { tsq[s.id] = 0; });
     const vis = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
     if (!vis.length) return;
@@ -963,6 +1003,19 @@ function recalculate() {
       if (pie) pie.textContent = items;
       if (pue) pue.textContent = items > 0 ? '$' + usd.toFixed(2) : '\u2014';
       if (pce) pce.textContent = items > 0 ? '\u00A5' + tot.toFixed(2) : '\u2014';
+      // Owe/refund column
+      const paid = allActualPaid[name] || 0;
+      if (allActualPaid[name] !== undefined) tActualPaid += allActualPaid[name];
+      const poe = document.getElementById('po-' + pi);
+      if (poe) {
+        if (items === 0 || allActualPaid[name] === undefined) { poe.textContent = '\u2014'; }
+        else {
+          const diff = r2(tot - paid);
+          if (diff > 0.005) { poe.innerHTML = '<span style="color:#E74C3C">\u00A5' + diff.toFixed(2) + ' 补</span>'; }
+          else if (diff < -0.005) { poe.innerHTML = '<span style="color:#7BC9A0">\u00A5' + Math.abs(diff).toFixed(2) + ' 退</span>'; }
+          else { poe.innerHTML = '<span style="color:#999">\u2714\ufe0f 已平</span>'; }
+        }
+      }
       pi++;
     });
     S.forEach(s => { const el = document.getElementById('tsq-' + g.team + '-' + s.id); if (el) el.textContent = tsq[s.id] || ''; });
@@ -970,6 +1023,14 @@ function recalculate() {
     if (ti) ti.textContent = tItems;
     if (tu) tu.textContent = tItems > 0 ? '$' + tUSD.toFixed(2) : '\u2014';
     if (tc) tc.textContent = tItems > 0 ? '\u00A5' + tCNY.toFixed(2) : '\u2014';
+    const tsapEl = document.getElementById('tsap-' + g.team);
+    if (tsapEl) tsapEl.textContent = tActualPaid > 0 ? '\u00A5' + tActualPaid.toFixed(2) : '\u2014';
+    const tsowEl = document.getElementById('tsow-' + g.team);
+    if (tsowEl) {
+      const teamDiff = r2(tCNY - tActualPaid);
+      if (tActualPaid > 0 && Math.abs(teamDiff) > 0.005) { tsowEl.innerHTML = teamDiff > 0 ? '<span style="color:#E74C3C">\u00A5' + teamDiff.toFixed(2) + '</span>' : '<span style="color:#7BC9A0">-\u00A5' + Math.abs(teamDiff).toFixed(2) + '</span>'; }
+      else { tsowEl.textContent = '\u2014'; }
+    }
     gItems += tItems; gUSD += tUSD; gCNY += tCNY;
   });
   document.getElementById('grandTotal').textContent = gItems > 0 ? '总计 ' + gItems + ' 件 · $' + gUSD.toFixed(2) + ' · \u00A5' + gCNY.toFixed(2) : '';
@@ -995,6 +1056,16 @@ document.getElementById('orderTable').addEventListener('input', function(e) {
   if (!allOrders[myName]) allOrders[myName] = {};
   if (v > 0) allOrders[myName][did] = v; else delete allOrders[myName][did];
   recalculate(); trackChange(did, v); saveOffline();
+});
+
+// Actual paid inputs — admin edits, saved on change
+document.getElementById('orderTable').addEventListener('change', function(e) {
+  const el = e.target;
+  if (el.matches('input[type="number"]') && el.dataset.ap) {
+    const memberName = el.dataset.ap;
+    const amount = Math.max(0, parseFloat(el.value) || 0);
+    saveActualPaid(memberName, amount);
+  }
 });
 
 function showOrderDetail(name) {
@@ -1058,6 +1129,10 @@ function clearMyOrders() {
   renderTable(); recalculate();
   applyLockState();
   updatePaymentBtns();
+  // 每次刷新弹出选团提醒
+  if (myName) {
+    document.getElementById('reminderOverlay').style.display = 'flex';
+  }
 })();
 </script>
 </body>
