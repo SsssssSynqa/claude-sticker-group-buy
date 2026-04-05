@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clawd 贴纸掉落 · 先到先得</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#FFF8F0;--card:#FFF;--primary:#E8714A;--primary-lt:#FDEEE8;
+  --purple:#B8A9C9;--purple-lt:#F0EBF5;--green:#7BC9A0;--green-lt:#E8F7EF;
+  --gold:#E8C84A;--gold-lt:#FDF6E3;--text:#3D3D3D;--text2:#999;
+  --border:#E8E0D8;--danger:#E74C3C;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+header{background:linear-gradient(135deg,#FDE8DC 0%,#F5E1F0 50%,#E0E8F5 100%);padding:18px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+header h1{font-size:21px;font-weight:700;color:var(--primary);margin-bottom:6px}
+.settings{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:13px}
+.settings label{display:flex;align-items:center;gap:5px}
+.s-input{width:65px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:center;background:var(--card)}
+.s-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-lt)}
+.s-input:disabled{background:#f0f0f0;color:var(--text2);cursor:not-allowed}
+.grand-total{font-weight:600;color:var(--primary)}
+.last-saved{font-size:11px;color:#bbb;margin-left:auto}
+
+section{padding:18px 24px}
+.section-title{font-size:17px;font-weight:600;margin-bottom:14px}
+.sticker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px}
+.sticker-card{background:var(--card);border-radius:12px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);border:1px solid var(--border);transition:transform .2s,box-shadow .2s;position:relative}
+.sticker-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.1)}
+.sticker-card.sold-out{opacity:0.5;pointer-events:none}
+.sticker-card.sold-out::after{content:'已领完';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.6);color:#fff;padding:6px 16px;border-radius:8px;font-size:14px;font-weight:700;z-index:10}
+.sticker-card img{width:100%;height:90px;object-fit:contain;border-radius:6px;background:#f9f9f9;margin-bottom:8px}
+.card-name{font-weight:600;font-size:13px;margin-bottom:3px}
+.card-size{font-size:11px;color:var(--text2);margin-bottom:6px}
+.type-badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:500;margin-right:4px}
+.badge-dc{background:var(--primary-lt);color:var(--primary)}
+.badge-holo{background:var(--purple-lt);color:#8B6EAE}
+.badge-glt{background:var(--gold-lt);color:#B5960F}
+.card-qty{font-size:20px;font-weight:700;margin:4px 0 2px}
+.card-price{font-size:11px;font-weight:400;color:#999;margin-bottom:1px}
+.card-price-cny{font-size:13px;font-weight:600;color:var(--primary)}
+.stock-info{font-size:14px;font-weight:700;color:var(--text);margin:6px 0;padding:4px 8px;background:var(--primary-lt);border-radius:6px}
+.stock-remaining{color:var(--primary);font-weight:800;font-size:16px}
+.card-link{font-size:11px;color:var(--text2);text-decoration:none;display:inline-block;margin-top:4px}
+.card-link:hover{color:var(--primary)}
+
+.card-my{display:flex;align-items:center;justify-content:space-between;margin:8px 0 4px;padding:6px 0;border-top:1px dashed var(--border)}
+.card-my-label{font-size:11px;color:var(--text2)}
+.card-my-qty{font-size:14px;font-weight:700;color:var(--primary)}
+.qty-ctrl{display:flex;align-items:center;gap:0;border:2px solid var(--border);border-radius:10px;overflow:hidden;margin-top:6px}
+.qty-btn{width:34px;height:34px;border:none;background:var(--bg);color:var(--text);font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;user-select:none;line-height:1}
+.qty-btn:hover{background:var(--primary-lt);color:var(--primary)}
+.qty-btn:active{background:var(--primary);color:#fff}
+.qty-btn.minus{border-right:1px solid var(--border)}
+.qty-btn.plus{border-left:1px solid var(--border)}
+.qty-val{flex:1;text-align:center;font-size:15px;font-weight:600;min-width:36px;padding:0 4px;background:var(--card);color:var(--text)}
+.qty-val.has-qty{color:var(--primary)}
+
+.table-controls{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.btn{padding:7px 14px;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:#D4623E}
+
+.table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border);background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+table{border-collapse:collapse;width:max-content;min-width:100%;font-size:12px}
+th,td{padding:5px 6px;border:1px solid #EEEAE5;text-align:center;white-space:nowrap}
+thead th{background:var(--primary-lt);color:var(--primary);font-weight:600;font-size:11px;position:sticky;top:0;z-index:20}
+.col-idx{position:sticky;left:0;z-index:21;width:32px;min-width:32px}
+.col-name{position:sticky;left:32px;z-index:21;width:88px;min-width:88px;text-align:left}
+thead .col-idx,thead .col-name{background:var(--primary-lt);z-index:25}
+tbody .col-idx,tbody .col-name{background:var(--card)}
+.p-row:hover td{background:#FFFAF6}
+.p-row:hover td.col-idx,.p-row:hover td.col-name{background:#FFFAF6}
+.p-row td.col-idx{color:var(--text2);font-size:11px}
+
+td input[type="number"]{width:42px;padding:2px 3px;border:1px solid transparent;border-radius:4px;text-align:center;font-size:12px;background:transparent;transition:all .15s}
+td input[type="number"]:hover{border-color:var(--border);background:var(--bg)}
+td input[type="number"]:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 2px var(--primary-lt)}
+.pt-items{font-weight:600;font-size:11px}
+.pt-usd{font-weight:600;font-size:11px;color:#333}
+.pt-cny{font-weight:600;font-size:11px;color:#333}
+
+footer{text-align:center;padding:18px;font-size:11px;color:var(--text2)}
+input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type="number"]{-moz-appearance:textfield}
+
+@media(max-width:768px){
+header{padding:14px}
+header h1{font-size:17px;line-height:1.3}
+.settings{gap:10px 8px;align-items:flex-start}
+.settings .last-saved{margin-left:0;width:100%}
+section{padding:14px}
+.section-title{font-size:16px;margin-bottom:12px}
+.sticker-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sticker-card{padding:10px;border-radius:10px}
+.sticker-card img{height:84px}
+.card-name{font-size:12px;line-height:1.3}
+.card-size,.card-link{font-size:10px}
+.card-qty{font-size:18px}
+.card-price{font-size:10px}
+.card-price-cny{font-size:12px}
+.qty-btn{width:40px;height:40px;font-size:20px}
+.qty-val{font-size:15px;min-width:40px}
+.table-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.table-controls .btn{width:100%;padding:10px 8px;font-size:12px}
+.team-select{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.team-select label{justify-content:center;padding:8px 10px;font-size:13px}
+.nick-popup{padding:22px 18px}
+.nick-popup h3{font-size:17px}
+.nick-popup p{font-size:12px}
+.nick-popup input,.nick-pin{font-size:16px}
+}
+
+.th-type{font-size:9px;font-weight:400;display:block;margin-top:2px}
+
+.nick-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center}
+.nick-popup{background:#fff;border-radius:16px;padding:28px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+.nick-popup h3{color:var(--primary);font-size:18px;margin-bottom:8px}
+.nick-popup p{font-size:13px;color:var(--text2);margin-bottom:16px}
+.nick-popup input{width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;text-align:center;margin-bottom:14px}
+.nick-popup input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-lt)}
+.nick-popup button{width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+.nick-popup button:hover{background:#D4623E}
+.nick-popup button:disabled{opacity:.5;cursor:not-allowed}
+.nick-tabs{display:flex;gap:0;margin-bottom:16px;border:2px solid var(--border);border-radius:10px;overflow:hidden}
+.nick-popup .nick-tab{flex:1;padding:8px;border:none;background:var(--bg);color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;width:auto;border-radius:0}
+.nick-popup .nick-tab.active{background:var(--primary);color:#fff;font-weight:600}
+.nick-pin{width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;text-align:center;margin-bottom:14px;letter-spacing:6px}
+.nick-pin:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-lt)}
+.nick-hint{font-size:11px;color:var(--text2);margin:-8px 0 12px}
+.nick-err{font-size:12px;color:var(--danger);margin-bottom:8px;display:none}
+.nick-err.show{display:block}
+
+.conn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;margin-left:8px;vertical-align:middle;transition:background .3s}
+.conn-dot.on{background:#4CAF50}
+.conn-dot.off{background:#E74C3C}
+.nick-tag{font-size:12px;color:var(--text2);cursor:pointer;padding:3px 8px;border-radius:6px;background:var(--primary-lt)}
+.nick-tag:hover{background:#FDDDD0}
+.order-detail-btn{background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;opacity:.5;transition:opacity .15s}
+.order-detail-btn:hover{opacity:1}
+.od-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px}
+.od-card{background:#fff;border-radius:16px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.od-header{padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center}
+.od-header h3{margin:0;font-size:16px;color:var(--text)}
+.od-close{background:none;border:none;font-size:20px;cursor:pointer;color:#999;padding:4px 8px}
+.od-close:hover{color:#333}
+.od-body{padding:12px 20px}
+.od-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0f0f0}
+.od-item:last-child{border-bottom:none}
+.od-item-name{font-size:15px;font-weight:600;color:var(--text)}
+.od-item-type{font-size:11px;padding:2px 6px;border-radius:4px;margin-left:6px}
+.od-item-right{text-align:right;white-space:nowrap}
+.od-item-qty{font-size:18px;font-weight:700;color:var(--primary)}
+.od-footer{padding:12px 20px;border-top:2px solid #f0f0f0;background:#FAFAFA;border-radius:0 0 16px 16px}
+.od-total{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+.od-total.main{font-size:15px;font-weight:700;color:var(--primary);padding:8px 0 4px}
+
+.my-row td{background:#FFF8F0 !important}
+.my-row:hover td{background:#FFF3E8 !important}
+.my-row td.col-name{font-weight:600;color:var(--primary)}
+
+.team-header-row td{background:#F0EBF5 !important;color:#8B6EAE;font-weight:700;font-size:13px;padding:8px 6px;border-top:2px solid #D8CCE8}
+.team-header-row td.col-idx,.team-header-row td.col-name{background:#F0EBF5 !important}
+.team-subtotal td{background:#FDF6E3 !important;font-weight:600;font-size:11px;color:#B5960F;border-bottom:2px solid #E8DFC0}
+.team-subtotal td.col-idx,.team-subtotal td.col-name{background:#FDF6E3 !important}
+.team-select{display:flex;gap:16px;justify-content:center;margin-bottom:14px}
+.team-select label{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;padding:8px 16px;border:2px solid var(--border);border-radius:10px;transition:all .15s}
+.team-select label:has(input:checked){border-color:var(--primary);background:var(--primary-lt)}
+.team-select input[type="radio"]{accent-color:var(--primary)}
+.team-tag{font-size:13px;color:#fff;cursor:pointer;padding:5px 12px;border-radius:8px;background:linear-gradient(135deg,#9B6EAE,#8B5E9E);font-weight:600;box-shadow:0 2px 8px rgba(139,110,174,.3);transition:all .15s;letter-spacing:.3px}
+.team-tag:hover{background:linear-gradient(135deg,#A87EBE,#9B6EAE);transform:translateY(-1px);box-shadow:0 4px 12px rgba(139,110,174,.4)}
+.team-tag::after{content:' \270f\fe0f';font-size:11px}
+
+.btn-clear-orders{padding:8px 16px;background:#FDEAEA;color:#D94040;border:2px solid #F0C0C0;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;flex:0 0 auto}
+.btn-clear-orders:hover{background:#F8D0D0;transform:translateY(-1px);box-shadow:0 4px 12px rgba(217,64,64,.2)}
+.btn-clear-orders:active{transform:translateY(0)}
+
+.col-pay{min-width:90px;width:90px}
+.pay-badge{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:8px;white-space:nowrap}
+.pay-unpaid{background:#f0f0f0;color:#999}
+.pay-unpaid::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;border:2px solid #ccc;background:transparent}
+.pay-self{background:#FFF3E0;color:#E8714A}
+.pay-self::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:#E8714A}
+.pay-confirmed{background:#E8F7EF;color:#2D8B5E}
+.pay-confirmed::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:#2D8B5E}
+.pay-btn{border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer;font-size:11px;padding:3px 8px;transition:all .15s;white-space:nowrap}
+.pay-btn:hover{background:var(--primary-lt);color:var(--primary);border-color:var(--primary)}
+.pay-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.pay-btn.active:hover{background:#D4623E}
+.pay-btn-confirm{border-color:var(--green);color:var(--green);background:#f0faf4}
+.pay-btn-confirm:hover{background:var(--green);color:#fff}
+
+.notice{margin:0 24px;padding-top:18px}
+.notice details{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden}
+.notice summary{padding:14px 18px;cursor:pointer;font-size:15px;font-weight:600;color:var(--primary);list-style:none;display:flex;align-items:center;gap:8px;user-select:none}
+.notice summary::-webkit-details-marker{display:none}
+.notice summary::before{content:'';display:inline-block;width:0;height:0;border-left:6px solid var(--primary);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .2s}
+.notice details[open] summary::before{transform:rotate(90deg)}
+.notice-body{padding:0 18px 18px;font-size:13px;line-height:1.8;color:var(--text)}
+.notice-body h4{font-size:14px;font-weight:600;margin:14px 0 6px;color:var(--primary);display:flex;align-items:center;gap:6px}
+.notice-body h4:first-child{margin-top:4px}
+.notice-body p{margin:2px 0}
+.notice-body .tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:8px;font-weight:500}
+.tag-date{background:#E8F7EF;color:#2D8B5E}
+.tag-warn{background:#FDEAEA;color:var(--danger)}
+.notice-body ol,.notice-body ul{padding-left:20px;margin:4px 0}
+.notice-body li{margin:2px 0}
+.notice-divider{height:1px;background:var(--border);margin:14px 0}
+
+.submit-bar{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#FDE8DC,#F5E1F0);border-top:2px solid var(--primary);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:500;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:0 -4px 20px rgba(0,0,0,.1)}
+.submit-bar.show{transform:translateY(0)}
+.submit-bar-info{font-size:13px;color:var(--text)}
+.submit-bar-info strong{color:var(--primary);font-size:15px}
+.submit-bar-btn{padding:10px 28px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.submit-bar-btn:hover{background:#D4623E;transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,113,74,.3)}
+.submit-bar-btn:active{transform:translateY(0)}
+.submit-bar-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.submit-bar-btn.success{background:var(--green)}
+</style>
+</head>
+<body>
+
+<div class="nick-overlay" id="nickOverlay" style="display:none">
+  <div class="nick-popup">
+    <h3>Clawd 贴纸掉落</h3>
+    <div class="nick-tabs">
+      <button class="nick-tab active" id="tabRegister" onclick="switchAuthTab('register')">新用户注册</button>
+      <button class="nick-tab" id="tabLogin" onclick="switchAuthTab('login')">已有账号</button>
+    </div>
+    <p id="authHint">请输入你的昵称（群内昵称，方便大家认出你）</p>
+    <input type="text" id="nickInput" placeholder="你的昵称..." maxlength="20" autocomplete="off">
+    <input type="password" inputmode="numeric" class="nick-pin" id="pinInput" placeholder="设置密码" maxlength="6" autocomplete="off">
+    <p class="nick-hint" id="pinHint">4~6位数字，用于换设备时找回账号</p>
+    <p class="nick-err" id="authErr"></p>
+    <div id="teamSection">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:6px">选择你的分团</p>
+      <div class="team-select">
+        <label><input type="radio" name="team" value="1"> 团1</label>
+        <label><input type="radio" name="team" value="2"> 团2</label>
+        <label><input type="radio" name="team" value="3"> 团3</label>
+        <label><input type="radio" name="team" value="4" checked> 团4</label>
+        <label><input type="radio" name="team" value="5"> 团5</label>
+      </div>
+    </div>
+    <button id="nickBtn" onclick="submitAuth()" disabled>领取贴纸</button>
+  </div>
+</div>
+
+<header>
+  <h1>Clawd 贴纸掉落 · 先到先得 <span class="conn-dot" id="connDot" title="连接中..."></span></h1>
+  <div class="settings">
+    <span class="nick-tag" id="nickTag" onclick="changeNick()" title="点击修改昵称"></span>
+    <span class="team-tag" id="teamTag" onclick="changeTeam()" title="点击切换分团"></span>
+    <label id="rateLabel">汇率 1 USD = <input type="number" class="s-input" id="rateInput" step="0.01" min="0" disabled> CNY</label>
+    <span class="grand-total" id="grandTotal"></span>
+    <span class="last-saved" id="lastSaved"></span>
+  </div>
+</header>
+
+<div class="notice">
+  <details open>
+    <summary>贴纸掉落说明 · 请先阅读</summary>
+    <div class="notice-body">
+      <h4>什么是贴纸掉落？</h4>
+      <p>Round2 拼团结束后，部分团员未按时付款（跑单），他们预定的贴纸变成了<strong>剩余库存</strong>。这些贴纸已经购买并到货，现在以<strong>先到先得</strong>的方式开放领取。</p>
+      <p><span class="tag tag-warn">注意</span> 每款贴纸库存有限，领完即止。页面上会实时显示每款贴纸的剩余数量。</p>
+
+      <h4>价格说明</h4>
+      <p>贴纸单价沿用 Round2 的最终成交价（根据 Round2 总量对应的 Sticker Mule 批量档位），不会因掉落数量少而涨价。</p>
+      <p>人民币金额按汇率换算，含 0.1% 银行手续费。</p>
+
+      <h4>如何领取</h4>
+      <ol>
+        <li>注册或登录账号（如果你是 Round2 老用户，可以直接用原昵称和密码登录）</li>
+        <li>在贴纸卡片上点 <strong>+/-</strong> 按钮选择想要的数量（不能超过剩余库存）</li>
+        <li><strong>改完数量记得点底部的「保存」按钮！</strong></li>
+        <li>保存后联系你所在团的团长付款</li>
+      </ol>
+
+      <div class="notice-divider"></div>
+
+      <h4>注意事项</h4>
+      <p><span class="tag tag-warn">重要</span> 库存实时变化，你选的数量在保存前可能被别人抢走。保存时如果库存不足会自动调整。</p>
+      <p>选完贴纸后请尽快联系团长完成付款，长时间不付款的订单可能会被清理。</p>
+    </div>
+  </details>
+</div>
+
+<section>
+  <div class="section-title">贴纸掉落</div>
+  <div class="sticker-grid" id="stickerGrid"></div>
+</section>
+
+<section>
+  <div class="section-title">领取统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
+  <div class="table-controls">
+    <button class="btn-clear-orders" id="btnClearOrders" onclick="clearMyOrders()">🗑 清空我的订单</button>
+    <button class="btn" id="btnHideEmpty" onclick="toggleHideEmpty()" style="background:#F0F4FF;color:#6B7FA3;border:1px dashed #B8C9E0;font-size:11px">👁 隐藏空订单</button>
+  </div>
+  <div class="table-wrap">
+    <table id="orderTable"></table>
+  </div>
+</section>
+
+<div class="submit-bar" id="submitBar">
+  <div class="submit-bar-info">你有 <strong id="submitCount">0</strong> 项修改未保存</div>
+  <button class="submit-bar-btn" id="submitBtn" onclick="submitCart()">保存</button>
+</div>
+
+<footer>Claude Code Sticker Drop · Made with love by Sylux</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+/* jshint esversion: 8, browser: true */
+// ============ CONFIG ============
+const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
+const ADMIN_NAMES = ['鹅鹅', '鹅'];
+const TEAM_LEADERS = {1: '豆沙', 2: '豆沙', 3: 'G', 4: 'シンヤ_r2', 5: '鹅鹅'};
+const ROUND2_TEAMS = [1, 2, 3, 4, 5];
+
+// ============ STICKER DATA (same as Round2) ============
+const S = [
+  {id:'r2_clawd', name:'Clawd', type:'dc', size:'2"x1.6"', itemId:19156131, img:'https://storage.googleapis.com/sm-artworks/5719926a-04ae-4afb-9925-f1f4521d38ce/large.png?cacheFor=b1c948c6194db63359b0f8564d4a7eed', t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,89],[300,106],[500,138],[1000,207],[2000,327],[3000,435],[5000,631],[10000,1062]]},
+  {id:'r2_ultrathink', name:'ultrathink', type:'dc', size:'4.21"x0.75"', itemId:19236575, img:'https://storage.googleapis.com/sm-artworks/0006ba04-0f46-4c86-930b-1b41a9480f14/large.png?cacheFor=f7003b57a2fc7bafc920f3ed2acb368a', t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,88],[300,106],[500,137],[1000,206],[2000,325],[3000,431],[5000,626],[10000,1053]]},
+  {id:'r2_clawd-happy', name:'Clawd happy', type:'dc', size:'2"x1.6"', itemId:19156132, img:'https://storage.googleapis.com/sm-artworks/be75b541-e429-4b61-a058-6a04bc35f712/large.png?cacheFor=26b5d38b95c02b9de101edd57a5846a9', t:[[1,5],[5,10],[10,17],[50,58],[100,69],[200,89],[300,106],[500,138],[1000,207],[2000,327],[3000,435],[5000,631],[10000,1062]]},
+  {id:'r2_vibing-dc', name:'Vibing', type:'dc', size:'3.21"x0.75"', itemId:17478826, img:'https://storage.googleapis.com/sm-artworks/c6e41ee6-4500-403f-a36c-3e6e72596e3a/large.png?cacheFor=e67ba358b1881dbc5ebedc5943e67dcb', t:[[1,5],[5,9],[10,16],[50,56],[100,65],[200,82],[300,97],[500,123],[1000,181],[2000,282],[3000,371],[5000,534],[10000,892]]},
+  {id:'r2_clawd-shiny', name:'Clawd shiny', type:'holo', size:'2"x1.61"', itemId:19156133, img:'https://storage.googleapis.com/sm-artworks/1c69d7fd-a6de-42a8-99be-3edc7b32c8f1/large.png?cacheFor=31a4293c9f5cc540655eb3642dd66c15', t:[[10,17],[50,63],[100,76],[200,99],[300,120],[500,158],[1000,241],[2000,385],[3000,514],[5000,752],[10000,1410]]},
+  {id:'r2_claudecode', name:'claudecode', type:'dc', size:'5.13"x0.75"', itemId:19156134, img:'https://storage.googleapis.com/sm-artworks/1a18c149-6820-437c-83a3-4053259f28d5/large.png?cacheFor=5d8dcc208c6c3caee71731b8daf13233', t:[[1,5],[5,10],[10,17],[50,60],[100,72],[200,94],[300,114],[500,149],[1000,227],[2000,363],[3000,485],[5000,706],[10000,1195]]},
+  {id:'r2_vibing-holo', name:'Vibing', type:'holo', size:'3.21"x0.75"', itemId:17478832, img:'https://storage.googleapis.com/sm-artworks/d85490fc-cd48-4248-b208-0bda8dad0e59/large.png?cacheFor=7ba69e81720e19d7d1fbb48a8163cbd9', t:[[10,17],[50,60],[100,71],[200,90],[300,108],[500,139],[1000,208],[2000,327],[3000,434],[5000,628],[10000,1119]]},
+  {id:'r2_reticulating', name:'reticulating', type:'dc', size:'5.13"x0.75"', itemId:19156130, img:'https://storage.googleapis.com/sm-artworks/3133e32f-64d5-48ee-9215-be6453365d8b/large.png?cacheFor=666df05e24c335393669a33fa071c47c', t:[[1,5],[5,10],[10,17],[50,60],[100,72],[200,94],[300,114],[500,150],[1000,229],[2000,365],[3000,488],[5000,712],[10000,1205]]},
+  {id:'r2_shipping', name:'Shipping', type:'dc', size:'3.63"x0.75"', itemId:17478831, img:'https://storage.googleapis.com/sm-artworks/4296af64-9d1c-4e87-889f-e5397b680e4a/large.png?cacheFor=ed5d463f001823bf25db91888595a687', t:[[1,5],[5,10],[10,16],[50,57],[100,68],[200,86],[300,103],[500,132],[1000,197],[2000,310],[3000,411],[5000,595],[10000,998]]},
+  {id:'r2_manifesting-holo', name:'Manifesting', type:'holo', size:'5.13"x0.75"', itemId:19156128, img:'https://storage.googleapis.com/sm-artworks/7c5cd395-b662-440f-a668-bf9052c8aafc/large.png?cacheFor=1f302fa314f6fee5ed260ed773250db6', t:[[10,18],[50,64],[100,78],[200,104],[300,126],[500,167],[1000,257],[2000,414],[3000,556],[5000,829],[10000,1566]]},
+  {id:'r2_baking', name:'Baking', type:'dc', size:'3.13"x0.75"', itemId:17478829, img:'https://storage.googleapis.com/sm-artworks/32774d7b-adab-48ca-8fc4-18fb0b0ec1c2/large.png?cacheFor=3bd97a513abf6349abb718b2cbdc00a7', t:[[1,5],[5,9],[10,16],[50,56],[100,65],[200,82],[300,96],[500,123],[1000,181],[2000,281],[3000,371],[5000,534],[10000,891]]},
+  {id:'r2_clawd-wave', name:'Clawd wave', type:'dc', size:'2.4"x1.5"', itemId:19235847, img:'https://storage.googleapis.com/sm-artworks/f1ec9028-203f-4d6f-a360-5eea91e9723e/large.png?cacheFor=73d7616389ce26a3ea44a9d279ca3ed9', t:[[1,5],[5,10],[10,17],[50,59],[100,71],[200,93],[300,112],[500,146],[1000,222],[2000,354],[3000,472],[5000,688],[10000,1162]]},
+  {id:'r2_manifesting-glt', name:'Manifesting', type:'glt', size:'5.13"x0.75"', itemId:17478833, img:'https://storage.googleapis.com/sm-artworks/15c2280e-7a5f-46d8-ba05-86073c9d0b09/large.png?cacheFor=1fa9c7949a091c06af06347102479bea', t:[[10,18],[50,64],[100,78],[200,104],[300,126],[500,167],[1000,257],[2000,414],[3000,556],[5000,830],[10000,1567]]},
+  {id:'r2_clawd-heart', name:'clawd heart', type:'dc', size:'2"x1.48"', itemId:20005406, img:'https://storage.googleapis.com/sm-artworks/d3c8ea82-59f0-4606-97fa-88acd0bf21a0/large.png', t:[[1,5],[5,10],[10,16],[50,57],[100,68],[200,87],[300,103],[500,133],[1000,199],[2000,314],[3000,416],[5000,602],[10000,1011]]},
+  {id:'r2_clawd-headphones', name:'Clawd Headphones', type:'dc', size:'2"x1.77"', itemId:19982716, img:'https://storage.googleapis.com/sm-artworks/d683c1c3-a865-4797-a5d3-7b1f82b90e86/large.png', t:[[1,5],[5,10],[10,17],[50,59],[100,71],[200,92],[300,110],[500,144],[1000,218],[2000,346],[3000,461],[5000,671],[10000,1132]]},
+  {id:'r2_clawd-wand', name:'Clawd Wand', type:'dc', size:'2"x0.97"', itemId:19982721, img:'https://storage.googleapis.com/sm-artworks/297554b5-c858-4e1d-8c96-86eb18496131/large.png', t:[[1,5],[5,9],[10,16],[50,54],[100,63],[200,78],[300,91],[500,114],[1000,166],[2000,254],[3000,333],[5000,476],[10000,788]]},
+  {id:'r2_clawd-bubble', name:'Clawd Bubble', type:'dc', size:'2"x1.43"', itemId:19982712, img:'https://storage.googleapis.com/sm-artworks/15cfce1b-f09f-46c4-9b1c-6da9d0d157d6/large.png', t:[[1,5],[5,10],[10,16],[50,57],[100,68],[200,86],[300,102],[500,131],[1000,196],[2000,308],[3000,408],[5000,589],[10000,989]]},
+  {id:'r2_clawd-coffee', name:'Clawd Coffee', type:'dc', size:'2"x1.12"', itemId:19982714, img:'https://storage.googleapis.com/sm-artworks/a751fc7b-1ef4-4ae6-9ae4-f0a92e428c33/large.png', t:[[1,5],[5,9],[10,16],[50,55],[100,64],[200,80],[300,95],[500,120],[1000,176],[2000,272],[3000,358],[5000,514],[10000,856]]},
+  {id:'r2_clawd-skateboard', name:'Clawd Skateboard', type:'dc', size:'1.99"x2"', itemId:19982720, img:'https://storage.googleapis.com/sm-artworks/298ed85d-dfc2-497d-a7c1-0bef98f77c02/large.png', t:[[1,5],[5,10],[10,17],[50,60],[100,73],[200,95],[300,115],[500,151],[1000,231],[2000,369],[3000,494],[5000,720],[10000,1219]]},
+  {id:'r2_clawd-book', name:'Clawd Book', type:'dc', size:'2"x1.4"', itemId:19982711, img:'https://storage.googleapis.com/sm-artworks/9d8d9dac-a077-4ad3-b60b-969b18dfa8a3/large.png', t:[[1,5],[5,10],[10,16],[50,57],[100,67],[200,85],[300,101],[500,130],[1000,194],[2000,304],[3000,402],[5000,581],[10000,974]]},
+  {id:'r2_clawd-cape', name:'Clawd Cape', type:'dc', size:'1.7"x2"', itemId:19982713, img:'https://storage.googleapis.com/sm-artworks/7046cd5f-a1e1-466c-a211-7b49671d23ab/large.png', t:[[1,5],[5,10],[10,17],[50,58],[100,70],[200,90],[300,109],[500,141],[1000,214],[2000,339],[3000,451],[5000,654],[10000,1104]]},
+  {id:'r2_clawd-dizzy', name:'Clawd Dizzy', type:'dc', size:'2"x1.33"', itemId:19982715, img:'https://storage.googleapis.com/sm-artworks/5df191cb-99cf-421a-b5ef-818977b487b8/large.png', t:[[1,5],[5,9],[10,16],[50,56],[100,67],[200,84],[300,100],[500,128],[1000,190],[2000,297],[3000,392],[5000,566],[10000,948]]},
+  {id:'r2_clawd-kite', name:'Clawd Kite', type:'dc', size:'2"x1.89"', itemId:19982717, img:'https://storage.googleapis.com/sm-artworks/3f521137-f17f-4119-9039-91e433c269c4/large.png', t:[[1,5],[5,10],[10,17],[50,59],[100,72],[200,94],[300,113],[500,148],[1000,225],[2000,359],[3000,480],[5000,699],[10000,1182]]},
+  {id:'r2_clawd-lightbulb', name:'Clawd Lightbulb', type:'dc', size:'1.33"x2"', itemId:19982718, img:'https://storage.googleapis.com/sm-artworks/966c86c2-9273-4064-9951-ab56fecd27bb/large.png', t:[[1,5],[5,9],[10,16],[50,56],[100,66],[200,84],[300,100],[500,128],[1000,189],[2000,296],[3000,391],[5000,564],[10000,944]]},
+  {id:'r2_clawd-magnifier', name:'Clawd Magnifier', type:'dc', size:'2"x1.79"', itemId:19982719, img:'https://storage.googleapis.com/sm-artworks/b604152e-1a17-444d-846e-c0fe257bda95/large.png', t:[[1,5],[5,10],[10,17],[50,59],[100,71],[200,92],[300,110],[500,144],[1000,219],[2000,348],[3000,463],[5000,674],[10000,1138]]}
+];
+
+// ============ DROP-SPECIFIC DATA ============
+const DROP_STOCK = {"clawd":77,"ultrathink":37,"clawd-happy":88,"vibing-dc":44,"clawd-shiny":94,"claudecode":27,"reticulating":19,"shipping":14,"manifesting-holo":25,"clawd-wave":16,"manifesting-glt":17,"vibing-holo":35,"baking":15,"clawd-heart":82,"clawd-headphones":67,"clawd-wand":82,"clawd-bubble":62,"clawd-coffee":69,"clawd-skateboard":60,"clawd-book":69,"clawd-cape":44,"clawd-dizzy":61,"clawd-kite":56,"clawd-lightbulb":54,"clawd-magnifier":80};
+const DROP_PREFIX = 'drop_';
+function dropId(sid) { return DROP_PREFIX + sid.replace('r2_', ''); }
+function baseId(did) { return 'r2_' + did.replace(DROP_PREFIX, ''); }
+function stockKey(s) { return s.id.replace('r2_', ''); }
+
+const R2_TOTALS = {"r2_clawd":1220,"r2_ultrathink":590,"r2_clawd-happy":1310,"r2_vibing-dc":570,"r2_clawd-shiny":1280,"r2_claudecode":560,"r2_reticulating":320,"r2_shipping":330,"r2_manifesting-holo":490,"r2_clawd-wave":360,"r2_manifesting-glt":340,"r2_vibing-holo":620,"r2_baking":400,"r2_clawd-heart":2770,"r2_clawd-headphones":2190,"r2_clawd-wand":2410,"r2_clawd-bubble":2050,"r2_clawd-coffee":2210,"r2_clawd-skateboard":1840,"r2_clawd-book":2020,"r2_clawd-cape":1430,"r2_clawd-dizzy":1940,"r2_clawd-kite":1860,"r2_clawd-lightbulb":2200,"r2_clawd-magnifier":2200};
+
+const TYPE_LABEL = {dc:'模切', holo:'全息', glt:'闪粉'};
+const TYPE_CLS = {dc:'badge-dc', holo:'badge-holo', glt:'badge-glt'};
+
+// ============ PRICING ============
+function r2(n) { return Math.round(n * 100) / 100; }
+function unitPrice(sticker, qty) {
+  const tiers = sticker.t;
+  if (qty <= 0) return tiers[0][1] / tiers[0][0];
+  let lower = tiers[0], upper = null;
+  for (let i = 0; i < tiers.length; i++) {
+    if (qty >= tiers[i][0]) lower = tiers[i];
+    if (qty < tiers[i][0] && !upper) upper = tiers[i];
+  }
+  if (!upper) return lower[1] / lower[0];
+  const ratio = (qty - lower[0]) / (upper[0] - lower[0]);
+  return (lower[1] + ratio * (upper[1] - lower[1])) / qty;
+}
+const DROP_UNIT_PRICES = {};
+S.forEach(s => { DROP_UNIT_PRICES[s.id] = unitPrice(s, R2_TOTALS[s.id] || 0); });
+
+// ============ STATE ============
+let myName = localStorage.getItem('gb2_nickname') || '';
+let myTeam = parseInt(localStorage.getItem('gb2_team')) || 4;
+let allOrders = {}, allTeams = {}, allJoinOrder = {}, globalSeqMap = {};
+let rate = 7.10, sb = null, connected = false, hideEmptyOrders = false;
+let renderTimer = null, pendingChanges = {};
+const PENDING_DRAFT_KEY = 'drop_pending_changes';
+let allPaySelf = {}, allPayLeader = {};
+
+// ============ HELPERS ============
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function hasOrders(name) { const o = allOrders[name]; return o && Object.values(o).some(q => q > 0); }
+function isAdmin(name) { return ADMIN_NAMES.includes(name); }
+function isLeaderOf(name, team) { return TEAM_LEADERS[team] === name || isAdmin(name); }
+
+function getClaimedQty(stickerObj) {
+  const did = dropId(stickerObj.id);
+  let total = 0;
+  for (const name in allOrders) total += (allOrders[name][did] || 0);
+  return total;
+}
+function getRemainingStock(stickerObj) {
+  return Math.max(0, (DROP_STOCK[stockKey(stickerObj)] || 0) - getClaimedQty(stickerObj));
+}
+
+// ============ SUPABASE ============
+function initSupabaseClient() {
+  if (typeof window.supabase === 'undefined') return false;
+  try { sb = window.supabase.createClient(SUPA_URL, SUPA_KEY); return true; }
+  catch(e) { console.error('Supabase init failed:', e); return false; }
+}
+async function initSupabase() {
+  if (!sb && !initSupabaseClient()) { setConnected(false); updateStatus('SDK加载失败'); loadOffline(); return; }
+  try { await loadAll(); saveOffline(); subscribeRealtime(); setConnected(true); updateStatus('已连接'); }
+  catch(e) { console.error('Init failed:', e); setConnected(false); updateStatus('连接失败'); loadOffline(); }
+}
+
+async function loadAll() {
+  let orders = [], from = 0;
+  while (true) {
+    const {data, error} = await sb.from('orders').select('*').like('sticker_id', 'drop_%').order('id').range(from, from + 999);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    orders = orders.concat(data);
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+  allOrders = {}; allTeams = {}; allPaySelf = {}; allPayLeader = {};
+  const joinOrd = {};
+  for (const row of orders) {
+    if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
+    if (row.sticker_id === 'drop__team') { allTeams[row.name] = row.quantity; }
+    else if (row.sticker_id === 'drop__pin') { /* skip */ }
+    else if (row.sticker_id === 'drop__payment_self') { if (row.quantity > 0) allPaySelf[row.name] = true; }
+    else if (row.sticker_id === 'drop__payment_leader') { if (row.quantity > 0) allPayLeader[row.name] = true; }
+    else if (row.quantity > 0) { if (!allOrders[row.name]) allOrders[row.name] = {}; allOrders[row.name][row.sticker_id] = row.quantity; }
+  }
+  allJoinOrder = joinOrd;
+  const {data: settings} = await sb.from('settings').select('*');
+  if (settings) for (const s of settings) {
+    if (s.key === 'drop_rate' || s.key === 'r2_rate') rate = parseFloat(s.value) || 7.10;
+  }
+}
+
+function subscribeRealtime() {
+  sb.channel('drop-sync').on('postgres_changes', {event:'*', schema:'public', table:'orders'}, p => {
+    const row = p.new || p.old;
+    if (!row || !row.sticker_id || !row.sticker_id.startsWith('drop_')) return;
+    if (row.sticker_id === 'drop__pin') return;
+    if (p.new && p.new.id) { const n = p.new.name; if (!allJoinOrder[n] || p.new.id < allJoinOrder[n]) allJoinOrder[n] = p.new.id; }
+    if (row.sticker_id === 'drop__team') { if (p.eventType === 'DELETE') delete allTeams[row.name]; else allTeams[p.new.name] = p.new.quantity; scheduleRender(); saveOffline(); return; }
+    if (row.sticker_id === 'drop__payment_self') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allPaySelf[row.name]; else if (p.new && p.new.quantity > 0) allPaySelf[p.new.name] = true; scheduleRender(); saveOffline(); return; }
+    if (row.sticker_id === 'drop__payment_leader') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allPayLeader[row.name]; else if (p.new && p.new.quantity > 0) allPayLeader[p.new.name] = true; scheduleRender(); saveOffline(); return; }
+    if (p.eventType === 'DELETE') { if (allOrders[row.name]) { delete allOrders[row.name][row.sticker_id]; if (!Object.keys(allOrders[row.name]).length) delete allOrders[row.name]; } }
+    else { const {name, sticker_id, quantity} = p.new; if (!allOrders[name]) allOrders[name] = {}; if (quantity > 0) allOrders[name][sticker_id] = quantity; else { delete allOrders[name][sticker_id]; if (!Object.keys(allOrders[name]).length) delete allOrders[name]; } }
+    scheduleRender(); saveOffline();
+  }).subscribe(st => { setConnected(st === 'SUBSCRIBED'); });
+}
+
+function scheduleRender() { clearTimeout(renderTimer); renderTimer = setTimeout(() => { renderTable(); recalculate(); }, 100); }
+
+// ============ PENDING CHANGES ============
+function trackChange(sid, qty) { pendingChanges[sid] = qty; savePendingDraft(); updateSubmitBar(); }
+function updateSubmitBar() {
+  const count = Object.keys(pendingChanges).length;
+  const bar = document.getElementById('submitBar'), btn = document.getElementById('submitBtn');
+  document.getElementById('submitCount').textContent = count;
+  if (count > 0) { bar.classList.add('show'); btn.textContent = '保存'; btn.disabled = false; btn.className = 'submit-bar-btn'; }
+  else { bar.classList.remove('show'); clearPendingDraft(); }
+}
+async function submitCart() {
+  if (!sb || !myName) return;
+  const entries = Object.entries(pendingChanges);
+  if (!entries.length) return;
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = '保存中...';
+  try {
+    const rows = entries.map(([sid, qty]) => ({name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()}));
+    const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'}).select();
+    if (error) throw error;
+    pendingChanges = {}; clearPendingDraft();
+    btn.textContent = '已保存 ✓'; btn.className = 'submit-bar-btn success'; updateStatus('已保存');
+    setTimeout(updateSubmitBar, 1500);
+  } catch(e) { console.error('Submit failed:', e); btn.disabled = false; btn.textContent = '保存失败，点击重试'; }
+}
+
+// ============ OFFLINE ============
+function saveOffline() { try { localStorage.setItem('drop_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, allPaySelf, allPayLeader})); } catch(e) {} }
+function savePendingDraft() { try { if (!myName || !Object.keys(pendingChanges).length) { clearPendingDraft(); return; } localStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify({name: myName, changes: pendingChanges})); } catch(e) {} }
+function clearPendingDraft() { try { localStorage.removeItem(PENDING_DRAFT_KEY); } catch(e) {} }
+function restorePendingDraft() { try { const d = JSON.parse(localStorage.getItem(PENDING_DRAFT_KEY)); if (!d || d.name !== myName || !d.changes) return; pendingChanges = d.changes; if (!allOrders[myName]) allOrders[myName] = {}; for (const [sid, qty] of Object.entries(pendingChanges)) { const v = Math.max(0, parseInt(qty) || 0); if (v > 0) allOrders[myName][sid] = v; else delete allOrders[myName][sid]; } } catch(e) {} }
+function loadOffline() { try { const d = JSON.parse(localStorage.getItem('drop_cache')); if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 7.10; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; } } catch(e) {} }
+
+// ============ UI ============
+function setConnected(on) { connected = on; const d = document.getElementById('connDot'); d.className = 'conn-dot ' + (on ? 'on' : 'off'); d.title = on ? '已连接' : '未连接'; }
+function updateStatus(msg) { const el = document.getElementById('lastSaved'); if (el) el.textContent = msg + ' ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}); }
+
+// ============ AUTH ============
+let authMode = 'register';
+function showNicknamePopup() {
+  document.getElementById('nickOverlay').style.display = 'flex';
+  const ni = document.getElementById('nickInput'), pi = document.getElementById('pinInput'), btn = document.getElementById('nickBtn');
+  const check = () => { btn.disabled = !ni.value.trim() || pi.value.length < 4; };
+  ni.oninput = check;
+  pi.oninput = () => { pi.value = pi.value.replace(/\D/g, '').slice(0, 6); check(); };
+  ni.onkeydown = e => { if (e.key === 'Enter') pi.focus(); };
+  pi.onkeydown = e => { if (e.key === 'Enter' && !btn.disabled) submitAuth(); };
+  ni.focus();
+}
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.getElementById('tabRegister').className = 'nick-tab' + (mode === 'register' ? ' active' : '');
+  document.getElementById('tabLogin').className = 'nick-tab' + (mode === 'login' ? ' active' : '');
+  document.getElementById('teamSection').style.display = mode === 'register' ? '' : 'none';
+  document.getElementById('authHint').textContent = mode === 'register' ? '请输入你的昵称（群内昵称，方便大家认出你）' : '输入你注册时的昵称和密码';
+  document.getElementById('pinInput').placeholder = mode === 'register' ? '设置密码' : '输入密码';
+  document.getElementById('pinHint').textContent = mode === 'register' ? '4~6位数字，用于换设备时找回账号' : '输入你注册时设置的4~6位数字密码';
+  document.getElementById('nickBtn').textContent = mode === 'register' ? '领取贴纸' : '登录';
+  document.getElementById('authErr').classList.remove('show');
+}
+async function submitAuth() {
+  const name = document.getElementById('nickInput').value.trim(), pin = document.getElementById('pinInput').value;
+  if (!name || pin.length < 4) return;
+  document.getElementById('authErr').classList.remove('show');
+  const btn = document.getElementById('nickBtn'); btn.disabled = true; btn.textContent = '处理中...';
+  try { if (authMode === 'register') await doRegister(name, pin); else await doLogin(name, pin); }
+  catch(e) { const el = document.getElementById('authErr'); el.textContent = e.message; el.classList.add('show'); btn.disabled = false; btn.textContent = authMode === 'register' ? '领取贴纸' : '登录'; }
+}
+async function doRegister(name, pin) {
+  if (!sb) throw new Error('未连接到服务器');
+  const {data: dp} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'drop__pin');
+  if (dp && dp.length > 0) throw new Error('该昵称已注册，请切换到「已有账号」');
+  const {data: rp} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r2__pin');
+  if (rp && rp.length > 0) throw new Error('该昵称已在Round2注册过，请用原密码登录');
+  const team = parseInt(document.querySelector('input[name="team"]:checked')?.value) || 4;
+  const {error} = await sb.from('orders').upsert([
+    {name, sticker_id: 'drop__pin', quantity: parseInt(pin), updated_at: new Date().toISOString()},
+    {name, sticker_id: 'drop__team', quantity: team, updated_at: new Date().toISOString()}
+  ], {onConflict: 'name,sticker_id'}).select();
+  if (error) throw new Error('注册失败: ' + error.message);
+  myName = name; myTeam = team;
+  localStorage.setItem('gb2_nickname', myName); localStorage.setItem('gb2_team', myTeam);
+  allTeams[myName] = myTeam;
+  document.getElementById('nickOverlay').style.display = 'none';
+  updateNickDisplay(); renderTable(); recalculate();
+}
+async function doLogin(name, pin) {
+  if (!sb) throw new Error('未连接到服务器');
+  let ok = false;
+  const {data: dp} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'drop__pin');
+  if (dp && dp.length > 0) { if (dp[0].quantity !== parseInt(pin)) throw new Error('密码错误'); ok = true; }
+  if (!ok) {
+    const {data: rp} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r2__pin');
+    if (rp && rp.length > 0) { if (rp[0].quantity !== parseInt(pin)) throw new Error('密码错误'); ok = true;
+      await sb.from('orders').upsert({name, sticker_id: 'drop__pin', quantity: parseInt(pin), updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
+    }
+  }
+  if (!ok) throw new Error('该昵称不存在');
+  myName = name; localStorage.setItem('gb2_nickname', myName);
+  const {data: dt} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'drop__team');
+  if (dt && dt.length > 0) myTeam = dt[0].quantity;
+  else {
+    const {data: rt} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r2__team');
+    if (rt && rt.length > 0) myTeam = rt[0].quantity;
+    await sb.from('orders').upsert({name, sticker_id: 'drop__team', quantity: myTeam, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
+  }
+  localStorage.setItem('gb2_team', myTeam);
+  document.getElementById('nickOverlay').style.display = 'none';
+  updateNickDisplay(); renderTable(); recalculate();
+}
+function changeNick() {
+  const n = prompt('修改昵称:', myName);
+  if (!n || !n.trim() || n.trim() === myName) return;
+  const old = myName; myName = n.trim(); localStorage.setItem('gb2_nickname', myName);
+  if (allOrders[old]) { allOrders[myName] = allOrders[old]; delete allOrders[old]; }
+  if (allTeams[old]) { allTeams[myName] = allTeams[old]; delete allTeams[old]; }
+  if (sb) sb.from('orders').update({name: myName, updated_at: new Date().toISOString()}).eq('name', old).like('sticker_id', 'drop_%').then(r => { if (r.error) console.error(r.error); });
+  updateNickDisplay(); renderTable(); recalculate();
+}
+function changeTeam() {
+  const c = prompt('当前：团' + myTeam + '\n输入新团号（' + ROUND2_TEAMS.filter(t => t !== myTeam).join('/') + '）：');
+  if (!c) return;
+  const t = parseInt(c);
+  if (!ROUND2_TEAMS.includes(t) || t === myTeam) { alert('请输入有效的团号'); return; }
+  myTeam = t; localStorage.setItem('gb2_team', myTeam); allTeams[myName] = myTeam; updateNickDisplay();
+  if (sb) sb.from('orders').upsert({name: myName, sticker_id: 'drop__team', quantity: myTeam, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
+  renderTable(); recalculate();
+}
+function updateNickDisplay() {
+  const el = document.getElementById('nickTag'); if (el) el.textContent = myName;
+  const te = document.getElementById('teamTag'); if (te) te.textContent = '团' + myTeam;
+}
+
+// ============ PAYMENT ============
+function paymentStatusOf(n) { if (allPayLeader[n]) return 'confirmed'; if (allPaySelf[n]) return 'self'; return 'unpaid'; }
+function paymentCellHTML(name, team) {
+  const st = paymentStatusOf(name), isMe = name === myName, lead = isLeaderOf(myName, team);
+  let h = st === 'confirmed' ? '<span class="pay-badge pay-confirmed">已确认</span>' : st === 'self' ? '<span class="pay-badge pay-self">待核实</span>' : '<span class="pay-badge pay-unpaid">未付</span>';
+  if (isMe && st === 'unpaid') h += ' <button class="pay-btn" onclick="confirmMyPay()">我已付款</button>';
+  if (isMe && st === 'self') h += ' <button class="pay-btn active" onclick="cancelMyPay()">撤销</button>';
+  if (lead && st === 'self') h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
+  if (lead && st === 'confirmed') h += ' <button class="pay-btn" onclick="leaderRevoke(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
+  if (lead && st === 'unpaid' && !isMe) h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
+  return h;
+}
+async function confirmMyPay() {
+  if (!sb || !myName || !confirm('确认你已完成付款？')) return;
+  allPaySelf[myName] = true; renderTable(); recalculate(); saveOffline();
+  const {error} = await sb.from('orders').upsert({name: myName, sticker_id: 'drop__payment_self', quantity: 1, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
+  if (error) { delete allPaySelf[myName]; renderTable(); recalculate(); alert('失败：' + error.message); }
+}
+async function cancelMyPay() {
+  if (!sb || !myName || !confirm('撤销付款确认？')) return;
+  delete allPaySelf[myName]; renderTable(); recalculate(); saveOffline();
+  const {error} = await sb.from('orders').upsert({name: myName, sticker_id: 'drop__payment_self', quantity: 0, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
+  if (error) { allPaySelf[myName] = true; renderTable(); recalculate(); alert('失败：' + error.message); }
+}
+async function leaderConfirm(mem) {
+  if (!sb) return;
+  const t = allTeams[mem] || 4; if (!isLeaderOf(myName, t)) return;
+  allPayLeader[mem] = true; if (!allPaySelf[mem]) allPaySelf[mem] = true;
+  renderTable(); recalculate(); saveOffline();
+  await sb.from('orders').upsert([{name: mem, sticker_id: 'drop__payment_leader', quantity: 1, updated_at: new Date().toISOString()},{name: mem, sticker_id: 'drop__payment_self', quantity: 1, updated_at: new Date().toISOString()}], {onConflict: 'name,sticker_id'}).select();
+}
+async function leaderRevoke(mem) {
+  if (!sb || !confirm('撤销 ' + mem + ' 的付款确认？')) return;
+  delete allPayLeader[mem]; renderTable(); recalculate(); saveOffline();
+  await sb.from('orders').upsert({name: mem, sticker_id: 'drop__payment_leader', quantity: 0, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
+}
+
+// ============ RENDER CARDS ============
+function renderCards() {
+  const grid = document.getElementById('stickerGrid');
+  let h = '';
+  S.forEach(s => {
+    const url = 'https://www.stickermule.com/claudecode/item/' + s.itemId;
+    const stock = DROP_STOCK[stockKey(s)] || 0;
+    h += '<div class="sticker-card" id="card-' + s.id + '"><img src="' + s.img + '" alt="' + s.name + '" loading="lazy"><div class="card-name">' + s.name + '</div><span class="type-badge ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span> <span class="card-size">' + s.size + '</span><div class="stock-info" id="si-' + s.id + '">库存 ' + stock + ' 张 · 剩余 <span class="stock-remaining">' + stock + '</span> 张</div><div class="card-price" id="cp-' + s.id + '">$' + DROP_UNIT_PRICES[s.id].toFixed(4) + '/张</div><div class="card-price-cny" id="cc-' + s.id + '">\u00A5' + (DROP_UNIT_PRICES[s.id] * rate).toFixed(4) + '/张</div><div class="card-my"><div><span class="card-my-label">我选的</span> <span class="card-my-qty" id="cmq-' + s.id + '">0 张</span></div></div><div class="qty-ctrl"><button class="qty-btn minus" data-sid="' + s.id + '" data-dir="-1">\u2212</button><span class="qty-val" id="cv-' + s.id + '">0</span><button class="qty-btn plus" data-sid="' + s.id + '" data-dir="1">+</button></div><a class="card-link" href="' + url + '" target="_blank">查看原页 \u2192</a></div>';
+  });
+  grid.innerHTML = h;
+}
+function updateCards() {
+  S.forEach(s => {
+    const sk = stockKey(s), stock = DROP_STOCK[sk] || 0, claimed = getClaimedQty(s), rem = Math.max(0, stock - claimed);
+    const si = document.getElementById('si-' + s.id);
+    if (si) si.innerHTML = '库存 ' + stock + ' 张 · 剩余 <span class="stock-remaining">' + rem + '</span> 张';
+    const did = dropId(s.id), myQ = (allOrders[myName] && allOrders[myName][did]) || 0;
+    const cmq = document.getElementById('cmq-' + s.id); if (cmq) cmq.textContent = myQ + ' 张';
+    const cv = document.getElementById('cv-' + s.id); if (cv) { cv.textContent = myQ; cv.className = 'qty-val' + (myQ > 0 ? ' has-qty' : ''); }
+    const card = document.getElementById('card-' + s.id);
+    if (card) { if (rem <= 0 && myQ <= 0) card.classList.add('sold-out'); else card.classList.remove('sold-out'); }
+  });
+}
+
+// ============ RENDER TABLE ============
+function getTeamsData() {
+  const names = new Set([...Object.keys(allOrders), ...Object.keys(allTeams), myName]);
+  const groups = {1:[],2:[],3:[],4:[],5:[],0:[]};
+  for (const n of names) { const t = allTeams[n] || 4; if (!groups[t]) groups[t] = []; groups[t].push(n); }
+  for (const t in groups) groups[t].sort((a,b) => a === myName ? -1 : b === myName ? 1 : (allJoinOrder[a]||Infinity) - (allJoinOrder[b]||Infinity));
+  const result = [];
+  if (groups[myTeam] && groups[myTeam].length) result.push({team: myTeam, names: groups[myTeam]});
+  for (const t of ROUND2_TEAMS) if (t !== myTeam && groups[t] && groups[t].length) result.push({team: t, names: groups[t]});
+  if (groups[0] && groups[0].length) result.push({team: 0, names: groups[0]});
+  return result;
+}
+
+function renderTable() {
+  const tbl = document.getElementById('orderTable'), td = getTeamsData();
+  let active = 0;
+  td.forEach(g => { active += g.names.filter(n => hasOrders(n)).length; });
+  document.getElementById('memberCount').textContent = active > 0 ? '（' + active + ' 人领取）' : '';
+
+  let h = '<thead><tr><th class="col-idx">#</th><th class="col-name">昵称</th>';
+  S.forEach(s => { h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>'; });
+  h += '<th>总件数</th><th>USD</th><th>CNY</th><th class="col-pay">付款</th></tr></thead><tbody>';
+
+  const sorted = Object.entries(allJoinOrder).sort((a,b) => a[1] - b[1]);
+  const seqMap = {}; sorted.forEach(([n], i) => { seqMap[n] = i + 1; }); globalSeqMap = seqMap;
+
+  let pi = 0;
+  td.forEach(g => {
+    const label = g.team > 0 ? '团' + g.team : '未分组';
+    const vis = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
+    if (!vis.length) return;
+    h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + label + '（' + vis.length + ' 人）</td>';
+    S.forEach(() => { h += '<td></td>'; });
+    h += '<td></td><td></td><td></td><td></td></tr>';
+
+    vis.forEach(name => {
+      const isMe = name === myName, o = allOrders[name] || {};
+      h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '"><td class="col-idx">' + (seqMap[name]||'') + '</td><td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')">📋</button></td>';
+      S.forEach(s => {
+        const did = dropId(s.id), v = o[did] || 0;
+        h += isMe ? '<td><input type="number" min="0" value="' + (v||'') + '" data-si="' + did + '"></td>' : '<td>' + (v||'') + '</td>';
+      });
+      h += '<td class="pt-items" id="pi-' + pi + '">0</td><td class="pt-usd" id="pu-' + pi + '">\u2014</td><td class="pt-cny" id="pc-' + pi + '">\u2014</td>';
+      h += '<td>' + paymentCellHTML(name, g.team) + '</td></tr>';
+      pi++;
+    });
+
+    h += '<tr class="team-subtotal"><td class="col-idx"></td><td class="col-name">' + label + '小计</td>';
+    S.forEach(s => { h += '<td id="tsq-' + g.team + '-' + s.id + '"></td>'; });
+    h += '<td id="tsi-' + g.team + '"></td><td id="tsu-' + g.team + '"></td><td id="tsc-' + g.team + '"></td><td></td></tr>';
+  });
+  h += '</tbody>';
+
+  // Save/restore focus
+  const f = document.activeElement; let fSid = null, fVal = null, fPos = null;
+  if (f && f.dataset && f.dataset.si) { fSid = f.dataset.si; fVal = f.value; fPos = f.selectionStart; }
+  tbl.innerHTML = h;
+  if (fSid) { const r = tbl.querySelector('input[data-si="' + fSid + '"]'); if (r) { r.value = fVal; r.focus(); try { r.setSelectionRange(fPos, fPos); } catch(e) {} } }
+  document.getElementById('btnHideEmpty').textContent = hideEmptyOrders ? '👁 显示全部' : '👁 隐藏空订单';
+}
+function toggleHideEmpty() { hideEmptyOrders = !hideEmptyOrders; renderTable(); recalculate(); }
+
+// ============ RECALCULATE ============
+function recalculate() {
+  const td = getTeamsData();
+  let pi = 0, gItems = 0, gUSD = 0, gCNY = 0;
+  td.forEach(g => {
+    let tItems = 0, tUSD = 0, tCNY = 0;
+    const tsq = {}; S.forEach(s => { tsq[s.id] = 0; });
+    const vis = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
+    if (!vis.length) return;
+    vis.forEach(name => {
+      const o = allOrders[name] || {};
+      let items = 0, usd = 0;
+      S.forEach(s => { const did = dropId(s.id), q = o[did] || 0; items += q; usd += r2(q * DROP_UNIT_PRICES[s.id]); tsq[s.id] += q; });
+      const cny = r2(usd * rate), fee = r2(cny * 0.001), tot = r2(cny + fee);
+      tItems += items; tUSD += usd; tCNY += tot;
+      const pie = document.getElementById('pi-' + pi), pue = document.getElementById('pu-' + pi), pce = document.getElementById('pc-' + pi);
+      if (pie) pie.textContent = items;
+      if (pue) pue.textContent = items > 0 ? '$' + usd.toFixed(2) : '\u2014';
+      if (pce) pce.textContent = items > 0 ? '\u00A5' + tot.toFixed(2) : '\u2014';
+      pi++;
+    });
+    S.forEach(s => { const el = document.getElementById('tsq-' + g.team + '-' + s.id); if (el) el.textContent = tsq[s.id] || ''; });
+    const ti = document.getElementById('tsi-' + g.team), tu = document.getElementById('tsu-' + g.team), tc = document.getElementById('tsc-' + g.team);
+    if (ti) ti.textContent = tItems;
+    if (tu) tu.textContent = tItems > 0 ? '$' + tUSD.toFixed(2) : '\u2014';
+    if (tc) tc.textContent = tItems > 0 ? '\u00A5' + tCNY.toFixed(2) : '\u2014';
+    gItems += tItems; gUSD += tUSD; gCNY += tCNY;
+  });
+  document.getElementById('grandTotal').textContent = gItems > 0 ? '总计 ' + gItems + ' 件 · $' + gUSD.toFixed(2) + ' · \u00A5' + gCNY.toFixed(2) : '';
+  updateCards();
+}
+
+// ============ EVENT HANDLERS ============
+document.getElementById('orderTable').addEventListener('input', function(e) {
+  const el = e.target;
+  if (!el.matches('input[type="number"]') || !el.dataset.si) return;
+  const did = el.dataset.si;
+  let v = Math.max(0, parseInt(el.value) || 0);
+  // Stock check
+  const r2Id = baseId(did), sObj = S.find(s => s.id === r2Id);
+  if (sObj) {
+    const stock = DROP_STOCK[stockKey(sObj)] || 0;
+    let others = 0; for (const n in allOrders) if (n !== myName) others += (allOrders[n][did] || 0);
+    const max = Math.max(0, stock - others);
+    if (v > max) { el.value = max; v = max; alert('剩余库存仅 ' + max + ' 张'); }
+  }
+  if (!allOrders[myName]) allOrders[myName] = {};
+  if (v > 0) allOrders[myName][did] = v; else delete allOrders[myName][did];
+  recalculate(); trackChange(did, v); saveOffline();
+});
+
+function showOrderDetail(name) {
+  const seq = globalSeqMap[name] || '?', team = allTeams[name] || '?', o = allOrders[name] || {};
+  let items = '', totalItems = 0, totalUSD = 0;
+  S.forEach(s => { const did = dropId(s.id), q = o[did] || 0; if (q > 0) { const sub = r2(q * DROP_UNIT_PRICES[s.id]); totalItems += q; totalUSD += sub; items += '<div class="od-item"><div><span class="od-item-name">' + esc(s.name) + '</span><span class="od-item-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></div><div class="od-item-right"><div class="od-item-qty">x' + q + '</div></div></div>'; } });
+  if (!items) items = '<div style="padding:20px;text-align:center;color:#999">暂无选购</div>';
+  const cny = r2(totalUSD * rate), fee = r2(cny * 0.001), tot = r2(cny + fee);
+  let foot = '<div class="od-total"><span>总件数</span><span>' + totalItems + ' 件</span></div><div class="od-total"><span>USD</span><span>$' + totalUSD.toFixed(2) + '</span></div><div class="od-total main"><span>CNY（含手续费）</span><span>\u00A5' + tot.toFixed(2) + '</span></div>';
+  const ov = document.createElement('div'); ov.className = 'od-overlay';
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="od-card"><div class="od-header"><h3>#' + seq + ' ' + esc(name) + ' · 团' + team + '</h3><button class="od-close">\u2715</button></div><div class="od-body">' + items + '</div><div class="od-footer">' + foot + '</div></div>';
+  ov.querySelector('.od-close').onclick = () => ov.remove();
+  document.body.appendChild(ov);
+}
+
+function clearMyOrders() {
+  if (!confirm('确定要清空你的所有订单吗？')) return;
+  const sids = Object.keys(allOrders[myName] || {});
+  delete allOrders[myName]; renderTable(); recalculate(); saveOffline();
+  if (sb && sids.length) sb.from('orders').upsert(sids.map(sid => ({name: myName, sticker_id: sid, quantity: 0, updated_at: new Date().toISOString()})), {onConflict: 'name,sticker_id'}).then(r => { if (!r.error) updateStatus('已清空'); });
+}
+
+// ============ INIT ============
+(function() {
+  const V = 'drop_v1';
+  if (localStorage.getItem('drop_cache_ver') !== V) { localStorage.removeItem('drop_cache'); localStorage.removeItem(PENDING_DRAFT_KEY); localStorage.setItem('drop_cache_ver', V); }
+})();
+
+(async function init() {
+  renderCards();
+  document.getElementById('stickerGrid').addEventListener('click', function(e) {
+    const btn = e.target.closest('.qty-btn');
+    if (!btn || !myName) return;
+    const sid = btn.dataset.sid, dir = parseInt(btn.dataset.dir), did = dropId(sid);
+    if (!allOrders[myName]) allOrders[myName] = {};
+    const cur = allOrders[myName][did] || 0;
+    let next = Math.max(0, cur + dir);
+    if (dir > 0) {
+      const sObj = S.find(s => s.id === sid);
+      if (sObj) { const stock = DROP_STOCK[stockKey(sObj)] || 0; let others = 0; for (const n in allOrders) if (n !== myName) others += (allOrders[n][did] || 0); const max = Math.max(0, stock - others); if (next > max) next = max; }
+      if (next === cur) return;
+    }
+    if (next > 0) allOrders[myName][did] = next;
+    else { delete allOrders[myName][did]; if (allOrders[myName] && !Object.keys(allOrders[myName]).length) delete allOrders[myName]; }
+    recalculate(); renderTable(); trackChange(did, next); saveOffline();
+  });
+
+  initSupabaseClient();
+  if (!myName) { showNicknamePopup(); await new Promise(r => { const c = setInterval(() => { if (myName) { clearInterval(c); r(); } }, 100); }); }
+  updateNickDisplay();
+  document.getElementById('rateInput').value = rate;
+  document.getElementById('orderTable').innerHTML = '<tbody><tr><td style="text-align:center;padding:40px;color:#999" colspan="24">连接中...</td></tr></tbody>';
+  await initSupabase();
+  if (myName && allTeams[myName]) { myTeam = allTeams[myName]; localStorage.setItem('gb2_team', myTeam); }
+  else if (myName && !allTeams[myName]) { allTeams[myName] = myTeam; if (sb) await sb.from('orders').upsert({name: myName, sticker_id: 'drop__team', quantity: myTeam, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select(); }
+  updateNickDisplay(); restorePendingDraft();
+  document.getElementById('rateInput').value = rate;
+  renderTable(); recalculate();
+})();
+</script>
+</body>
+</html>
