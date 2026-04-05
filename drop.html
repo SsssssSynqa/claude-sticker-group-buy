@@ -369,7 +369,7 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const ADMIN_NAMES = ['鹅鹅', '鹅'];
 const TEAM_LEADERS = {1: '豆沙', 2: '豆沙', 3: 'G', 4: 'シンヤ_r2', 5: '鹅鹅'};
 const ROUND2_TEAMS = [1, 2, 3, 4, 5];
-const TEAM_QR = {1: 'r2-pay-12.jpg', 2: 'r2-pay-12.jpg', 3: 'r2-pay-3.jpg', 4: 'r2-pay-4.png', 5: 'r2-pay-5.png'};
+const TEAM_QR = {1: 'r2-pay-5.png', 2: 'r2-pay-5.png', 3: 'r2-pay-5.png', 4: 'r2-pay-5.png', 5: 'r2-pay-5.png'};
 const PAYMENT_QR_ENABLED = true;
 
 // ============ STICKER DATA (same as Round2) ============
@@ -763,8 +763,8 @@ function showPaymentQR() {
   const myFee = r2(myCNY * 0.001);
   const myTotal = r2(myCNY + myFee);
 
-  document.getElementById('payQrTitle').textContent = '团' + team + ' 付款码';
-  document.getElementById('payQrLeader').textContent = '团长：' + leader;
+  document.getElementById('payQrTitle').textContent = '掉落付款码';
+  document.getElementById('payQrLeader').textContent = '统一收款：鹅鹅（5团团长）';
   const wrap = document.getElementById('payQrImgWrap');
   if (qrSrc) { wrap.innerHTML = '<img src="' + qrSrc + '" alt="团' + team + '付款码">'; }
   else { wrap.innerHTML = '<div class="pay-qr-no-img">付款码准备中…<br>请联系团长获取</div>'; }
