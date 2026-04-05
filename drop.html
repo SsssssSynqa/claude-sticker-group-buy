@@ -859,7 +859,7 @@ function showPaymentQR() {
     + '\u26a0\ufe0f 转账时必须备注：<span style="font-size:16px">#' + mySeq + ' ' + esc(myName) + '</span><br>'
     + '<span style="font-weight:400;font-size:12px;color:#999">（编号 + 昵称，方便团长核账）</span></div>'
     + '1. 请按上方金额向团长转账，<b>备注编号和昵称</b><br>'
-    + '2. 完成转账后，将<b>订单详情截图</b>和<b>付款截图</b>一起发到群里<br>'
+    + '2. 完成转账后，点击表格中你名字旁的📋复制订单，连同<b>付款截图</b>一起发到群里<br>'
     + '3. 回到本页点击「\ud83d\udcb0 我已完成付款」确认';
   document.getElementById('payQrOverlay').classList.add('on');
 }
@@ -1112,6 +1112,23 @@ document.getElementById('orderTable').addEventListener('change', function(e) {
   }
 });
 
+function getOrderText(name) {
+  const seq = globalSeqMap[name] || '?', team = allTeams[name] || '?', o = allOrders[name] || {};
+  let lines = ['Clawd贴纸掉落 · 订单详情', '#' + seq + ' ' + name + ' · 团' + team, ''];
+  let totalItems = 0, totalUSD = 0;
+  S.forEach(s => { const did = dropId(s.id), q = o[did] || 0; if (q > 0) { const sub = r2(q * DROP_UNIT_PRICES[s.id]); totalItems += q; totalUSD += sub; lines.push(s.name + '(' + TYPE_LABEL[s.type] + ') x' + q); } });
+  const cny = r2(totalUSD * rate), fee = r2(cny * 0.001), tot = r2(cny + fee);
+  lines.push('', '总件数: ' + totalItems + ' 件', 'USD: $' + totalUSD.toFixed(2), 'CNY（含手续费）: ¥' + tot.toFixed(2));
+  return lines.join('\n');
+}
+
+function copyOrderText(name) {
+  const text = getOrderText(name);
+  navigator.clipboard.writeText(text).then(() => { alert('订单已复制到剪贴板'); }).catch(() => {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); alert('订单已复制到剪贴板');
+  });
+}
+
 function showOrderDetail(name) {
   const seq = globalSeqMap[name] || '?', team = allTeams[name] || '?', o = allOrders[name] || {};
   let items = '', totalItems = 0, totalUSD = 0;
@@ -1119,6 +1136,7 @@ function showOrderDetail(name) {
   if (!items) items = '<div style="padding:20px;text-align:center;color:#999">暂无选购</div>';
   const cny = r2(totalUSD * rate), fee = r2(cny * 0.001), tot = r2(cny + fee);
   let foot = '<div class="od-total"><span>总件数</span><span>' + totalItems + ' 件</span></div><div class="od-total"><span>USD</span><span>$' + totalUSD.toFixed(2) + '</span></div><div class="od-total main"><span>CNY（含手续费）</span><span>\u00A5' + tot.toFixed(2) + '</span></div>';
+  foot += '<button onclick="copyOrderText(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')" style="margin-top:12px;width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">📋 复制订单文本</button>';
   const ov = document.createElement('div'); ov.className = 'od-overlay';
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
   ov.innerHTML = '<div class="od-card"><div class="od-header"><h3>#' + seq + ' ' + esc(name) + ' · 团' + team + '</h3><button class="od-close">\u2715</button></div><div class="od-body">' + items + '</div><div class="od-footer">' + foot + '</div></div>';
