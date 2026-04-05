@@ -381,7 +381,7 @@ section{padding:14px}
       <p style="margin:0 0 10px"><strong>你在哪个群就选哪个团！</strong>掉落的贴纸会和 Round2 的订单一起发货。</p>
       <p style="margin:0"><strong>选错团会导致发货混乱，请务必确认！</strong></p>
     </div>
-    <button onclick="document.getElementById('reminderOverlay').style.display='none'" style="margin-top:20px;padding:10px 36px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3)">我知道了</button>
+    <button onclick="document.getElementById('reminderOverlay').style.display='none';document.getElementById('countdownBanner').scrollIntoView({behavior:'smooth',block:'center'})" style="margin-top:20px;padding:10px 36px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3)">我知道了</button>
   </div>
 </div>
 
@@ -1155,6 +1155,10 @@ function clearMyOrders() {
   // 每次刷新弹出选团提醒
   if (myName) {
     document.getElementById('reminderOverlay').style.display = 'flex';
+  } else {
+    // 未登录用户直接滚到倒计时
+    const cb = document.getElementById('countdownBanner');
+    if (cb) setTimeout(() => cb.scrollIntoView({behavior:'smooth',block:'center'}), 300);
   }
 })();
 
