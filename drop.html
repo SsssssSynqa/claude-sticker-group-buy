@@ -616,6 +616,7 @@ function switchAuthTab(mode) {
 async function submitAuth() {
   const name = document.getElementById('nickInput').value.trim(), pin = document.getElementById('pinInput').value;
   if (!name || pin.length < 4) return;
+  if (['null','undefined','NaN','true','false',''].includes(name)) { alert('这个昵称不可用'); return; }
   document.getElementById('authErr').classList.remove('show');
   const btn = document.getElementById('nickBtn'); btn.disabled = true; btn.textContent = '处理中...';
   try { if (authMode === 'register') await doRegister(name, pin); else await doLogin(name, pin); }
