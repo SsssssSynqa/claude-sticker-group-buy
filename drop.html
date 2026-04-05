@@ -399,7 +399,8 @@ const PAYMENT_QR_ENABLED = true;
 // 开放时间：团长先选，到点后普通用户可下单
 const DROP_OPEN_TIME = new Date('2026-04-06T20:00:00+08:00'); // 晚上8点（北京时间）
 function isDropOpen() { return Date.now() >= DROP_OPEN_TIME.getTime(); }
-function isPrivileged(name) { return isAdmin(name) || Object.values(TEAM_LEADERS).includes(name); }
+const EXTRA_LEADERS = ['Keichi', 'Mori']; // Round1团长，也有提前选购权限
+function isPrivileged(name) { return isAdmin(name) || Object.values(TEAM_LEADERS).includes(name) || EXTRA_LEADERS.includes(name); }
 
 // ============ STICKER DATA (same as Round2) ============
 const S = [
