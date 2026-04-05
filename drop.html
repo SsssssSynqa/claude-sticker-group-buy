@@ -41,8 +41,8 @@ section{padding:18px 24px}
 .card-qty{font-size:20px;font-weight:700;margin:4px 0 2px}
 .card-price{font-size:11px;font-weight:400;color:#999;margin-bottom:1px}
 .card-price-cny{font-size:13px;font-weight:600;color:var(--primary)}
-.stock-info{font-size:14px;font-weight:700;color:var(--text);margin:6px 0;padding:4px 8px;background:var(--primary-lt);border-radius:6px}
-.stock-remaining{color:var(--primary);font-weight:800;font-size:16px}
+.stock-info{font-size:11px;font-weight:600;color:var(--text);margin:4px 0;padding:3px 6px;background:var(--primary-lt);border-radius:6px;white-space:nowrap}
+.stock-remaining{color:var(--primary);font-weight:800;font-size:13px}
 .card-link{font-size:11px;color:var(--text2);text-decoration:none;display:inline-block;margin-top:4px}
 .card-link:hover{color:var(--primary)}
 
@@ -217,6 +217,39 @@ section{padding:14px}
 .submit-bar-btn:active{transform:translateY(0)}
 .submit-bar-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
 .submit-bar-btn.success{background:var(--green)}
+
+.btn-lock{background:var(--danger);color:#fff;font-size:13px;font-weight:600;border:none;padding:8px 20px;border-radius:10px;cursor:pointer;transition:all .15s}.btn-lock:hover{background:#C0392B;transform:translateY(-1px)}.btn-lock.unlocked{background:var(--green)}.btn-lock.unlocked:hover{background:#5BA87D}
+.lock-banner{margin:0 24px;padding:14px 18px;background:linear-gradient(135deg,#FDEAEA,#FDE8E8);border:2px solid var(--danger);border-radius:12px;text-align:center;font-size:14px;font-weight:600;color:var(--danger);display:none;margin-top:14px}
+.lock-banner.show{display:block}
+.locked-input{opacity:.5;pointer-events:none}
+.lock-notice{font-size:12px;color:var(--danger);font-weight:500;margin-left:8px}
+
+.pay-qr-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:none;align-items:center;justify-content:center}
+.pay-qr-overlay.on{display:flex}
+.pay-qr-popup{background:#fff;border-radius:16px;padding:28px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+.pay-qr-popup h3{color:var(--primary);font-size:18px;margin-bottom:4px}
+.pay-qr-popup .pay-qr-leader{font-size:13px;color:var(--text2);margin-bottom:16px}
+.pay-qr-popup img{width:240px;height:240px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.1);margin-bottom:16px;object-fit:contain;background:#f9f9f9}
+.pay-qr-popup .pay-qr-hint{font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.8;text-align:left;background:#FFF8F5;border-radius:8px;padding:10px 14px;border:1px solid #FFE0D0}
+.pay-qr-popup button{width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+.pay-qr-popup button:hover{background:#D4623E}
+.pay-qr-no-img{width:240px;height:120px;display:flex;align-items:center;justify-content:center;background:#f9f9f9;border-radius:12px;margin:0 auto 16px;color:var(--text2);font-size:13px;border:2px dashed var(--border)}
+
+.pay-action-bar{display:flex;gap:8px;max-width:700px;margin:0 auto 16px;justify-content:center;flex-wrap:wrap}
+.btn-pay-qr{flex:1;min-width:0;padding:13px 16px;background:#fff;color:var(--primary);border:2px solid var(--primary);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-pay-qr:hover{background:var(--primary-lt);transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,113,74,.2)}
+.btn-pay-qr:active{transform:translateY(0)}
+.btn-pay-confirm{flex:1;min-width:0;padding:13px 16px;background:linear-gradient(135deg,#5BA87D,#4A9B6F);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(91,168,125,.3);transition:all .15s;white-space:nowrap}
+.btn-pay-confirm:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(91,168,125,.4)}
+.btn-pay-confirm:active{transform:translateY(0)}
+.btn-pay-confirm:disabled{opacity:.7;cursor:not-allowed;transform:none}
+.btn-pay-confirm.self-confirmed{background:linear-gradient(135deg,#E8714A,#D4623E)}
+.btn-pay-confirm.confirmed{background:linear-gradient(135deg,#2D8B5E,#247A50)}
+
+@media(max-width:768px){
+.pay-action-bar{display:grid;grid-template-columns:1fr;gap:10px;max-width:none}
+.btn-pay-qr,.btn-pay-confirm{width:100%;padding:12px 14px;font-size:13px;line-height:1.35;white-space:normal;text-align:center}
+}
 </style>
 </head>
 <body>
@@ -287,6 +320,8 @@ section{padding:14px}
   </details>
 </div>
 
+<div class="lock-banner" id="lockBanner">🔒 已锁单 — 所有贴纸数量已锁定，不可修改</div>
+
 <section>
   <div class="section-title">贴纸掉落</div>
   <div class="sticker-grid" id="stickerGrid"></div>
@@ -294,7 +329,12 @@ section{padding:14px}
 
 <section>
   <div class="section-title">领取统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
+  <div class="pay-action-bar">
+    <button class="btn-pay-qr" id="btnPayQR" onclick="showPaymentQR()">📱 查看付款码</button>
+    <button class="btn-pay-confirm" id="btnPayConfirm" onclick="handlePayBtnClick()">💰 我已完成付款</button>
+  </div>
   <div class="table-controls">
+    <button class="btn btn-lock" id="lockBtn" onclick="toggleLock()" style="display:none">🔒 锁单</button>
     <button class="btn-clear-orders" id="btnClearOrders" onclick="clearMyOrders()">🗑 清空我的订单</button>
     <button class="btn" id="btnHideEmpty" onclick="toggleHideEmpty()" style="background:#F0F4FF;color:#6B7FA3;border:1px dashed #B8C9E0;font-size:11px">👁 隐藏空订单</button>
   </div>
@@ -302,6 +342,16 @@ section{padding:14px}
     <table id="orderTable"></table>
   </div>
 </section>
+
+<div class="pay-qr-overlay" id="payQrOverlay" onclick="if(event.target===this)closePaymentQR()">
+  <div class="pay-qr-popup">
+    <h3 id="payQrTitle">付款二维码</h3>
+    <p class="pay-qr-leader" id="payQrLeader"></p>
+    <div id="payQrImgWrap"></div>
+    <p class="pay-qr-hint" id="payQrHint"></p>
+    <button onclick="closePaymentQR()">关闭</button>
+  </div>
+</div>
 
 <div class="submit-bar" id="submitBar">
   <div class="submit-bar-info">你有 <strong id="submitCount">0</strong> 项修改未保存</div>
@@ -319,6 +369,8 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const ADMIN_NAMES = ['鹅鹅', '鹅'];
 const TEAM_LEADERS = {1: '豆沙', 2: '豆沙', 3: 'G', 4: 'シンヤ_r2', 5: '鹅鹅'};
 const ROUND2_TEAMS = [1, 2, 3, 4, 5];
+const TEAM_QR = {1: 'r2-pay-12.jpg', 2: 'r2-pay-12.jpg', 3: 'r2-pay-3.jpg', 4: 'r2-pay-4.png', 5: 'r2-pay-5.png'};
+const PAYMENT_QR_ENABLED = true;
 
 // ============ STICKER DATA (same as Round2) ============
 const S = [
@@ -382,7 +434,7 @@ S.forEach(s => { DROP_UNIT_PRICES[s.id] = unitPrice(s, R2_TOTALS[s.id] || 0); })
 let myName = localStorage.getItem('gb2_nickname') || '';
 let myTeam = parseInt(localStorage.getItem('gb2_team')) || 4;
 let allOrders = {}, allTeams = {}, allJoinOrder = {}, globalSeqMap = {};
-let rate = 7.10, sb = null, connected = false, hideEmptyOrders = false;
+let rate = 7.10, sb = null, connected = false, hideEmptyOrders = false, isLocked = false;
 let renderTimer = null, pendingChanges = {};
 const PENDING_DRAFT_KEY = 'drop_pending_changes';
 let allPaySelf = {}, allPayLeader = {};
@@ -439,6 +491,7 @@ async function loadAll() {
   const {data: settings} = await sb.from('settings').select('*');
   if (settings) for (const s of settings) {
     if (s.key === 'drop_rate' || s.key === 'r2_rate') rate = parseFloat(s.value) || 7.10;
+    if (s.key === 'drop_locked') isLocked = s.value === '1';
   }
 }
 
@@ -454,6 +507,10 @@ function subscribeRealtime() {
     if (p.eventType === 'DELETE') { if (allOrders[row.name]) { delete allOrders[row.name][row.sticker_id]; if (!Object.keys(allOrders[row.name]).length) delete allOrders[row.name]; } }
     else { const {name, sticker_id, quantity} = p.new; if (!allOrders[name]) allOrders[name] = {}; if (quantity > 0) allOrders[name][sticker_id] = quantity; else { delete allOrders[name][sticker_id]; if (!Object.keys(allOrders[name]).length) delete allOrders[name]; } }
     scheduleRender(); saveOffline();
+  }).on('postgres_changes', {event:'*', schema:'public', table:'settings'}, p => {
+    if (!p.new) return;
+    if (p.new.key === 'drop_rate') { rate = parseFloat(p.new.value) || 7.10; document.getElementById('rateInput').value = rate; recalculate(); saveOffline(); }
+    if (p.new.key === 'drop_locked') { isLocked = p.new.value === '1'; applyLockState(); saveOffline(); }
   }).subscribe(st => { setConnected(st === 'SUBSCRIBED'); });
 }
 
@@ -469,6 +526,7 @@ function updateSubmitBar() {
   else { bar.classList.remove('show'); clearPendingDraft(); }
 }
 async function submitCart() {
+  if (isLocked) { alert('已锁单，无法修改'); return; }
   if (!sb || !myName) return;
   const entries = Object.entries(pendingChanges);
   if (!entries.length) return;
@@ -485,11 +543,11 @@ async function submitCart() {
 }
 
 // ============ OFFLINE ============
-function saveOffline() { try { localStorage.setItem('drop_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, allPaySelf, allPayLeader})); } catch(e) {} }
+function saveOffline() { try { localStorage.setItem('drop_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader})); } catch(e) {} }
 function savePendingDraft() { try { if (!myName || !Object.keys(pendingChanges).length) { clearPendingDraft(); return; } localStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify({name: myName, changes: pendingChanges})); } catch(e) {} }
 function clearPendingDraft() { try { localStorage.removeItem(PENDING_DRAFT_KEY); } catch(e) {} }
 function restorePendingDraft() { try { const d = JSON.parse(localStorage.getItem(PENDING_DRAFT_KEY)); if (!d || d.name !== myName || !d.changes) return; pendingChanges = d.changes; if (!allOrders[myName]) allOrders[myName] = {}; for (const [sid, qty] of Object.entries(pendingChanges)) { const v = Math.max(0, parseInt(qty) || 0); if (v > 0) allOrders[myName][sid] = v; else delete allOrders[myName][sid]; } } catch(e) {} }
-function loadOffline() { try { const d = JSON.parse(localStorage.getItem('drop_cache')); if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 7.10; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; } } catch(e) {} }
+function loadOffline() { try { const d = JSON.parse(localStorage.getItem('drop_cache')); if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 7.10; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; } } catch(e) {} }
 
 // ============ UI ============
 function setConnected(on) { connected = on; const d = document.getElementById('connDot'); d.className = 'conn-dot ' + (on ? 'on' : 'off'); d.title = on ? '已连接' : '未连接'; }
@@ -596,6 +654,7 @@ function paymentStatusOf(n) { if (allPayLeader[n]) return 'confirmed'; if (allPa
 function paymentCellHTML(name, team) {
   const st = paymentStatusOf(name), isMe = name === myName, lead = isLeaderOf(myName, team);
   let h = st === 'confirmed' ? '<span class="pay-badge pay-confirmed">已确认</span>' : st === 'self' ? '<span class="pay-badge pay-self">待核实</span>' : '<span class="pay-badge pay-unpaid">未付</span>';
+  if (!isLocked) return h;
   if (isMe && st === 'unpaid') h += ' <button class="pay-btn" onclick="confirmMyPay()">我已付款</button>';
   if (isMe && st === 'self') h += ' <button class="pay-btn active" onclick="cancelMyPay()">撤销</button>';
   if (lead && st === 'self') h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
@@ -627,6 +686,177 @@ async function leaderRevoke(mem) {
   delete allPayLeader[mem]; renderTable(); recalculate(); saveOffline();
   await sb.from('orders').upsert({name: mem, sticker_id: 'drop__payment_leader', quantity: 0, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
 }
+
+// ============ LOCK ============
+async function toggleLock() {
+  if (!sb || !ADMIN_NAMES.includes(myName)) return;
+  const newVal = isLocked ? '0' : '1';
+  const lockBtn = document.getElementById('lockBtn');
+  if (lockBtn) { lockBtn.disabled = true; lockBtn.textContent = '处理中...'; }
+  try {
+    const {error} = await sb.from('settings').upsert(
+      {key: 'drop_locked', value: newVal, updated_at: new Date().toISOString()},
+      {onConflict: 'key'}
+    );
+    if (error) throw error;
+    isLocked = !isLocked;
+    applyLockState();
+    saveOffline();
+  } catch(e) {
+    console.error('Lock toggle failed:', e);
+    alert('锁单操作失败：' + e.message);
+  }
+  if (lockBtn) lockBtn.disabled = false;
+}
+
+function applyLockState() {
+  const banner = document.getElementById('lockBanner');
+  const lockBtn = document.getElementById('lockBtn');
+  if (banner) banner.classList.toggle('show', isLocked);
+  if (lockBtn) {
+    if (ADMIN_NAMES.includes(myName)) {
+      lockBtn.style.display = '';
+      if (isLocked) {
+        lockBtn.textContent = '🔓 解锁';
+        lockBtn.className = 'btn btn-lock unlocked';
+      } else {
+        lockBtn.textContent = '🔒 锁单';
+        lockBtn.className = 'btn btn-lock';
+      }
+    }
+  }
+  document.querySelectorAll('.qty-btn').forEach(b => {
+    b.disabled = isLocked;
+    b.style.opacity = isLocked ? '.4' : '';
+    b.style.pointerEvents = isLocked ? 'none' : '';
+  });
+  document.querySelectorAll('#orderTable input[type="number"]').forEach(inp => {
+    inp.disabled = isLocked;
+    inp.style.opacity = isLocked ? '.5' : '';
+  });
+  const clearBtn = document.getElementById('btnClearOrders');
+  if (clearBtn) {
+    clearBtn.disabled = isLocked;
+    clearBtn.style.opacity = isLocked ? '.4' : '';
+    clearBtn.style.pointerEvents = isLocked ? 'none' : '';
+  }
+  if (isLocked) {
+    const bar = document.getElementById('submitBar');
+    if (bar) bar.classList.remove('show');
+    pendingChanges = {};
+  }
+  updatePaymentBtns();
+}
+
+// ============ PAYMENT QR ============
+function showPaymentQR() {
+  if (!PAYMENT_QR_ENABLED) { alert('付款码已关闭。'); return; }
+  if (!isLocked) { alert('截单后才能查看付款码哦～请等待团长锁单'); return; }
+  const team = myTeam;
+  const leader = TEAM_LEADERS[team] || '未知';
+  const qrSrc = TEAM_QR[team];
+
+  let myUSD = 0;
+  const orders = allOrders[myName] || {};
+  S.forEach(s => { const did = dropId(s.id), q = orders[did] || 0; if (q > 0) myUSD += r2(q * DROP_UNIT_PRICES[s.id]); });
+  const myCNY = r2(myUSD * rate);
+  const myFee = r2(myCNY * 0.001);
+  const myTotal = r2(myCNY + myFee);
+
+  document.getElementById('payQrTitle').textContent = '团' + team + ' 付款码';
+  document.getElementById('payQrLeader').textContent = '团长：' + leader;
+  const wrap = document.getElementById('payQrImgWrap');
+  if (qrSrc) { wrap.innerHTML = '<img src="' + qrSrc + '" alt="团' + team + '付款码">'; }
+  else { wrap.innerHTML = '<div class="pay-qr-no-img">付款码准备中…<br>请联系团长获取</div>'; }
+
+  let amountHTML = '';
+  if (myUSD > 0) {
+    amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
+      + '你需要转账：<span style="font-size:20px">\u00A5' + myTotal.toFixed(2) + '</span>'
+      + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">含0.1%手续费</div></div>';
+  } else {
+    amountHTML = '<div style="background:#f5f5f5;border-radius:10px;padding:12px;margin:10px 0;color:#999;font-size:13px">你还没有选购贴纸</div>';
+  }
+
+  const mySeq = globalSeqMap[myName] || '?';
+  document.getElementById('payQrHint').innerHTML = amountHTML
+    + '<strong>付款说明</strong><br>'
+    + '<div style="background:#FDEAEA;border:2px solid #E74C3C;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:13px;color:#C0392B;font-weight:600">'
+    + '\u26a0\ufe0f 转账时必须备注：<span style="font-size:16px">#' + mySeq + ' ' + esc(myName) + '</span><br>'
+    + '<span style="font-weight:400;font-size:12px;color:#999">（编号 + 昵称，方便团长核账）</span></div>'
+    + '1. 请按上方金额向团长转账，<b>备注编号和昵称</b><br>'
+    + '2. 完成转账后，将<b>订单详情截图</b>和<b>付款截图</b>一起发到群里<br>'
+    + '3. 回到本页点击「\ud83d\udcb0 我已完成付款」确认';
+  document.getElementById('payQrOverlay').classList.add('on');
+}
+
+function closePaymentQR() {
+  document.getElementById('payQrOverlay').classList.remove('on');
+}
+
+function handlePayBtnClick() {
+  if (!isLocked) { alert('截单后才能确认付款哦～请等待团长锁单'); return; }
+  const st = paymentStatusOf(myName);
+  if (st === 'confirmed') return;
+  if (st === 'self') cancelMyPay();
+  else confirmMyPay();
+}
+
+function updatePaymentBtns() {
+  const btn = document.getElementById('btnPayConfirm');
+  const qrBtn = document.getElementById('btnPayQR');
+  if (!btn) return;
+
+  if (!isLocked) {
+    btn.textContent = '🔒 截单后付款';
+    btn.className = 'btn-pay-confirm';
+    btn.disabled = true;
+    if (qrBtn) { qrBtn.style.opacity = '0.5'; qrBtn.style.pointerEvents = 'none'; }
+    return;
+  }
+
+  if (qrBtn) {
+    if (!PAYMENT_QR_ENABLED) { qrBtn.textContent = '📱 付款码已关闭'; qrBtn.style.opacity = '0.5'; qrBtn.style.pointerEvents = 'none'; }
+    else { qrBtn.style.opacity = '1'; qrBtn.style.pointerEvents = 'auto'; }
+  }
+
+  const st = paymentStatusOf(myName);
+  if (st === 'confirmed') {
+    btn.textContent = '✅ 团长已确认';
+    btn.className = 'btn-pay-confirm confirmed';
+    btn.disabled = true;
+  } else if (st === 'self') {
+    btn.textContent = '🟠 已付款(待确认)';
+    btn.className = 'btn-pay-confirm self-confirmed';
+    btn.disabled = false;
+  } else {
+    btn.textContent = '💰 我已完成付款';
+    btn.className = 'btn-pay-confirm';
+    btn.disabled = false;
+  }
+}
+
+// ============ FLUSH ON EXIT ============
+function flushPendingOnExit() {
+  if (!sb || !myName || Object.keys(pendingChanges).length === 0) return;
+  if (isLocked) { savePendingDraft(); return; }
+  savePendingDraft();
+  const rows = Object.entries(pendingChanges).map(([sid, qty]) => ({
+    name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()
+  }));
+  const url = SUPA_URL + '/rest/v1/orders?on_conflict=name,sticker_id';
+  fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'resolution=merge-duplicates'},
+    body: JSON.stringify(rows),
+    keepalive: true
+  }).catch(() => {});
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushPendingOnExit(); });
+window.addEventListener('beforeunload', (e) => {
+  if (Object.keys(pendingChanges).length > 0) { flushPendingOnExit(); e.preventDefault(); e.returnValue = '你有未保存的修改，确定要离开吗？'; }
+});
+window.addEventListener('pagehide', flushPendingOnExit);
 
 // ============ RENDER CARDS ============
 function renderCards() {
@@ -744,12 +974,14 @@ function recalculate() {
   });
   document.getElementById('grandTotal').textContent = gItems > 0 ? '总计 ' + gItems + ' 件 · $' + gUSD.toFixed(2) + ' · \u00A5' + gCNY.toFixed(2) : '';
   updateCards();
+  updatePaymentBtns();
 }
 
 // ============ EVENT HANDLERS ============
 document.getElementById('orderTable').addEventListener('input', function(e) {
   const el = e.target;
   if (!el.matches('input[type="number"]') || !el.dataset.si) return;
+  if (isLocked) return;
   const did = el.dataset.si;
   let v = Math.max(0, parseInt(el.value) || 0);
   // Stock check
@@ -780,6 +1012,7 @@ function showOrderDetail(name) {
 }
 
 function clearMyOrders() {
+  if (isLocked) { alert('已锁单，无法修改'); return; }
   if (!confirm('确定要清空你的所有订单吗？')) return;
   const sids = Object.keys(allOrders[myName] || {});
   delete allOrders[myName]; renderTable(); recalculate(); saveOffline();
@@ -797,6 +1030,7 @@ function clearMyOrders() {
   document.getElementById('stickerGrid').addEventListener('click', function(e) {
     const btn = e.target.closest('.qty-btn');
     if (!btn || !myName) return;
+    if (isLocked) { alert('已锁单，无法修改'); return; }
     const sid = btn.dataset.sid, dir = parseInt(btn.dataset.dir), did = dropId(sid);
     if (!allOrders[myName]) allOrders[myName] = {};
     const cur = allOrders[myName][did] || 0;
@@ -822,6 +1056,8 @@ function clearMyOrders() {
   updateNickDisplay(); restorePendingDraft();
   document.getElementById('rateInput').value = rate;
   renderTable(); recalculate();
+  applyLockState();
+  updatePaymentBtns();
 })();
 </script>
 </body>
