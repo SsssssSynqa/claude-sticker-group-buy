@@ -740,6 +740,26 @@ async function saveActualPaid(memberName, amount) {
   else { updateStatus('已更新 ' + memberName + ' 的实付金额'); }
 }
 
+// ============ ADMIN CLEAR USER ============
+async function adminClearUser(targetName) {
+  if (!sb || !isAdmin(myName)) { alert('只有管理员可以操作'); return; }
+  if (!confirm('确认清空 ' + targetName + ' 的所有掉落订单？')) return;
+  const ords = allOrders[targetName] || {};
+  const deletes = Object.keys(ords).filter(did => did.startsWith('drop_') && ords[did] > 0).map(did =>
+    sb.from('orders').delete().match({name: targetName, sticker_id: did})
+  );
+  // Also clear payment records
+  deletes.push(sb.from('orders').delete().match({name: targetName, sticker_id: 'drop__payment_self'}));
+  deletes.push(sb.from('orders').delete().match({name: targetName, sticker_id: 'drop__payment_leader'}));
+  deletes.push(sb.from('orders').delete().match({name: targetName, sticker_id: 'drop__actual_paid'}));
+  const results = await Promise.all(deletes);
+  const errs = results.filter(r => r.error);
+  if (errs.length) { alert('部分删除失败：' + errs.map(r => r.error.message).join(', ')); }
+  else { alert(targetName + ' 的订单已清空'); }
+  delete allOrders[targetName]; delete allPaySelf[targetName]; delete allPayLeader[targetName]; delete allActualPaid[targetName];
+  renderTable(); recalculate(); saveOffline();
+}
+
 // ============ LOCK ============
 async function toggleLock() {
   if (!sb || !ADMIN_NAMES.includes(myName)) return;
@@ -973,7 +993,8 @@ function renderTable() {
 
     vis.forEach(name => {
       const isMe = name === myName, o = allOrders[name] || {};
-      h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '"><td class="col-idx">' + (seqMap[name]||'') + '</td><td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')">📋</button></td>';
+      const adminClearBtn = (isAdmin(myName) && !isMe) ? ' <button class="order-detail-btn" style="color:#e74c3c" onclick="adminClearUser(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')" title="清空此人订单">🗑</button>' : '';
+      h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '"><td class="col-idx">' + (seqMap[name]||'') + '</td><td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')">📋</button>' + adminClearBtn + '</td>';
       S.forEach(s => {
         const did = dropId(s.id), v = o[did] || 0;
         h += isMe ? '<td><input type="number" min="0" value="' + (v||'') + '" data-si="' + did + '"></td>' : '<td>' + (v||'') + '</td>';
