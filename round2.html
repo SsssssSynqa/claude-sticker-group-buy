@@ -637,6 +637,7 @@ let allShipFeeSelf = {}; // {name: true} — self-confirmed shipping fee paid
 let allShipFeeLeader = {}; // {name: true} — leader-confirmed shipping fee paid
 let allShipped = {}; // {name: true} — leader-confirmed shipped
 let allAddressesCache = {}; // {name: {team, recipient, phone, address}} — for 4/5 团代发总览面板
+let currentAddressTarget = null; // 地址 modal 当前操作对象（null 表示自己填；其他值表示为别人代填，仅 admin/饼饼）
 // Drop 掉落订单数据（只给代发总览面板用，不参与 round2 主统计）
 let allDropOrders = {};      // {name: {sticker_id: qty}} 以 drop_ 开头的贴纸订单
 let allDropActualPaid = {};  // {name: 元} drop__actual_paid
@@ -1994,21 +1995,39 @@ function closePaymentQR() {
 }
 
 // ============ ADDRESS (DROPSHIP TEAMS ONLY) ============
-function openAddressForm() {
-  if (!DROPSHIP_TEAMS.includes(myTeam)) { alert('本团不需要填写地址'); return; }
-  loadMyAddress();
-  document.getElementById('addressOverlay').classList.add('on');
+function openAddressForm(memberName) {
+  // memberName 存在且不等于 myName 时为代填模式（仅 admin/饼饼）
+  const isProxy = memberName && memberName !== myName;
+  if (isProxy && !canViewAllAddresses(myName)) { alert('无权代填他人地址'); return; }
+  const targetName = memberName || myName;
+  const targetTeam = isProxy ? (allTeams[targetName] ?? allDropTeams[targetName]) : myTeam;
+  if (!DROPSHIP_TEAMS.includes(targetTeam)) { alert('该成员不在代发团'); return; }
+  currentAddressTarget = isProxy ? targetName : null;
+  // 更新标题副标题
+  const overlay = document.getElementById('addressOverlay');
+  const title = overlay.querySelector('h3');
+  const subtitle = overlay.querySelector('.pay-qr-leader');
+  if (isProxy) {
+    if (title) title.textContent = '🖊️ 代填收货地址：' + targetName;
+    if (subtitle) subtitle.textContent = '为 ' + targetName + '（团' + targetTeam + '）代填 · 只有管理员、代发方和本人可见';
+  } else {
+    if (title) title.textContent = '📦 填写收货地址';
+    if (subtitle) subtitle.textContent = '代发团专用 · 只有你自己、管理员和代发方可见';
+  }
+  loadAddressFor(targetName);
+  overlay.classList.add('on');
 }
 
 function closeAddressForm() {
   document.getElementById('addressOverlay').classList.remove('on');
   const s = document.getElementById('addrStatus');
   if (s) s.textContent = '';
+  currentAddressTarget = null;
 }
 
-async function loadMyAddress() {
-  if (!sb || !myName) return;
-  const {data, error} = await sb.from('addresses').select('*').eq('name', myName).maybeSingle();
+async function loadAddressFor(name) {
+  if (!sb || !name) return;
+  const {data, error} = await sb.from('addresses').select('*').eq('name', name).maybeSingle();
   if (error) { console.error('Load address failed:', error); return; }
   const r = document.getElementById('addrRecipient');
   const p = document.getElementById('addrPhone');
@@ -2023,10 +2042,15 @@ async function loadMyAddress() {
     if (a) a.value = '';
   }
 }
+async function loadMyAddress() { return loadAddressFor(myName); } // 兼容旧调用
 
 async function saveAddress() {
-  if (!sb || !myName) return;
-  if (!DROPSHIP_TEAMS.includes(myTeam)) { alert('本团不需要填写地址'); return; }
+  if (!sb) return;
+  const targetName = currentAddressTarget || myName;
+  const isProxy = targetName !== myName;
+  if (isProxy && !canViewAllAddresses(myName)) { alert('无权代填他人地址'); return; }
+  const targetTeam = isProxy ? (allTeams[targetName] ?? allDropTeams[targetName]) : myTeam;
+  if (!DROPSHIP_TEAMS.includes(targetTeam)) { alert('该成员不在代发团'); return; }
   const recipient = (document.getElementById('addrRecipient').value || '').trim();
   const phone = (document.getElementById('addrPhone').value || '').trim();
   const address = (document.getElementById('addrAddress').value || '').trim();
@@ -2039,7 +2063,7 @@ async function saveAddress() {
   status.textContent = '保存中...';
   status.style.color = '#999';
   const {error} = await sb.from('addresses').upsert({
-    name: myName, team: myTeam, recipient, phone, address,
+    name: targetName, team: targetTeam, recipient, phone, address,
     updated_at: new Date().toISOString()
   }, {onConflict: 'name'}).select();
   if (error) {
@@ -2047,11 +2071,11 @@ async function saveAddress() {
     status.style.color = '#E74C3C';
     return;
   }
-  status.textContent = '✓ 已保存';
+  status.textContent = isProxy ? ('✓ 已为 ' + targetName + ' 代填') : '✓ 已保存';
   status.style.color = '#2D8B5E';
   setTimeout(() => closeAddressForm(), 1200);
   // 本地同步 cache，立即反映到面板（realtime 到达前）
-  allAddressesCache[myName] = {name: myName, team: myTeam, recipient, phone, address, updated_at: new Date().toISOString()};
+  allAddressesCache[targetName] = {name: targetName, team: targetTeam, recipient, phone, address, updated_at: new Date().toISOString()};
   if (canViewAllAddresses(myName)) renderAllAddresses();
 }
 
@@ -2173,8 +2197,18 @@ function renderAllAddresses() {
       } else {
         const emptyTd = document.createElement('td');
         emptyTd.colSpan = 3;
-        emptyTd.textContent = '暂无地址';
         emptyTd.style.cssText = 'padding:8px 10px;color:#bbb;font-style:italic;text-align:center;background:#FAFAFA';
+        const span = document.createElement('span');
+        span.textContent = '暂无地址';
+        emptyTd.appendChild(span);
+        if (canViewAllAddresses(myName)) {
+          emptyTd.appendChild(document.createTextNode(' '));
+          const btn = document.createElement('button');
+          btn.textContent = '🖊️ 代填';
+          btn.style.cssText = 'margin-left:8px;padding:3px 10px;background:#fff;color:#8B6EAE;border:1px solid #B8A9C9;border-radius:6px;font-size:11px;cursor:pointer;font-style:normal';
+          btn.onclick = (e) => { e.stopPropagation(); openAddressForm(name); };
+          emptyTd.appendChild(btn);
+        }
         tr.appendChild(emptyTd);
       }
 
