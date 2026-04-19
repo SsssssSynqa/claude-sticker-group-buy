@@ -2556,9 +2556,9 @@ function renderTable() {
   S.forEach(s => {
     h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
   });
-  h += '<th>总件数</th><th>USD（预估）</th><th>USD（应付）</th><th>手续费</th><th>关税</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应收</th><th>应退</th>';
+  h += '<th>总件数</th><th>USD（预估）</th><th>USD（应付）</th><th>手续费</th><th>关税</th><th>运费</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应收</th><th>应退</th>';
   if (PAYMENT_FEATURES_ENABLED) {
-    h += '<th class="col-pay">付款</th><th class="col-pay">运费</th><th class="col-pay">发货</th>';
+    h += '<th class="col-pay">付款状态</th><th class="col-pay">运费核实</th><th class="col-pay">发货状态</th>';
   }
   h += '</tr></thead>';
 
@@ -2566,23 +2566,23 @@ function renderTable() {
   // Combined summary rows (pricing uses combined totals across all teams)
   h += '<tr class="s-row r-qty"><td class="col-idx"></td><td class="col-name">总数量</td>';
   S.forEach(s => { h += '<td id="sq-' + s.id + '">0</td>'; });
-  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-price"><td class="col-idx"></td><td class="col-name">单价(¥)</td>';
   S.forEach(s => { h += '<td id="sp-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+  h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
   h += '<tr class="s-row r-total"><td class="col-idx"></td><td class="col-name">该款总价</td>';
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-tax"></td><td id="st-grand-actual"></td><td></td><td></td><td></td><td></td>';
+  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-tax"></td><td id="st-grand-shipfee"></td><td id="st-grand-actual"></td><td></td><td></td><td></td><td></td>';
   if (PAYMENT_FEATURES_ENABLED) h += '<td></td><td></td><td></td>';
   h += '</tr>';
 
-  // 三团汇总 row (grand totals across all teams)
-  h += '<tr class="team-subtotal" style="background:#FFF8F0;font-weight:700"><td class="col-idx"></td><td class="col-name">三团汇总</td>';
+  // 五团汇总 row (grand totals across all teams)
+  h += '<tr class="team-subtotal" style="background:#FFF8F0;font-weight:700"><td class="col-idx"></td><td class="col-name">五团汇总</td>';
   S.forEach(s => { h += '<td id="gtsq-' + s.id + '"></td>'; });
-  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-tax"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refunded"></td><td id="gt-owe"></td><td id="gt-refund"></td>';
-  if (PAYMENT_FEATURES_ENABLED) h += '<td></td><td></td><td></td>';
+  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-tax"></td><td id="gt-shipfee"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refunded"></td><td id="gt-owe"></td><td id="gt-refund"></td>';
+  if (PAYMENT_FEATURES_ENABLED) h += '<td id="gt-pay-stats"></td><td id="gt-shipfee-stats"></td><td id="gt-ship-stats"></td>';
   h += '</tr>';
 
   // Compute global join-order sequence numbers (stable: based on ALL registered users, not just visible ones)
@@ -2608,7 +2608,7 @@ function renderTable() {
     const headerCount = hideEmptyOrders ? visibleNames.length + '/' + g.names.length : '' + g.names.length;
     h += '<tr class="team-header-row' + (isRunawaySection ? ' runaway-header' : '') + '" data-team="' + g.team + '" onclick="toggleTeamCollapse(' + g.team + ')" style="cursor:pointer"><td class="col-idx"></td><td class="col-name"><span class="collapse-arrow" style="display:inline-block;width:14px;margin-right:4px;font-size:10px;color:#8B6EAE">▶</span>' + teamLabel + '（' + headerCount + ' 人）</td>';
     S.forEach(() => { h += '<td></td>'; });
-    h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
+    h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>';
     if (PAYMENT_FEATURES_ENABLED) {
       let teamConfirmed = 0, teamSelfPaid = 0;
       visibleNames.forEach(n => { const ps = paymentStatusOf(n); if (ps === 'confirmed') teamConfirmed++; else if (ps === 'self') teamSelfPaid++; });
@@ -2657,6 +2657,7 @@ function renderTable() {
       h += '<td class="pt-cny" id="pc-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-fee" id="pf-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-tax" id="px-' + personIdx + '">\u2014</td>';
+      h += '<td class="pt-shipfee" id="psf-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-actual" id="pa-' + personIdx + '">\u2014</td>';
       // Actual paid column — editable by team leader / admin only
       const apVal = allActualPaid[name];
@@ -2692,6 +2693,7 @@ function renderTable() {
     h += '<td id="tsc-' + g.team + '"></td>';
     h += '<td id="tsf-' + g.team + '"></td>';
     h += '<td id="tsx-' + g.team + '"></td>';
+    h += '<td id="tsshf-' + g.team + '"></td>';
     h += '<td id="tsa-' + g.team + '"></td>';
     h += '<td id="tsap-' + g.team + '"></td>';
     h += '<td id="tsrf-' + g.team + '"></td>';
@@ -2800,12 +2802,12 @@ function recalculate() {
   cachedStickerData = data;
   // Per-person totals and per-team subtotals
   let personIdx = 0;
-  let gtItems = 0, gtUSD = 0, gtActual = 0, gtCNY = 0, gtFee = 0, gtTax = 0, gtAP = 0, gtRefunded = 0, gtOwe = 0, gtRefund = 0;
+  let gtItems = 0, gtUSD = 0, gtActual = 0, gtCNY = 0, gtFee = 0, gtTax = 0, gtShipfee = 0, gtAP = 0, gtRefunded = 0, gtOwe = 0, gtRefund = 0;
   const gtStickerQty = {};
   S.forEach(s => { gtStickerQty[s.id] = 0; });
 
   teamsData.forEach(g => {
-    let teamItems = 0, teamUSD = 0, teamFee = 0, teamTax = 0, teamActualPaid = 0, teamActualCNY = 0, teamRefunded = 0, teamOwe = 0, teamRefund = 0;
+    let teamItems = 0, teamUSD = 0, teamFee = 0, teamTax = 0, teamShipfee = 0, teamActualPaid = 0, teamActualCNY = 0, teamRefunded = 0, teamOwe = 0, teamRefund = 0;
     const teamStickerQty = {};
     S.forEach(s => { teamStickerQty[s.id] = 0; });
 
@@ -2831,20 +2833,27 @@ function recalculate() {
       // Per-person tax: proportional to their USD share
       const personTax = (taxCNY > 0 && grandUSD > 0 && usd > 0) ? r2(usd / grandUSD * taxCNY) : 0;
       teamTax += personTax;
+      // Per-person shipping fee: 4/5 团有订单的人固定 ¥6.30/单
+      const personShipfee = (DROPSHIP_TEAMS.includes(g.team) && items > 0) ? DROPSHIP_FEE : 0;
+      teamShipfee += personShipfee;
       if (allActualPaid[name] !== undefined) teamActualPaid += allActualPaid[name];
       if (allRefunded[name] !== undefined) teamRefunded += allRefunded[name];
       let personRefund = 0, personOwe = 0;
 
-      // CNY（实际应付）= proportional share of actual SM total × rate, plus fee, plus tax
+      // CNY（实际应付）= proportional share of actual SM total × rate, plus fee, tax, shipfee
       let personActual = 0;
       if (discountRatio > 0 && items > 0) {
         const actualBase = r2(usd * discountRatio * rate);
         const actualFee = r2(actualBase * 0.001);
-        personActual = r2(actualBase + actualFee + personTax);
+        personActual = r2(actualBase + actualFee + personTax + personShipfee);
         teamActualCNY += personActual;
       } else if (items > 0 && personTax > 0) {
-        // No actual USD set yet but tax exists — show estimate + tax
-        personActual = r2(cny + fee + personTax);
+        // 有税但 actualUSD 没录 — 预估 + 税 + 运费
+        personActual = r2(cny + fee + personTax + personShipfee);
+        teamActualCNY += personActual;
+      } else if (items > 0 && personShipfee > 0) {
+        // 4/5 团即使无税且无折扣，也要包含运费
+        personActual = r2(cny + fee + personShipfee);
         teamActualCNY += personActual;
       }
 
@@ -2862,6 +2871,9 @@ function recalculate() {
       if (pfEl) pfEl.textContent = items > 0 ? '\u00A5' + fee.toFixed(2) : '\u2014';
       if (pxEl) pxEl.textContent = personTax > 0 ? '\u00A5' + personTax.toFixed(2) : '\u2014';
       if (pxEl && personTax > 0) pxEl.style.color = '#E74C3C';
+      const psfEl = document.getElementById('psf-' + personIdx);
+      if (psfEl) psfEl.textContent = personShipfee > 0 ? '\u00A5' + personShipfee.toFixed(2) : '\u2014';
+      if (psfEl && personShipfee > 0) psfEl.style.color = '#8B6EAE';
       // 应收/应退 calculation
       const paid = allActualPaid[name] || 0;
       const refunded = allRefunded[name] || 0;
@@ -2910,6 +2922,9 @@ function recalculate() {
     const tsxEl = document.getElementById('tsx-' + g.team);
     if (tsxEl) tsxEl.textContent = teamTax > 0 ? '\u00A5' + teamTax.toFixed(2) : '\u2014';
     if (tsxEl && teamTax > 0) tsxEl.style.color = '#E74C3C';
+    const tsshfEl = document.getElementById('tsshf-' + g.team);
+    if (tsshfEl) tsshfEl.textContent = teamShipfee > 0 ? '\u00A5' + teamShipfee.toFixed(2) : '\u2014';
+    if (tsshfEl && teamShipfee > 0) tsshfEl.style.color = '#8B6EAE';
     const tsapEl = document.getElementById('tsap-' + g.team);
     if (tsapEl && teamActualPaid > 0) tsapEl.innerHTML = '<span style="color:#E8714A">\u00A5' + teamActualPaid.toFixed(2) + '</span>';
     else if (tsapEl) tsapEl.textContent = '\u2014';
@@ -2924,7 +2939,7 @@ function recalculate() {
 
     // Accumulate grand totals
     gtItems += teamItems; gtUSD += teamUSD; gtActual += teamActualCNY;
-    gtCNY += teamCNY; gtFee += teamFee; gtTax += teamTax; gtAP += teamActualPaid; gtRefunded += teamRefunded; gtOwe += teamOwe; gtRefund += teamRefund;
+    gtCNY += teamCNY; gtFee += teamFee; gtTax += teamTax; gtShipfee += teamShipfee; gtAP += teamActualPaid; gtRefunded += teamRefunded; gtOwe += teamOwe; gtRefund += teamRefund;
   });
 
   const grandCNY = r2(grandUSD * rate);
@@ -2944,6 +2959,8 @@ function recalculate() {
   if (sgC) sgC.textContent = actualUSD > 0 ? '$' + actualUSD.toFixed(2) : '\u2014';
   if (sgF) sgF.textContent = '\u00A5' + grandFee.toFixed(2);
   if (sgX) { sgX.textContent = taxCNY > 0 ? '\u00A5' + taxCNY.toFixed(2) : '\u2014'; if (taxCNY > 0) sgX.style.color = '#E74C3C'; }
+  const sgSh = document.getElementById('st-grand-shipfee');
+  if (sgSh) { sgSh.textContent = gtShipfee > 0 ? '\u00A5' + gtShipfee.toFixed(2) : '\u2014'; if (gtShipfee > 0) sgSh.style.color = '#8B6EAE'; }
 
   // Fill 三团汇总 row
   S.forEach(s => {
@@ -2964,6 +2981,8 @@ function recalculate() {
   if (gtfEl) gtfEl.textContent = gtItems > 0 ? '\u00A5' + gtFee.toFixed(2) : '\u2014';
   const gtxEl = document.getElementById('gt-tax');
   if (gtxEl) { gtxEl.textContent = gtTax > 0 ? '\u00A5' + gtTax.toFixed(2) : '\u2014'; if (gtTax > 0) gtxEl.style.color = '#E74C3C'; }
+  const gtShEl = document.getElementById('gt-shipfee');
+  if (gtShEl) { gtShEl.textContent = gtShipfee > 0 ? '\u00A5' + gtShipfee.toFixed(2) : '\u2014'; if (gtShipfee > 0) gtShEl.style.color = '#8B6EAE'; }
   if (gtapEl && gtAP > 0) gtapEl.innerHTML = '<span style="color:#E8714A">\u00A5' + gtAP.toFixed(2) + '</span>';
   else if (gtapEl) gtapEl.textContent = '\u2014';
   const gtrfEl = document.getElementById('gt-refunded');
@@ -2974,6 +2993,59 @@ function recalculate() {
   if (gtowEl && gtOwe > 0) gtowEl.style.color = '#E67E22';
   const gtrEl = document.getElementById('gt-refund');
   if (gtrEl) gtrEl.textContent = gtRefund > 0 ? '\u00A5' + gtRefund.toFixed(2) : '\u2014';
+
+  // 五团汇总：付款/运费核实/发货 全局统计
+  let gtPayC = 0, gtPayS = 0, gtSfC = 0, gtSfS = 0, gtShp = 0, gtVisible = 0;
+  teamsData.forEach(g => {
+    if (g.team === -1) return; // 跑单段不参与付款/发货统计
+    const visibleNames = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
+    gtVisible += visibleNames.length;
+    visibleNames.forEach(n => {
+      const ps = paymentStatusOf(n);
+      if (ps === 'confirmed') gtPayC++; else if (ps === 'self') gtPayS++;
+      const ss = shipFeeStatusOf(n);
+      if (ss === 'confirmed') gtSfC++; else if (ss === 'self') gtSfS++;
+      if (allShipped[n]) gtShp++;
+    });
+  });
+  const fillStats = (elId, c, s, u, ok, self, pending) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.replaceChildren();
+    const addBadge = (sym, n, cls, color) => {
+      if (n <= 0) return;
+      const span = document.createElement('span');
+      span.className = 'pay-stats ' + cls;
+      if (color) span.style.color = color;
+      span.textContent = sym + n;
+      el.appendChild(span);
+      el.appendChild(document.createTextNode(' '));
+    };
+    addBadge(ok, c, 'pay-stats-ok');
+    addBadge(self, s, '', '#E8714A');
+    addBadge(pending, u, 'pay-stats-pending');
+  };
+  fillStats('gt-pay-stats', gtPayC, gtPayS, gtVisible - gtPayC - gtPayS, '\u2705', '\ud83d\udfe0', '\u2b55');
+  fillStats('gt-shipfee-stats', gtSfC, gtSfS, gtVisible - gtSfC - gtSfS, '\u2705', '\ud83d\udfe0', '\u2b55');
+  const gtShipEl = document.getElementById('gt-ship-stats');
+  if (gtShipEl) {
+    gtShipEl.replaceChildren();
+    if (gtShp > 0) {
+      const s1 = document.createElement('span');
+      s1.className = 'pay-stats';
+      s1.style.color = '#2E7D32';
+      s1.textContent = '\ud83d\udce6' + gtShp;
+      gtShipEl.appendChild(s1);
+      gtShipEl.appendChild(document.createTextNode(' '));
+    }
+    const notShp = gtVisible - gtShp;
+    if (notShp > 0) {
+      const s2 = document.createElement('span');
+      s2.className = 'pay-stats pay-stats-pending';
+      s2.textContent = '\u2b55' + notShp;
+      gtShipEl.appendChild(s2);
+    }
+  }
 
   updateCards(data);
 }
