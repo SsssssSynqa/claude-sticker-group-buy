@@ -132,10 +132,11 @@ section{padding:14px}
 .card-price-cny{font-size:11px}
 .qty-btn{width:40px;height:40px;font-size:20px}
 .qty-val{font-size:15px;min-width:40px}
-.pay-action-bar{display:grid;grid-template-columns:1fr;gap:10px;max-width:none}
-.btn-my-export,.btn-pay-qr,.btn-pay-confirm,.btn-pay-addr{width:100%;padding:12px 14px;font-size:13px;line-height:1.35;white-space:normal;text-align:center}
-.table-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.table-controls .btn{width:100%;padding:10px 8px;font-size:12px}
+.pay-action-bar{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;max-width:none}
+.btn-my-export,.btn-pay-qr,.btn-pay-confirm,.btn-pay-addr{padding:11px 10px;font-size:13px;line-height:1.3;text-align:center}
+.table-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:8px}
+.table-controls .btn{width:100%;padding:10px 8px;font-size:12px;white-space:nowrap}
+.table-controls .btn-clear-orders{width:100%;padding:10px 8px;font-size:12px;white-space:nowrap}
 .team-select{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .team-select label{justify-content:center;padding:8px 10px;font-size:13px}
 .qr-section{margin:0 14px 18px;padding:18px 14px}
@@ -232,17 +233,17 @@ section{padding:14px}
 .team-tag{font-size:13px;color:#fff;cursor:pointer;padding:5px 12px;border-radius:8px;background:linear-gradient(135deg,#9B6EAE,#8B5E9E);font-weight:600;box-shadow:0 2px 8px rgba(139,110,174,.3);transition:all .15s;letter-spacing:.3px}
 .team-tag:hover{background:linear-gradient(135deg,#A87EBE,#9B6EAE);transform:translateY(-1px);box-shadow:0 4px 12px rgba(139,110,174,.4)}
 .team-tag::after{content:' ✏️';font-size:11px}
-.pay-action-bar{display:flex;gap:8px;max-width:700px;margin:0 auto 16px;justify-content:center;flex-wrap:wrap}
-.btn-my-export{flex:1;min-width:0;padding:13px 16px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3);transition:all .15s;letter-spacing:.3px;white-space:nowrap}
+.pay-action-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;max-width:700px;margin:0 auto 16px}
+.btn-my-export{min-width:0;padding:13px 14px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3);transition:all .15s;letter-spacing:.3px;line-height:1.3}
 .btn-my-export:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,113,74,.4)}
 .btn-my-export:active{transform:translateY(0)}
-.btn-pay-qr{flex:1;min-width:0;padding:13px 16px;background:#fff;color:var(--primary);border:2px solid var(--primary);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-pay-qr{min-width:0;padding:13px 14px;background:#fff;color:var(--primary);border:2px solid var(--primary);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;line-height:1.3}
 .btn-pay-qr:hover{background:var(--primary-lt);transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,113,74,.2)}
 .btn-pay-qr:active{transform:translateY(0)}
-.btn-pay-addr{flex:1;min-width:0;padding:13px 16px;background:linear-gradient(135deg,#9B6EAE,#8B5E9E);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(139,110,174,.3);transition:all .15s;white-space:nowrap}
+.btn-pay-addr{min-width:0;padding:13px 14px;background:linear-gradient(135deg,#9B6EAE,#8B5E9E);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(139,110,174,.3);transition:all .15s;line-height:1.3}
 .btn-pay-addr:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(139,110,174,.4)}
 .btn-pay-addr:active{transform:translateY(0)}
-.btn-pay-confirm{flex:1;min-width:0;padding:13px 16px;background:linear-gradient(135deg,#5BA87D,#4A9B6F);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(91,168,125,.3);transition:all .15s;white-space:nowrap}
+.btn-pay-confirm{min-width:0;padding:13px 14px;background:linear-gradient(135deg,#5BA87D,#4A9B6F);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(91,168,125,.3);transition:all .15s;line-height:1.3}
 .btn-pay-confirm:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(91,168,125,.4)}
 .btn-pay-confirm:active{transform:translateY(0)}
 .btn-pay-confirm:disabled{opacity:.7;cursor:not-allowed;transform:none}
@@ -393,7 +394,7 @@ section{padding:14px}
       <p style="margin:10px 0 4px"><span class="tag tag-date">4、5 团</span> <strong>走代发</strong>（代发方统一分拣、打包、国内发货）</p>
       <ol>
         <li>锁单付款后，点击页面上的「<strong>📦 填写收货地址</strong>」按钮，填好<strong>收件人姓名 / 手机号 / 完整地址</strong>（省+市+区+街道+门牌号）</li>
-        <li>点击「<strong>📱 查看付款码</strong>」扫码，按页面显示的金额付 <strong>代发运费 ¥6.30/单</strong>（含<strong>分拣费+国内快递</strong>，<span style="color:#E8714A">不含清关费</span>）</li>
+        <li>点击「<strong>📱 查看付款码</strong>」扫码，按页面显示的金额付 <strong>代发运费 ¥6.30/单</strong>（<strong>1kg 以内</strong>，含<strong>分拣费+国内快递</strong>，<span style="color:#E8714A">不含清关费；超重按实际补差，代发方会在群内单独联系</span>）</li>
         <li>付款完成后点击「💰 我已完成付款」标记付款状态</li>
         <li>代发方核实到账后会安排<strong>分拣打包并发货</strong>，发货完成后网站上你的发货状态会更新为 <strong>✅ 已发货</strong></li>
       </ol>
@@ -424,7 +425,7 @@ section{padding:14px}
     <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">进入发货流程</h3>
     <div style="text-align:left;font-size:14px;line-height:1.9;color:#333">
       <p style="margin:0 0 10px"><strong>🧧 1、2、3 团：</strong>走闲鱼补邮费，群内通知，<strong>无需在网站填地址</strong>。</p>
-      <p style="margin:0"><strong>📦 4、5 团：</strong>走代发，在网站<strong>填收货地址</strong>+扫码付 <strong>代发运费 ¥6.30</strong>。清关费另计，按全员占比分摊。</p>
+      <p style="margin:0"><strong>📦 4、5 团：</strong>走代发，在网站<strong>填收货地址</strong>+扫码付 <strong>代发运费 ¥6.30</strong>（1kg 以内，超重补差）。清关费另计，按全员占比分摊。</p>
     </div>
     <button onclick="document.getElementById('reminderOverlay').style.display='none'" style="margin-top:20px;padding:10px 36px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3)">我知道了</button>
   </div>
