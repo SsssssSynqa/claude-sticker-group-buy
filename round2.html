@@ -623,6 +623,7 @@ let globalSeqMap = {}; // {name: globalSequenceNumber}
 let rate = 7.10;
 let actualUSD = 0; // actual SM cart total in USD (set by admin after checkout)
 let cachedGrandUSD = 0;
+let cachedGrandUSDActive = 0; // 非跑单人员的 USD 之和（关税分摊分母）
 let cachedDiscountRatio = 0;
 let cachedStickerData = {}; // {stickerId: {totalQty, unitPrice}}
 let taxCNY = 0; // customs tax total in CNY (set by admin after customs clearance)
@@ -1884,6 +1885,7 @@ function showPaymentQR() {
   // Calculate my total payment amount — reuse ALL cached values from recalculate()
   let myUSD = 0;
   const grandUSD = cachedGrandUSD;
+  const grandUSDActive = cachedGrandUSDActive;
   const discountRatio = cachedDiscountRatio;
   const orders = allOrders[myName] || {};
   S.forEach(s => {
@@ -1895,8 +1897,8 @@ function showPaymentQR() {
   const myFee = r2(myCNY * 0.001);
   const shippingFee = isDropship ? DROPSHIP_FEE : 0;  // 4/5团代发运费 ¥6.3/单
   const myEstTotal = r2(myCNY + myFee + shippingFee);
-  // Actual amounts (with SM multi-design discount + tax)
-  const myTax = (taxCNY > 0 && grandUSD > 0 && myUSD > 0) ? r2(myUSD / grandUSD * taxCNY) : 0;
+  // Actual amounts (with SM multi-design discount + tax) - 跑单者不分摊关税
+  const myTax = (taxCNY > 0 && grandUSDActive > 0 && myUSD > 0 && !isRunaway(myName)) ? r2(myUSD / grandUSDActive * taxCNY) : 0;
   let myActualTotal = 0;
   if (discountRatio > 0 && myUSD > 0) {
     const actualBase = r2(myUSD * discountRatio * rate);
@@ -2798,6 +2800,15 @@ function recalculate() {
   S.forEach(s => { grandUSD += r2(data[s.id].totalQty * data[s.id].unitPrice); });
   const discountRatio = (actualUSD > 0 && grandUSD > 0) ? actualUSD / grandUSD : 0;
   cachedGrandUSD = grandUSD;
+  // 关税分摊分母：扣除跑单人员的 USD（跑单者不分摊关税）
+  let runawayUSD = 0;
+  Object.keys(allOrders).forEach(name => {
+    if (isRunaway(name)) {
+      S.forEach(s => { runawayUSD += r2((allOrders[name][s.id] || 0) * data[s.id].unitPrice); });
+    }
+  });
+  const grandUSDActive = r2(grandUSD - runawayUSD);
+  cachedGrandUSDActive = grandUSDActive;
   cachedDiscountRatio = discountRatio;
   cachedStickerData = data;
   // Per-person totals and per-team subtotals
@@ -2830,8 +2841,8 @@ function recalculate() {
 
       const fee = r2(cny * 0.001); // 0.1% bank transfer fee
       teamFee += fee;
-      // Per-person tax: proportional to their USD share
-      const personTax = (taxCNY > 0 && grandUSD > 0 && usd > 0) ? r2(usd / grandUSD * taxCNY) : 0;
+      // Per-person tax: proportional to their USD share (跑单人员不分摊)
+      const personTax = (taxCNY > 0 && grandUSDActive > 0 && usd > 0 && !isRunaway(name)) ? r2(usd / grandUSDActive * taxCNY) : 0;
       teamTax += personTax;
       // Per-person shipping fee: 4/5 团有订单的人固定 ¥6.30/单
       const personShipfee = (DROPSHIP_TEAMS.includes(g.team) && items > 0) ? DROPSHIP_FEE : 0;
@@ -3109,10 +3120,11 @@ function exportMyOrder() {
   const estCNY = r2(totalUSD * rate);
   const estFee = r2(estCNY * 0.001);
   const estTotal = r2(estCNY + estFee);
-  // Reuse cached values from recalculate()
+  // Reuse cached values from recalculate() - 跑单者不分摊关税
   const grandUSD = cachedGrandUSD;
+  const grandUSDActive = cachedGrandUSDActive;
   const dr = cachedDiscountRatio;
-  const myTax = (taxCNY > 0 && grandUSD > 0 && totalUSD > 0) ? r2(totalUSD / grandUSD * taxCNY) : 0;
+  const myTax = (taxCNY > 0 && grandUSDActive > 0 && totalUSD > 0 && !isRunaway(myName)) ? r2(totalUSD / grandUSDActive * taxCNY) : 0;
   lines.push('', '总件数：' + totalItems);
   if (dr > 0 && totalUSD > 0) {
     const actBase = r2(totalUSD * dr * rate);
@@ -3200,7 +3212,9 @@ function showOrderDetail(name) {
   const dropPaid = allDropActualPaid[name] || 0;
   const dr = cachedDiscountRatio;
   const grandUSD = cachedGrandUSD;
-  const myTax = (taxCNY > 0 && grandUSD > 0 && r2TotalUSD > 0) ? r2(r2TotalUSD / grandUSD * taxCNY) : 0;
+  const grandUSDActive = cachedGrandUSDActive;
+  // 跑单者不分摊关税
+  const myTax = (taxCNY > 0 && grandUSDActive > 0 && r2TotalUSD > 0 && !isRunaway(name)) ? r2(r2TotalUSD / grandUSDActive * taxCNY) : 0;
 
   // 构建 DOM
   const overlay = document.createElement('div');
