@@ -156,12 +156,21 @@ section{padding:14px}
 .od-total{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
 .od-total.main{font-size:15px;font-weight:700;color:var(--primary);padding:8px 0 4px}
 
-.my-row td{background:#FFF8F0 !important}
-.my-row:hover td{background:#FFF3E8 !important}
+/* 折叠状态（默认）：白色干净 */
+.my-row td{background:#fff !important}
+.my-row:hover td{background:#FFFAF5 !important}
 .my-row td.col-name{font-weight:600;color:var(--primary)}
+/* 展开状态：高亮强调 */
+.my-row.expanded td{background:#FFE8D5 !important;box-shadow:inset 0 1px 0 rgba(232,113,74,.15),inset 0 -1px 0 rgba(232,113,74,.15)}
+.my-row.expanded:hover td{background:#FFDCC0 !important}
+.my-row.expanded td.col-name{font-weight:700;border-left:3px solid var(--primary)}
+.my-row.expanded td.col-idx{color:var(--primary);font-weight:700}
 
-.team-header-row td{background:#F0EBF5 !important;color:#8B6EAE;font-weight:700;font-size:13px;padding:8px 6px;border-top:2px solid #D8CCE8}
-.team-header-row td.col-idx,.team-header-row td.col-name{background:#F0EBF5 !important}
+.team-header-row td{background:#F0EBF5 !important;color:#8B6EAE;font-weight:700;font-size:13px;padding:8px 6px;border-top:2px solid #D8CCE8;cursor:pointer}
+.team-header-row td.col-idx,.team-header-row td.col-name{background:#F0EBF5 !important;cursor:pointer}
+.team-header-row:hover td{background:#E8DFEF !important}
+.team-header-row:hover td.col-idx,.team-header-row:hover td.col-name{background:#E8DFEF !important}
+.collapse-arrow{display:inline-block;width:14px;margin-right:4px;font-size:10px;color:#8B6EAE}
 .team-subtotal td{background:#FDF6E3 !important;font-weight:600;font-size:11px;color:#B5960F;border-bottom:2px solid #E8DFC0}
 .team-subtotal td.col-idx,.team-subtotal td.col-name{background:#FDF6E3 !important}
 .team-select{display:flex;gap:16px;justify-content:center;margin-bottom:14px}
@@ -472,8 +481,9 @@ S.forEach(s => { DROP_UNIT_PRICES[s.id] = unitPrice(s, R2_TOTALS[s.id] || 0); })
 let myName = localStorage.getItem('gb2_nickname') || '';
 let myTeam = parseInt(localStorage.getItem('gb2_team')) || 4;
 let allOrders = {}, allTeams = {}, allJoinOrder = {}, globalSeqMap = {};
-let rate = 7.10, sb = null, connected = false, hideEmptyOrders = false, isLocked = false;
+let rate = 7.10, sb = null, connected = false, hideEmptyOrders = true, isLocked = false;
 let renderTimer = null, pendingChanges = {};
+let collapsedTeams = {}; // {team: bool} — true=折叠；未设置时默认折叠（除自己那行 .my-row 会穿透显示）
 const PENDING_DRAFT_KEY = 'drop_pending_changes';
 let allPaySelf = {}, allPayLeader = {}, allActualPaid = {};
 
@@ -991,14 +1001,14 @@ function renderTable() {
     const label = g.team > 0 ? '团' + g.team : '未分组';
     const vis = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
     if (!vis.length) return;
-    h += '<tr class="team-header-row"><td class="col-idx"></td><td class="col-name">' + label + '（' + vis.length + ' 人）</td>';
+    h += '<tr class="team-header-row" data-team="' + g.team + '" onclick="toggleTeamCollapse(' + g.team + ')"><td class="col-idx"></td><td class="col-name"><span class="collapse-arrow">▶</span>' + label + '（' + vis.length + ' 人）</td>';
     S.forEach(() => { h += '<td></td>'; });
     h += '<td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
     vis.forEach(name => {
       const isMe = name === myName, o = allOrders[name] || {};
       const adminClearBtn = (isAdmin(myName) && !isMe) ? ' <button class="order-detail-btn" style="color:#e74c3c" onclick="adminClearUser(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')" title="清空此人订单">🗑</button>' : '';
-      h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '"><td class="col-idx">' + (seqMap[name]||'') + '</td><td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')">📋</button>' + adminClearBtn + '</td>';
+      h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-team="' + g.team + '" data-name="' + esc(name) + '"><td class="col-idx">' + (seqMap[name]||'') + '</td><td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')">📋</button>' + adminClearBtn + '</td>';
       S.forEach(s => {
         const did = dropId(s.id), v = o[did] || 0;
         h += isMe ? '<td><input type="number" min="0" value="' + (v||'') + '" data-si="' + did + '"></td>' : '<td>' + (v||'') + '</td>';
@@ -1029,8 +1039,37 @@ function renderTable() {
   tbl.innerHTML = h;
   if (fSid) { const r = tbl.querySelector('input[data-si="' + fSid + '"]'); if (r) { r.value = fVal; r.focus(); try { r.setSelectionRange(fPos, fPos); } catch(e) {} } }
   document.getElementById('btnHideEmpty').textContent = hideEmptyOrders ? '👁 显示全部' : '👁 隐藏空订单';
+  applyCollapseState();
 }
 function toggleHideEmpty() { hideEmptyOrders = !hideEmptyOrders; renderTable(); recalculate(); }
+
+function isTeamCollapsed(team) {
+  if (team in collapsedTeams) return collapsedTeams[team];
+  // 默认全部团折叠，my-row（自己那行）会穿透 applyCollapseState 的隐藏逻辑保持可见
+  return true;
+}
+
+function toggleTeamCollapse(team) {
+  collapsedTeams[team] = !isTeamCollapsed(team);
+  applyCollapseState();
+}
+
+function applyCollapseState() {
+  // p-row：折叠团的非自己行 display:none；my-row 根据所属团折叠状态切换 expanded class
+  document.querySelectorAll('.p-row[data-team]').forEach(tr => {
+    const team = parseInt(tr.dataset.team);
+    const isMe = tr.classList.contains('my-row');
+    const collapsed = isTeamCollapsed(team);
+    tr.style.display = (collapsed && !isMe) ? 'none' : '';
+    if (isMe) tr.classList.toggle('expanded', !collapsed);
+  });
+  // team-header 上的折叠箭头更新
+  document.querySelectorAll('.team-header-row[data-team]').forEach(tr => {
+    const team = parseInt(tr.dataset.team);
+    const arrow = tr.querySelector('.collapse-arrow');
+    if (arrow) arrow.textContent = isTeamCollapsed(team) ? '▶' : '▼';
+  });
+}
 
 // ============ RECALCULATE ============
 function recalculate() {
