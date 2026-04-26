@@ -539,7 +539,7 @@ async function loadAll() {
   allJoinOrder = joinOrd;
   const {data: settings} = await sb.from('settings').select('*');
   if (settings) for (const s of settings) {
-    if (s.key === 'drop_rate' || s.key === 'r2_rate') rate = parseFloat(s.value) || 7.10;
+    if (s.key === 'drop_rate') rate = parseFloat(s.value) || 7.10;
     if (s.key === 'drop_locked') isLocked = s.value === '1';
   }
 }
