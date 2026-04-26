@@ -450,6 +450,7 @@ section{padding:14px}
     <button class="btn-my-export" onclick="exportMyOrder()">📋 导出我的订单</button>
     <button class="btn-pay-qr" id="btnPayQR" onclick="showPaymentQR()">📱 查看付款码</button>
     <button class="btn-pay-addr" id="btnAddress" onclick="openAddressForm()" style="display:none">📦 填写收货地址</button>
+    <button class="btn-pay-addr" id="btnTracking" onclick="showMyTracking()" style="display:none;background:linear-gradient(135deg,#7CB342,#558B2F);box-shadow:0 4px 12px rgba(124,179,66,.3)">📮 查看快递单号</button>
     <button class="btn-pay-confirm" id="btnPayConfirm" onclick="handlePayBtnClick()">💰 我已完成付款</button>
   </div>
   <div class="table-controls">
@@ -1417,6 +1418,7 @@ function updateNickDisplay() {
   applyRatePermission();
   // Address features: dropship teams button + admin/designated viewer panel
   updateAddressBtn();
+  updateTrackingBtn();
   updateAllAddressesPanel();
 }
 
@@ -2089,6 +2091,47 @@ function updateAddressBtn() {
   btn.style.display = (myName && DROPSHIP_TEAMS.includes(myTeam)) ? '' : 'none';
 }
 
+function updateTrackingBtn() {
+  const btn = document.getElementById('btnTracking');
+  if (!btn) return;
+  btn.style.display = (myName && DROPSHIP_TEAMS.includes(myTeam)) ? '' : 'none';
+}
+
+function showMyTracking() {
+  if (!myName) { alert('请先选择昵称'); return; }
+  if (!DROPSHIP_TEAMS.includes(myTeam)) { alert('1/2/3 团由团长直接发货，无在线快递单号查询'); return; }
+  const addr = allAddressesCache[myName];
+  if (!addr) { alert('你还没填收货地址。请先点「📦 填写收货地址」填好后再来查。'); return; }
+  const tn = (addr.tracking_number || '').trim();
+  if (!tn) {
+    alert('📮 团长还没填你的快递单号，请耐心等等～\n\n你的收件信息：\n收件人：' + (addr.recipient || '') + '\n手机：' + (addr.phone || '') + '\n地址：' + (addr.address || ''));
+    return;
+  }
+  const shippedTag = allShipped[myName] ? '✅ 已发货\n\n' : '⏳ 单号已填，发货状态待团长确认\n\n';
+  alert('📮 你的快递信息\n\n' + shippedTag + '快递单号：' + tn + '\n\n收件人：' + (addr.recipient || '') + '\n手机：' + (addr.phone || '') + '\n地址：' + (addr.address || ''));
+}
+
+async function saveTracking(targetName, value) {
+  if (!sb) { alert('未连接到数据库'); return; }
+  if (!canViewAllAddresses(myName)) { alert('仅 admin/饼饼可填快递单号'); return; }
+  const v = (value || '').trim();
+  // 先确保 addresses 行存在（如果该用户还没地址行，不能upsert tracking_number）
+  const existing = allAddressesCache[targetName];
+  if (!existing) { alert('该用户还没填地址，请先代填地址再填单号'); return; }
+  const team = existing.team || allTeams[targetName] || null;
+  try {
+    const {error} = await sb.from('addresses').upsert(
+      {name: targetName, team, recipient: existing.recipient, phone: existing.phone, address: existing.address, tracking_number: v || null, updated_at: new Date().toISOString()},
+      {onConflict: 'name'}
+    );
+    if (error) throw error;
+    allAddressesCache[targetName] = {...existing, tracking_number: v || null};
+  } catch(e) {
+    console.error('saveTracking failed:', e);
+    alert('保存失败：' + e.message);
+  }
+}
+
 async function loadAllAddressesCache() {
   if (!sb) return;
   const {data, error} = await sb.from('addresses').select('*');
@@ -2150,7 +2193,7 @@ function renderAllAddresses() {
 
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
-    ['#', '昵称', '收件人', '手机', '地址', '运费', '发货'].forEach(h => {
+    ['#', '昵称', '收件人', '手机', '地址', '快递单号', '运费', '发货'].forEach(h => {
       const th = document.createElement('th');
       th.textContent = h;
       th.style.cssText = 'padding:8px 10px;background:#F0EBF5;color:#8B6EAE;text-align:left;border-bottom:1px solid var(--border);font-weight:600;white-space:nowrap';
@@ -2215,6 +2258,37 @@ function renderAllAddresses() {
         }
         tr.appendChild(emptyTd);
       }
+
+      // 快递单号 (admin/饼饼 可编辑;input 失焦保存)
+      const trackTd = document.createElement('td');
+      trackTd.style.cssText = 'padding:8px 10px;white-space:nowrap';
+      const trackInput = document.createElement('input');
+      trackInput.type = 'text';
+      trackInput.placeholder = '未填';
+      trackInput.value = (allAddressesCache[name] && allAddressesCache[name].tracking_number) || '';
+      trackInput.style.cssText = 'width:140px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:monospace;background:#fff';
+      trackInput.disabled = !allAddressesCache[name] || !canViewAllAddresses(myName);
+      if (allAddressesCache[name] && trackInput.value) {
+        trackInput.style.background = '#F3F8E8';
+        trackInput.style.borderColor = '#B5CC8E';
+      }
+      let lastSaved = trackInput.value;
+      trackInput.addEventListener('blur', async () => {
+        const v = trackInput.value.trim();
+        if (v === lastSaved) return;
+        await saveTracking(name, v);
+        lastSaved = v;
+        if (v) {
+          trackInput.style.background = '#F3F8E8';
+          trackInput.style.borderColor = '#B5CC8E';
+        } else {
+          trackInput.style.background = '#fff';
+          trackInput.style.borderColor = 'var(--border)';
+        }
+      });
+      trackInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') trackInput.blur(); });
+      trackTd.appendChild(trackInput);
+      tr.appendChild(trackTd);
 
       // 运费 badge (只读)
       const feeTd = document.createElement('td');
