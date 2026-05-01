@@ -3300,9 +3300,12 @@ function exportMyOrder() {
   } else {
     lines.push(...details);
   }
+  const isDropship = DROPSHIP_TEAMS.includes(myTeam);
+  const shippingFee = isDropship ? DROPSHIP_FEE : 0;
+  const myPackingFee = packingFeeFor(myName);
   const estCNY = r2(totalUSD * rate);
   const estFee = r2(estCNY * 0.001);
-  const estTotal = r2(estCNY + estFee);
+  const estTotal = r2(estCNY + estFee + shippingFee + myPackingFee);
   // Reuse cached values from recalculate() - 跑单者不分摊关税
   const grandUSD = cachedGrandUSD;
   const grandUSDActive = cachedGrandUSDActive;
@@ -3312,8 +3315,13 @@ function exportMyOrder() {
   if (dr > 0 && totalUSD > 0) {
     const actBase = r2(totalUSD * dr * rate);
     const actFee = r2(actBase * 0.001);
-    const actTotal = r2(actBase + actFee + myTax);
-    lines.push('CNY（实际应付）：¥' + actTotal.toFixed(2) + '（含0.1%手续费' + (myTax > 0 ? ' + 关税¥' + myTax.toFixed(2) : '') + '）');
+    const actTotal = r2(actBase + actFee + myTax + shippingFee + myPackingFee);
+    let payLabel = 'CNY（实际应付）：¥' + actTotal.toFixed(2) + '（含0.1%手续费';
+    if (myTax > 0) payLabel += ' + 关税¥' + myTax.toFixed(2);
+    if (shippingFee > 0) payLabel += ' + 代发运费¥' + shippingFee.toFixed(2);
+    if (myPackingFee > 0) payLabel += ' + 包材费¥' + myPackingFee.toFixed(2);
+    payLabel += '）';
+    lines.push(payLabel);
     // 应收/应退
     const paid = allActualPaid[myName] || 0;
     const refunded = allRefunded[myName] || 0;
