@@ -531,7 +531,7 @@ const TEAM_LEADERS = {1: '豆沙', 2: 'Mori', 3: 'G', 4: 'シンヤ_r2', 5: '鹅
 const TEAM_QR = {4: 'r2-pay-4.png', 5: 'r2-pay-5.png'}; // 1-3团线下结算不需要付款码
 const ROUND2_TEAMS = [1, 2, 3, 4, 5];
 const DROPSHIP_TEAMS = [4, 5];   // 走代发的团，需要填地址 + 加运费
-const DROPSHIP_FEE = 6.3;        // 代发分拣+运费（¥/单）
+const DROPSHIP_FEE = 8.75;       // 代发运费基础（¥/单,含首程分摊）+ 北京上海+1 + 新疆西藏+13
 const PAYMENT_FEATURES_ENABLED = true;
 const PAYMENT_QR_ENABLED = true; // 4/5团代发运费开放线上收款
 
@@ -796,6 +796,7 @@ function handleAddressEvent(payload) {
     allAddressesCache[payload.new.name] = payload.new;
   }
   scheduleRenderAllAddresses();
+  recalculate(); // 地址变化可能影响 4/5 团代发运费的偏远附加
 }
 
 function handleOrderEvent(payload) {
@@ -1162,6 +1163,16 @@ function packingFeeFor(name) {
   });
   if (teamSumUSD <= 0) return 0;
   return r2(totalFee * mySumUSD / teamSumUSD);
+}
+
+// 4/5 团代发运费的偏远地区附加（按地址字符串判定）
+function dropshipExtraFor(name) {
+  if (!DROPSHIP_TEAMS.includes(allTeams[name])) return 0;
+  const addr = (allAddressesCache[name] && allAddressesCache[name].address) || '';
+  if (!addr) return 0;
+  if (addr.includes('新疆') || addr.includes('西藏')) return 13;
+  if (addr.includes('北京') || addr.includes('上海')) return 1;
+  return 0;
 }
 
 // ============ LOCK ============
@@ -1983,7 +1994,8 @@ function showPaymentQR() {
   // Estimated amounts (no discount)
   const myCNY = r2(myUSD * rate);
   const myFee = r2(myCNY * 0.001);
-  const shippingFee = isDropship ? DROPSHIP_FEE : 0;  // 4/5团代发运费 ¥6.3/单
+  const shipExtra = isDropship ? dropshipExtraFor(myName) : 0;  // 北京上海+1 / 新疆西藏+13
+  const shippingFee = isDropship ? r2(DROPSHIP_FEE + shipExtra) : 0;  // 4/5团代发运费 ¥8.75/单 + 偏远附加
   const myPackingFee = packingFeeFor(myName); // 1/2/3团包材费分摊
   const myEstTotal = r2(myCNY + myFee + shippingFee + myPackingFee);
   // Actual amounts (with SM multi-design discount + tax) - 跑单者不分摊关税
@@ -2057,7 +2069,7 @@ function showPaymentQR() {
         // Not paid yet — show full actual amount
         amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
           + '你需要转账：<span style="font-size:20px">\u00A5' + myActualTotal.toFixed(2) + '</span>'
-          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付（含0.1%手续费' + (myTax > 0 ? ' + 关税¥' + myTax.toFixed(2) : '') + (shippingFee > 0 ? ' + 代发运费¥' + shippingFee.toFixed(2) : '') + (myPackingFee > 0 ? ' + 包材费¥' + myPackingFee.toFixed(2) : '') + '），已折算SM多款折扣</div>'
+          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付（含0.1%手续费' + (myTax > 0 ? ' + 关税¥' + myTax.toFixed(2) : '') + (shippingFee > 0 ? ' + 代发运费¥' + DROPSHIP_FEE.toFixed(2) + (shipExtra > 0 ? ' + 偏远附加¥' + shipExtra.toFixed(2) : '') : '') + (myPackingFee > 0 ? ' + 包材费¥' + myPackingFee.toFixed(2) : '') + '），已折算SM多款折扣</div>'
           + '<div style="font-size:11px;font-weight:400;color:#bbb;margin-top:2px">原预估 \u00A5' + myEstTotal.toFixed(2) + '</div>'
           + '</div>';
       }
@@ -2065,7 +2077,7 @@ function showPaymentQR() {
       // No actual USD set yet, show estimate
       amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
         + '预估转账金额：<span style="font-size:20px">\u00A5' + myEstTotal.toFixed(2) + '</span>'
-        + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">预估金额（含0.1%手续费' + (shippingFee > 0 ? ' + 代发运费¥' + shippingFee.toFixed(2) : '') + (myPackingFee > 0 ? ' + 包材费¥' + myPackingFee.toFixed(2) : '') + '），实际金额待团长确认</div>'
+        + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">预估金额（含0.1%手续费' + (shippingFee > 0 ? ' + 代发运费¥' + DROPSHIP_FEE.toFixed(2) + (shipExtra > 0 ? ' + 偏远附加¥' + shipExtra.toFixed(2) : '') : '') + (myPackingFee > 0 ? ' + 包材费¥' + myPackingFee.toFixed(2) : '') + '），实际金额待团长确认</div>'
         + '</div>';
     }
   } else {
@@ -3011,7 +3023,7 @@ function recalculate() {
       const personTax = (taxCNY > 0 && grandUSDActive > 0 && usd > 0 && !isRunaway(name)) ? r2(usd / grandUSDActive * taxCNY) : 0;
       teamTax += personTax;
       // Per-person shipping fee: 4/5 团有订单的人固定 ¥6.30/单
-      const personShipfee = (DROPSHIP_TEAMS.includes(g.team) && items > 0) ? DROPSHIP_FEE : 0;
+      const personShipfee = (DROPSHIP_TEAMS.includes(g.team) && items > 0) ? r2(DROPSHIP_FEE + dropshipExtraFor(name)) : 0;
       teamShipfee += personShipfee;
       // Per-person packing fee: 1/2/3 团按订单 USD 比例分摊该团总包材费
       const personPackfee = (items > 0) ? packingFeeFor(name) : 0;
@@ -3301,7 +3313,8 @@ function exportMyOrder() {
     lines.push(...details);
   }
   const isDropship = DROPSHIP_TEAMS.includes(myTeam);
-  const shippingFee = isDropship ? DROPSHIP_FEE : 0;
+  const shipExtra = isDropship ? dropshipExtraFor(myName) : 0;
+  const shippingFee = isDropship ? r2(DROPSHIP_FEE + shipExtra) : 0;
   const myPackingFee = packingFeeFor(myName);
   const estCNY = r2(totalUSD * rate);
   const estFee = r2(estCNY * 0.001);
@@ -3318,7 +3331,10 @@ function exportMyOrder() {
     const actTotal = r2(actBase + actFee + myTax + shippingFee + myPackingFee);
     let payLabel = 'CNY（实际应付）：¥' + actTotal.toFixed(2) + '（含0.1%手续费';
     if (myTax > 0) payLabel += ' + 关税¥' + myTax.toFixed(2);
-    if (shippingFee > 0) payLabel += ' + 代发运费¥' + shippingFee.toFixed(2);
+    if (shippingFee > 0) {
+      payLabel += ' + 代发运费¥' + DROPSHIP_FEE.toFixed(2);
+      if (shipExtra > 0) payLabel += ' + 偏远附加¥' + shipExtra.toFixed(2);
+    }
     if (myPackingFee > 0) payLabel += ' + 包材费¥' + myPackingFee.toFixed(2);
     payLabel += '）';
     lines.push(payLabel);
@@ -3530,7 +3546,7 @@ function showOrderDetail(name) {
     if (dr > 0 && r2TotalUSD > 0) {
       const actBase = r2(r2TotalUSD * dr * rate);
       const actFee = r2(actBase * 0.001);
-      const shippingFee = DROPSHIP_TEAMS.includes(teamNum) ? DROPSHIP_FEE : 0;
+      const shippingFee = DROPSHIP_TEAMS.includes(teamNum) ? r2(DROPSHIP_FEE + dropshipExtraFor(name)) : 0;
       const myPackFee = packingFeeFor(name);
       const actTotal = r2(actBase + actFee + myTax + shippingFee + myPackFee);
       addRow(footer, '实际应付', '\u00a5' + actTotal.toFixed(2), {main: true});
