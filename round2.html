@@ -353,6 +353,7 @@ section{padding:14px}
     <label id="rateLabel">汇率 1 USD = <input type="number" class="s-input" id="rateInput" step="0.01" min="0"> CNY</label><button class="btn-rate-save" id="btnRateSave" onclick="saveRate()">💾 保存</button>
     <span id="actualUsdWrap" style="display:none;margin-left:4px;background:#FDF6E3;border:1px solid #E8C84A;border-radius:8px;padding:3px 10px;align-items:center;gap:5px"><label style="font-size:13px">实际USD = <input type="number" class="s-input" id="actualUsdInput" step="0.01" min="0" placeholder="SM总价" style="width:100px"></label><button id="btnActualUsdSave" onclick="saveActualUSD()" style="display:none;padding:3px 10px;background:#E8C84A;color:#3D3D3D;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:4px">💾 保存</button></span>
     <span id="taxCnyWrap" style="display:none;margin-left:4px;background:#FDEAEA;border:1px solid #E74C3C;border-radius:8px;padding:3px 10px;align-items:center;gap:5px"><label style="font-size:13px">关税 ¥ <input type="number" class="s-input" id="taxCnyInput" step="0.01" min="0" placeholder="总税额" style="width:100px"></label><button id="btnTaxCnySave" onclick="saveTaxCNY()" style="display:none;padding:3px 10px;background:#E74C3C;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:4px">💾 保存</button></span>
+    <span id="packingFeeWrap" style="display:none;margin-left:4px;background:#F0EBF5;border:1px solid #B8A9C9;border-radius:8px;padding:3px 10px;align-items:center;gap:6px;flex-wrap:wrap"><label style="font-size:13px;color:#8B6EAE;font-weight:600">📦包材费</label><label style="font-size:12px">1团¥<input type="number" class="s-input" id="packingFeeT1Input" step="0.01" min="0" placeholder="0" style="width:62px"></label><label style="font-size:12px">2团¥<input type="number" class="s-input" id="packingFeeT2Input" step="0.01" min="0" placeholder="0" style="width:62px"></label><label style="font-size:12px">3团¥<input type="number" class="s-input" id="packingFeeT3Input" step="0.01" min="0" placeholder="0" style="width:62px"></label><button id="btnPackingFeeSave" onclick="savePackingFees()" style="display:none;padding:3px 10px;background:#8B6EAE;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">💾 保存</button></span>
     <span class="grand-total" id="grandTotal"></span>
     <span class="last-saved" id="lastSaved"></span>
   </div>
@@ -625,6 +626,7 @@ let allJoinOrder = {}; // {name: minRecordId} — for global join sequence
 let globalSeqMap = {}; // {name: globalSequenceNumber}
 let rate = 7.10;
 let actualUSD = 0; // actual SM cart total in USD (set by admin after checkout)
+let packingFeeT1 = 0, packingFeeT2 = 0, packingFeeT3 = 0; // 1/2/3团包材费总额(¥),按订单金额比例摊给团内成员
 let cachedGrandUSD = 0;
 let cachedGrandUSDActive = 0; // 非跑单人员的 USD 之和（关税分摊分母）
 let cachedDiscountRatio = 0;
@@ -762,6 +764,9 @@ async function loadAll() {
       if (s.key === 'r2_locked') isLocked = s.value === '1';
       if (s.key === 'r2_actual_usd') actualUSD = parseFloat(s.value) || 0;
       if (s.key === 'r2_tax_cny') taxCNY = parseFloat(s.value) || 0;
+      if (s.key === 'r2_packing_fee_t1') packingFeeT1 = parseFloat(s.value) || 0;
+      if (s.key === 'r2_packing_fee_t2') packingFeeT2 = parseFloat(s.value) || 0;
+      if (s.key === 'r2_packing_fee_t3') packingFeeT3 = parseFloat(s.value) || 0;
     }
   }
 }
@@ -926,6 +931,21 @@ function handleSettingsEvent(payload) {
     document.getElementById('taxCnyInput').value = taxCNY || '';
     recalculate();
     saveOffline();
+  }
+  if (payload.new.key === 'r2_packing_fee_t1') {
+    packingFeeT1 = parseFloat(payload.new.value) || 0;
+    const inp = document.getElementById('packingFeeT1Input'); if (inp) inp.value = packingFeeT1 || '';
+    recalculate(); saveOffline();
+  }
+  if (payload.new.key === 'r2_packing_fee_t2') {
+    packingFeeT2 = parseFloat(payload.new.value) || 0;
+    const inp = document.getElementById('packingFeeT2Input'); if (inp) inp.value = packingFeeT2 || '';
+    recalculate(); saveOffline();
+  }
+  if (payload.new.key === 'r2_packing_fee_t3') {
+    packingFeeT3 = parseFloat(payload.new.value) || 0;
+    const inp = document.getElementById('packingFeeT3Input'); if (inp) inp.value = packingFeeT3 || '';
+    recalculate(); saveOffline();
   }
 }
 
@@ -1092,6 +1112,58 @@ async function saveTaxCNY() {
   }
 }
 
+async function savePackingFees() {
+  if (!sb) return;
+  const canEdit = isAdmin(myName) || [1,2,3].some(t => TEAM_LEADERS[t] === myName);
+  if (!canEdit) { alert('只有管理员或 1/2/3 团团长可以设置包材费'); return; }
+  const v1 = parseFloat(document.getElementById('packingFeeT1Input').value) || 0;
+  const v2 = parseFloat(document.getElementById('packingFeeT2Input').value) || 0;
+  const v3 = parseFloat(document.getElementById('packingFeeT3Input').value) || 0;
+  const saveBtn = document.getElementById('btnPackingFeeSave');
+  if (saveBtn) { saveBtn.textContent = '保存中...'; saveBtn.style.pointerEvents = 'none'; }
+  try {
+    const now = new Date().toISOString();
+    await sb.from('settings').upsert([
+      {key: 'r2_packing_fee_t1', value: String(v1), updated_at: now},
+      {key: 'r2_packing_fee_t2', value: String(v2), updated_at: now},
+      {key: 'r2_packing_fee_t3', value: String(v3), updated_at: now}
+    ], {onConflict: 'key'});
+    packingFeeT1 = v1; packingFeeT2 = v2; packingFeeT3 = v3;
+    recalculate();
+    saveOffline();
+    if (saveBtn) { saveBtn.textContent = '✅ 已保存'; saveBtn.classList.remove('unsaved'); }
+    setTimeout(() => { if (saveBtn) { saveBtn.textContent = '💾 保存'; saveBtn.style.pointerEvents = ''; } }, 1500);
+  } catch(e) {
+    console.error('Packing fee save failed:', e);
+    alert('保存失败：' + e.message);
+    if (saveBtn) { saveBtn.textContent = '💾 保存'; saveBtn.style.pointerEvents = ''; }
+  }
+}
+
+// 计算某人的包材费分摊（按团内订单 USD 比例平分该团总包材费）
+function packingFeeFor(name) {
+  const team = allTeams[name];
+  if (![1,2,3].includes(team)) return 0;
+  const totalFee = team === 1 ? packingFeeT1 : team === 2 ? packingFeeT2 : packingFeeT3;
+  if (!totalFee || totalFee <= 0) return 0;
+  const data = cachedStickerData;
+  if (!data || Object.keys(data).length === 0) return 0;
+  let teamSumUSD = 0, mySumUSD = 0;
+  Object.keys(allOrders).forEach(n => {
+    if (allTeams[n] !== team) return;
+    const orders = allOrders[n] || {};
+    let usd = 0;
+    S.forEach(s => {
+      const q = orders[s.id] || 0;
+      if (data[s.id]) usd += r2(q * data[s.id].unitPrice);
+    });
+    teamSumUSD += usd;
+    if (n === name) mySumUSD = usd;
+  });
+  if (teamSumUSD <= 0) return 0;
+  return r2(totalFee * mySumUSD / teamSumUSD);
+}
+
 // ============ LOCK ============
 async function toggleLock() {
   if (!sb || !ADMIN_NAMES.includes(myName)) return;
@@ -1160,7 +1232,7 @@ function applyLockState() {
 
 // ============ OFFLINE FALLBACK ============
 function saveOffline() {
-  try { localStorage.setItem('gb2_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader, allActualPaid, actualUSD, taxCNY, allShipFeeSelf, allShipFeeLeader, allShipped})); } catch(e) {}
+  try { localStorage.setItem('gb2_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader, allActualPaid, actualUSD, taxCNY, packingFeeT1, packingFeeT2, packingFeeT3, allShipFeeSelf, allShipFeeLeader, allShipped})); } catch(e) {}
 }
 
 function savePendingDraft() {
@@ -1194,7 +1266,7 @@ function restorePendingDraft() {
 function loadOffline() {
   try {
     const d = JSON.parse(localStorage.getItem('gb2_cache'));
-    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; allActualPaid = d.allActualPaid || {}; actualUSD = d.actualUSD || 0; taxCNY = d.taxCNY || 0; allShipFeeSelf = d.allShipFeeSelf || {}; allShipFeeLeader = d.allShipFeeLeader || {}; allShipped = d.allShipped || {}; }
+    if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 6.90; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; allActualPaid = d.allActualPaid || {}; actualUSD = d.actualUSD || 0; taxCNY = d.taxCNY || 0; packingFeeT1 = d.packingFeeT1 || 0; packingFeeT2 = d.packingFeeT2 || 0; packingFeeT3 = d.packingFeeT3 || 0; allShipFeeSelf = d.allShipFeeSelf || {}; allShipFeeLeader = d.allShipFeeLeader || {}; allShipped = d.allShipped || {}; }
   } catch(e) {}
 }
 
@@ -1443,6 +1515,18 @@ function applyRatePermission() {
   if (taxBtn) taxBtn.style.display = canEdit ? 'inline-block' : 'none';
   const taxInput = document.getElementById('taxCnyInput');
   if (taxInput && taxCNY > 0) taxInput.value = taxCNY;
+  // Show packing fee inputs for admin or any of 1/2/3 team leaders
+  const canEditPacking = canEdit || [1,2,3].some(t => TEAM_LEADERS[t] === myName);
+  const pfWrap = document.getElementById('packingFeeWrap');
+  const pfBtn = document.getElementById('btnPackingFeeSave');
+  if (pfWrap) pfWrap.style.display = canEditPacking ? 'inline-flex' : 'none';
+  if (pfBtn) pfBtn.style.display = canEditPacking ? 'inline-block' : 'none';
+  const pf1 = document.getElementById('packingFeeT1Input');
+  const pf2 = document.getElementById('packingFeeT2Input');
+  const pf3 = document.getElementById('packingFeeT3Input');
+  if (pf1) { pf1.value = packingFeeT1 || ''; pf1.disabled = !canEditPacking; }
+  if (pf2) { pf2.value = packingFeeT2 || ''; pf2.disabled = !canEditPacking; }
+  if (pf3) { pf3.value = packingFeeT3 || ''; pf3.disabled = !canEditPacking; }
 }
 
 async function changePin() {
@@ -1900,19 +1984,23 @@ function showPaymentQR() {
   const myCNY = r2(myUSD * rate);
   const myFee = r2(myCNY * 0.001);
   const shippingFee = isDropship ? DROPSHIP_FEE : 0;  // 4/5团代发运费 ¥6.3/单
-  const myEstTotal = r2(myCNY + myFee + shippingFee);
+  const myPackingFee = packingFeeFor(myName); // 1/2/3团包材费分摊
+  const myEstTotal = r2(myCNY + myFee + shippingFee + myPackingFee);
   // Actual amounts (with SM multi-design discount + tax) - 跑单者不分摊关税
   const myTax = (taxCNY > 0 && grandUSDActive > 0 && myUSD > 0 && !isRunaway(myName)) ? r2(myUSD / grandUSDActive * taxCNY) : 0;
   let myActualTotal = 0;
   if (discountRatio > 0 && myUSD > 0) {
     const actualBase = r2(myUSD * discountRatio * rate);
     const actualFee = r2(actualBase * 0.001);
-    myActualTotal = r2(actualBase + actualFee + myTax + shippingFee);
+    myActualTotal = r2(actualBase + actualFee + myTax + shippingFee + myPackingFee);
   } else if (myUSD > 0 && myTax > 0) {
-    myActualTotal = r2(myCNY + myFee + myTax + shippingFee);
+    myActualTotal = r2(myCNY + myFee + myTax + shippingFee + myPackingFee);
   } else if (myUSD > 0 && shippingFee > 0) {
     // 4/5团即使没税也要显示运费作为应付
-    myActualTotal = r2(myCNY + myFee + shippingFee);
+    myActualTotal = r2(myCNY + myFee + shippingFee + myPackingFee);
+  } else if (myUSD > 0 && myPackingFee > 0) {
+    // 1/2/3团仅有包材费、无折扣无税时也作为应付显示
+    myActualTotal = r2(myCNY + myFee + myPackingFee);
   }
 
   document.getElementById('payQrTitle').textContent = isDropship ? ('团' + team + ' 付款码') : ('团' + team + ' 结算');
@@ -1969,7 +2057,7 @@ function showPaymentQR() {
         // Not paid yet — show full actual amount
         amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
           + '你需要转账：<span style="font-size:20px">\u00A5' + myActualTotal.toFixed(2) + '</span>'
-          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付（含0.1%手续费' + (myTax > 0 ? ' + 关税¥' + myTax.toFixed(2) : '') + (shippingFee > 0 ? ' + 代发运费¥' + shippingFee.toFixed(2) : '') + '），已折算SM多款折扣</div>'
+          + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付（含0.1%手续费' + (myTax > 0 ? ' + 关税¥' + myTax.toFixed(2) : '') + (shippingFee > 0 ? ' + 代发运费¥' + shippingFee.toFixed(2) : '') + (myPackingFee > 0 ? ' + 包材费¥' + myPackingFee.toFixed(2) : '') + '），已折算SM多款折扣</div>'
           + '<div style="font-size:11px;font-weight:400;color:#bbb;margin-top:2px">原预估 \u00A5' + myEstTotal.toFixed(2) + '</div>'
           + '</div>';
       }
@@ -1977,7 +2065,7 @@ function showPaymentQR() {
       // No actual USD set yet, show estimate
       amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
         + '预估转账金额：<span style="font-size:20px">\u00A5' + myEstTotal.toFixed(2) + '</span>'
-        + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">预估金额（含0.1%手续费' + (shippingFee > 0 ? ' + 代发运费¥' + shippingFee.toFixed(2) : '') + '），实际金额待团长确认</div>'
+        + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">预估金额（含0.1%手续费' + (shippingFee > 0 ? ' + 代发运费¥' + shippingFee.toFixed(2) : '') + (myPackingFee > 0 ? ' + 包材费¥' + myPackingFee.toFixed(2) : '') + '），实际金额待团长确认</div>'
         + '</div>';
     }
   } else {
@@ -2634,7 +2722,7 @@ function renderTable() {
   S.forEach(s => {
     h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>';
   });
-  h += '<th>总件数</th><th>USD（预估）</th><th>USD（应付）</th><th>手续费</th><th>关税</th><th>运费</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应收</th><th>应退</th>';
+  h += '<th>总件数</th><th>USD（预估）</th><th>USD（应付）</th><th>手续费</th><th>关税</th><th>运费</th><th>包材费</th><th>CNY（实际应付）</th><th>实付</th><th>已退</th><th>应收</th><th>应退</th>';
   if (PAYMENT_FEATURES_ENABLED) {
     h += '<th class="col-pay">付款状态</th><th class="col-pay">运费核实</th><th class="col-pay">发货状态</th>';
   }
@@ -2652,14 +2740,14 @@ function renderTable() {
 
   h += '<tr class="s-row r-total"><td class="col-idx"></td><td class="col-name">该款总价</td>';
   S.forEach(s => { h += '<td id="st-' + s.id + '">\u2014</td>'; });
-  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-tax"></td><td id="st-grand-shipfee"></td><td id="st-grand-actual"></td><td></td><td></td><td></td><td></td>';
+  h += '<td></td><td id="st-grand-usd"></td><td id="st-grand-cny"></td><td id="st-grand-fee"></td><td id="st-grand-tax"></td><td id="st-grand-shipfee"></td><td id="st-grand-packfee"></td><td id="st-grand-actual"></td><td></td><td></td><td></td><td></td>';
   if (PAYMENT_FEATURES_ENABLED) h += '<td></td><td></td><td></td>';
   h += '</tr>';
 
   // 五团汇总 row (grand totals across all teams)
   h += '<tr class="team-subtotal" style="background:#FFF8F0;font-weight:700"><td class="col-idx"></td><td class="col-name">五团汇总</td>';
   S.forEach(s => { h += '<td id="gtsq-' + s.id + '"></td>'; });
-  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-tax"></td><td id="gt-shipfee"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refunded"></td><td id="gt-owe"></td><td id="gt-refund"></td>';
+  h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-tax"></td><td id="gt-shipfee"></td><td id="gt-packfee"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refunded"></td><td id="gt-owe"></td><td id="gt-refund"></td>';
   if (PAYMENT_FEATURES_ENABLED) h += '<td id="gt-pay-stats"></td><td id="gt-shipfee-stats"></td><td id="gt-ship-stats"></td>';
   h += '</tr>';
 
@@ -2736,6 +2824,7 @@ function renderTable() {
       h += '<td class="pt-fee" id="pf-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-tax" id="px-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-shipfee" id="psf-' + personIdx + '">\u2014</td>';
+      h += '<td class="pt-packfee" id="ppk-' + personIdx + '">\u2014</td>';
       h += '<td class="pt-actual" id="pa-' + personIdx + '">\u2014</td>';
       // Actual paid column — editable by team leader / admin only
       const apVal = allActualPaid[name];
@@ -2772,6 +2861,7 @@ function renderTable() {
     h += '<td id="tsf-' + g.team + '"></td>';
     h += '<td id="tsx-' + g.team + '"></td>';
     h += '<td id="tsshf-' + g.team + '"></td>';
+    h += '<td id="tspk-' + g.team + '"></td>';
     h += '<td id="tsa-' + g.team + '"></td>';
     h += '<td id="tsap-' + g.team + '"></td>';
     h += '<td id="tsrf-' + g.team + '"></td>';
@@ -2889,12 +2979,12 @@ function recalculate() {
   cachedStickerData = data;
   // Per-person totals and per-team subtotals
   let personIdx = 0;
-  let gtItems = 0, gtUSD = 0, gtActual = 0, gtCNY = 0, gtFee = 0, gtTax = 0, gtShipfee = 0, gtAP = 0, gtRefunded = 0, gtOwe = 0, gtRefund = 0;
+  let gtItems = 0, gtUSD = 0, gtActual = 0, gtCNY = 0, gtFee = 0, gtTax = 0, gtShipfee = 0, gtPackfee = 0, gtAP = 0, gtRefunded = 0, gtOwe = 0, gtRefund = 0;
   const gtStickerQty = {};
   S.forEach(s => { gtStickerQty[s.id] = 0; });
 
   teamsData.forEach(g => {
-    let teamItems = 0, teamUSD = 0, teamFee = 0, teamTax = 0, teamShipfee = 0, teamActualPaid = 0, teamActualCNY = 0, teamRefunded = 0, teamOwe = 0, teamRefund = 0;
+    let teamItems = 0, teamUSD = 0, teamFee = 0, teamTax = 0, teamShipfee = 0, teamPackfee = 0, teamActualPaid = 0, teamActualCNY = 0, teamRefunded = 0, teamOwe = 0, teamRefund = 0;
     const teamStickerQty = {};
     S.forEach(s => { teamStickerQty[s.id] = 0; });
 
@@ -2923,24 +3013,31 @@ function recalculate() {
       // Per-person shipping fee: 4/5 团有订单的人固定 ¥6.30/单
       const personShipfee = (DROPSHIP_TEAMS.includes(g.team) && items > 0) ? DROPSHIP_FEE : 0;
       teamShipfee += personShipfee;
+      // Per-person packing fee: 1/2/3 团按订单 USD 比例分摊该团总包材费
+      const personPackfee = (items > 0) ? packingFeeFor(name) : 0;
+      teamPackfee += personPackfee;
       if (allActualPaid[name] !== undefined) teamActualPaid += allActualPaid[name];
       if (allRefunded[name] !== undefined) teamRefunded += allRefunded[name];
       let personRefund = 0, personOwe = 0;
 
-      // CNY（实际应付）= proportional share of actual SM total × rate, plus fee, tax, shipfee
+      // CNY（实际应付）= proportional share of actual SM total × rate, plus fee, tax, shipfee, packfee
       let personActual = 0;
       if (discountRatio > 0 && items > 0) {
         const actualBase = r2(usd * discountRatio * rate);
         const actualFee = r2(actualBase * 0.001);
-        personActual = r2(actualBase + actualFee + personTax + personShipfee);
+        personActual = r2(actualBase + actualFee + personTax + personShipfee + personPackfee);
         teamActualCNY += personActual;
       } else if (items > 0 && personTax > 0) {
-        // 有税但 actualUSD 没录 — 预估 + 税 + 运费
-        personActual = r2(cny + fee + personTax + personShipfee);
+        // 有税但 actualUSD 没录 — 预估 + 税 + 运费 + 包材费
+        personActual = r2(cny + fee + personTax + personShipfee + personPackfee);
         teamActualCNY += personActual;
       } else if (items > 0 && personShipfee > 0) {
         // 4/5 团即使无税且无折扣，也要包含运费
-        personActual = r2(cny + fee + personShipfee);
+        personActual = r2(cny + fee + personShipfee + personPackfee);
+        teamActualCNY += personActual;
+      } else if (items > 0 && personPackfee > 0) {
+        // 1/2/3 团仅有包材费、无折扣无税时也作为应付显示
+        personActual = r2(cny + fee + personPackfee);
         teamActualCNY += personActual;
       }
 
@@ -2961,6 +3058,9 @@ function recalculate() {
       const psfEl = document.getElementById('psf-' + personIdx);
       if (psfEl) psfEl.textContent = personShipfee > 0 ? '\u00A5' + personShipfee.toFixed(2) : '\u2014';
       if (psfEl && personShipfee > 0) psfEl.style.color = '#8B6EAE';
+      const ppkEl = document.getElementById('ppk-' + personIdx);
+      if (ppkEl) ppkEl.textContent = personPackfee > 0 ? '\u00A5' + personPackfee.toFixed(2) : '\u2014';
+      if (ppkEl && personPackfee > 0) ppkEl.style.color = '#8B6EAE';
       // 应收/应退 calculation
       const paid = allActualPaid[name] || 0;
       const refunded = allRefunded[name] || 0;
@@ -3012,6 +3112,9 @@ function recalculate() {
     const tsshfEl = document.getElementById('tsshf-' + g.team);
     if (tsshfEl) tsshfEl.textContent = teamShipfee > 0 ? '\u00A5' + teamShipfee.toFixed(2) : '\u2014';
     if (tsshfEl && teamShipfee > 0) tsshfEl.style.color = '#8B6EAE';
+    const tspkEl = document.getElementById('tspk-' + g.team);
+    if (tspkEl) tspkEl.textContent = teamPackfee > 0 ? '\u00A5' + teamPackfee.toFixed(2) : '\u2014';
+    if (tspkEl && teamPackfee > 0) tspkEl.style.color = '#8B6EAE';
     const tsapEl = document.getElementById('tsap-' + g.team);
     if (tsapEl && teamActualPaid > 0) tsapEl.innerHTML = '<span style="color:#E8714A">\u00A5' + teamActualPaid.toFixed(2) + '</span>';
     else if (tsapEl) tsapEl.textContent = '\u2014';
@@ -3026,7 +3129,7 @@ function recalculate() {
 
     // Accumulate grand totals
     gtItems += teamItems; gtUSD += teamUSD; gtActual += teamActualCNY;
-    gtCNY += teamCNY; gtFee += teamFee; gtTax += teamTax; gtShipfee += teamShipfee; gtAP += teamActualPaid; gtRefunded += teamRefunded; gtOwe += teamOwe; gtRefund += teamRefund;
+    gtCNY += teamCNY; gtFee += teamFee; gtTax += teamTax; gtShipfee += teamShipfee; gtPackfee += teamPackfee; gtAP += teamActualPaid; gtRefunded += teamRefunded; gtOwe += teamOwe; gtRefund += teamRefund;
   });
 
   const grandCNY = r2(grandUSD * rate);
@@ -3048,6 +3151,8 @@ function recalculate() {
   if (sgX) { sgX.textContent = taxCNY > 0 ? '\u00A5' + taxCNY.toFixed(2) : '\u2014'; if (taxCNY > 0) sgX.style.color = '#E74C3C'; }
   const sgSh = document.getElementById('st-grand-shipfee');
   if (sgSh) { sgSh.textContent = gtShipfee > 0 ? '\u00A5' + gtShipfee.toFixed(2) : '\u2014'; if (gtShipfee > 0) sgSh.style.color = '#8B6EAE'; }
+  const sgPk = document.getElementById('st-grand-packfee');
+  if (sgPk) { sgPk.textContent = gtPackfee > 0 ? '\u00A5' + gtPackfee.toFixed(2) : '\u2014'; if (gtPackfee > 0) sgPk.style.color = '#8B6EAE'; }
 
   // Fill 三团汇总 row
   S.forEach(s => {
@@ -3070,6 +3175,8 @@ function recalculate() {
   if (gtxEl) { gtxEl.textContent = gtTax > 0 ? '\u00A5' + gtTax.toFixed(2) : '\u2014'; if (gtTax > 0) gtxEl.style.color = '#E74C3C'; }
   const gtShEl = document.getElementById('gt-shipfee');
   if (gtShEl) { gtShEl.textContent = gtShipfee > 0 ? '\u00A5' + gtShipfee.toFixed(2) : '\u2014'; if (gtShipfee > 0) gtShEl.style.color = '#8B6EAE'; }
+  const gtPkEl = document.getElementById('gt-packfee');
+  if (gtPkEl) { gtPkEl.textContent = gtPackfee > 0 ? '\u00A5' + gtPackfee.toFixed(2) : '\u2014'; if (gtPackfee > 0) gtPkEl.style.color = '#8B6EAE'; }
   if (gtapEl && gtAP > 0) gtapEl.innerHTML = '<span style="color:#E8714A">\u00A5' + gtAP.toFixed(2) + '</span>';
   else if (gtapEl) gtapEl.textContent = '\u2014';
   const gtrfEl = document.getElementById('gt-refunded');
@@ -3416,8 +3523,10 @@ function showOrderDetail(name) {
       const actBase = r2(r2TotalUSD * dr * rate);
       const actFee = r2(actBase * 0.001);
       const shippingFee = DROPSHIP_TEAMS.includes(teamNum) ? DROPSHIP_FEE : 0;
-      const actTotal = r2(actBase + actFee + myTax + shippingFee);
+      const myPackFee = packingFeeFor(name);
+      const actTotal = r2(actBase + actFee + myTax + shippingFee + myPackFee);
       addRow(footer, '实际应付', '\u00a5' + actTotal.toFixed(2), {main: true});
+      if (myPackFee > 0) addRow(footer, '\u2514 包材费', '\u00a5' + myPackFee.toFixed(2));
       addRow(footer, '已付', r2Paid > 0 ? '\u00a5' + r2Paid.toFixed(2) : '\u2014');
       if (r2Paid > 0) {
         if (r2Refunded > 0) addRow(footer, '已退', '\u00a5' + r2Refunded.toFixed(2));
@@ -3429,7 +3538,9 @@ function showOrderDetail(name) {
     } else if (r2TotalUSD > 0) {
       const estCNY = r2(r2TotalUSD * rate);
       const estFee = r2(estCNY * 0.001);
-      addRow(footer, 'CNY（预估）', '\u00a5' + r2(estCNY + estFee).toFixed(2));
+      const myPackFee = packingFeeFor(name);
+      addRow(footer, 'CNY（预估）', '\u00a5' + r2(estCNY + estFee + myPackFee).toFixed(2));
+      if (myPackFee > 0) addRow(footer, '\u2514 包材费', '\u00a5' + myPackFee.toFixed(2));
       if (r2Paid > 0) addRow(footer, '已付', '\u00a5' + r2Paid.toFixed(2));
     } else if (r2Paid > 0) {
       addRow(footer, '已付', '\u00a5' + r2Paid.toFixed(2));
@@ -3484,6 +3595,22 @@ document.getElementById('taxCnyInput').addEventListener('input', function() {
   recalculate();
   const saveBtn = document.getElementById('btnTaxCnySave');
   if (saveBtn) saveBtn.style.display = 'inline-block';
+});
+
+['packingFeeT1Input','packingFeeT2Input','packingFeeT3Input'].forEach((id, idx) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', function() {
+    const canEdit = isAdmin(myName) || [1,2,3].some(t => TEAM_LEADERS[t] === myName);
+    if (!canEdit) return;
+    const v = parseFloat(this.value) || 0;
+    if (idx === 0) packingFeeT1 = v;
+    else if (idx === 1) packingFeeT2 = v;
+    else packingFeeT3 = v;
+    recalculate();
+    const saveBtn = document.getElementById('btnPackingFeeSave');
+    if (saveBtn) { saveBtn.style.display = 'inline-block'; saveBtn.classList.add('unsaved'); }
+  });
 });
 
 // ============ IMPORT / EXPORT ============
