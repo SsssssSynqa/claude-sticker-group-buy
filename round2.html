@@ -469,7 +469,7 @@ section{padding:14px}
 <section id="allAddressesSection" style="display:none">
   <details id="allAddressesPanel">
     <summary style="cursor:pointer;font-weight:600;font-size:15px;color:#8B6EAE;padding:12px 16px;background:#F0EBF5;border-radius:10px;list-style:none;display:flex;align-items:center;flex-wrap:wrap;gap:8px">
-      <span style="flex:1;min-width:200px">📦 4/5团代发总览（仅管理员/饼饼可见）</span>
+      <span style="flex:1;min-width:200px">📦 4/5团代发总览（仅管理员可见）</span>
       <button onclick="loadAllAddresses();event.preventDefault();event.stopPropagation()" style="padding:3px 10px;background:#fff;color:#8B6EAE;border:1px solid #B8A9C9;border-radius:6px;font-size:12px;cursor:pointer">🔄 刷新</button>
       <button onclick="exportAddressesCSV();event.preventDefault();event.stopPropagation()" style="padding:3px 10px;background:#8B6EAE;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">📥 导出 CSV</button>
     </summary>
@@ -526,7 +526,7 @@ section{padding:14px}
 const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
 const ADMIN_NAMES = ['鹅鹅', '鹅'];
-const ADDRESS_VIEWERS = ['鹅鹅', '鹅', '饼饼']; // 能查看所有代发地址的白名单（admin + 指定代发账号）
+const ADDRESS_VIEWERS = ['鹅鹅', '鹅']; // 能查看所有代发地址的白名单（admin + 指定代发账号）
 const TEAM_LEADERS = {1: '豆沙', 2: 'Mori', 3: 'G', 4: 'シンヤ_r2', 5: '鹅鹅'};
 const TEAM_QR = {4: 'r2-pay-4.png', 5: 'r2-pay-5.png'}; // 1-3团线下结算不需要付款码
 const ROUND2_TEAMS = [1, 2, 3, 4, 5];
@@ -643,7 +643,7 @@ let allShipFeeSelf = {}; // {name: true} — self-confirmed shipping fee paid
 let allShipFeeLeader = {}; // {name: true} — leader-confirmed shipping fee paid
 let allShipped = {}; // {name: true} — leader-confirmed shipped
 let allAddressesCache = {}; // {name: {team, recipient, phone, address}} — for 4/5 团代发总览面板
-let currentAddressTarget = null; // 地址 modal 当前操作对象（null 表示自己填；其他值表示为别人代填，仅 admin/饼饼）
+let currentAddressTarget = null; // 地址 modal 当前操作对象（null 表示自己填；其他值表示为别人代填，仅 admin）
 // Drop 掉落订单数据（只给代发总览面板用，不参与 round2 主统计）
 let allDropOrders = {};      // {name: {sticker_id: qty}} 以 drop_ 开头的贴纸订单
 let allDropActualPaid = {};  // {name: 元} drop__actual_paid
@@ -1880,7 +1880,7 @@ async function leaderUnmarkShipped(memberName) {
   }
 }
 
-// 代发方专用发货操作（admin/饼饼 在地址面板里能点；饼饼不是团长但应该能标发货）
+// 代发方专用发货操作（admin 在地址面板里能点；代发方不是团长但应该能标发货）
 async function dropshipMarkShipped(memberName) {
   if (!sb) return;
   if (!canViewAllAddresses(myName)) { alert('无权操作'); return; }
@@ -2090,7 +2090,7 @@ function closePaymentQR() {
 
 // ============ ADDRESS (DROPSHIP TEAMS ONLY) ============
 function openAddressForm(memberName) {
-  // memberName 存在且不等于 myName 时为代填模式（仅 admin/饼饼）
+  // memberName 存在且不等于 myName 时为代填模式（仅 admin）
   const isProxy = memberName && memberName !== myName;
   if (isProxy && !canViewAllAddresses(myName)) { alert('无权代填他人地址'); return; }
   const targetName = memberName || myName;
@@ -2201,7 +2201,7 @@ function showMyTracking() {
 
 async function saveTracking(targetName, value) {
   if (!sb) { alert('未连接到数据库'); return; }
-  if (!canViewAllAddresses(myName)) { alert('仅 admin/饼饼可填快递单号'); return; }
+  if (!canViewAllAddresses(myName)) { alert('仅管理员可填快递单号'); return; }
   const v = (value || '').trim();
   // 先确保 addresses 行存在（如果该用户还没地址行，不能upsert tracking_number）
   const existing = allAddressesCache[targetName];
@@ -2347,7 +2347,7 @@ function renderAllAddresses() {
         tr.appendChild(emptyTd);
       }
 
-      // 快递单号 (admin/饼饼 可编辑;input 失焦保存)
+      // 快递单号 (admin 可编辑;input 失焦保存)
       const trackTd = document.createElement('td');
       trackTd.style.cssText = 'padding:8px 10px;white-space:nowrap';
       const trackInput = document.createElement('input');
@@ -2390,7 +2390,7 @@ function renderAllAddresses() {
       feeTd.appendChild(feeBadge);
       tr.appendChild(feeTd);
 
-      // 发货 badge + 按钮（admin/饼饼 能点）
+      // 发货 badge + 按钮（admin 能点）
       const shipTd = document.createElement('td');
       shipTd.style.cssText = 'padding:8px 10px;white-space:nowrap';
       const shipBadge = document.createElement('span');
