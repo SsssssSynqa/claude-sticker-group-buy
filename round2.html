@@ -2474,15 +2474,27 @@ function exportAddressesCSV() {
   };
 
   // 2026-05-04: 代发不看网站, CSV 必须自带"分多少张" 信息.
-  //  - 贴纸总数: 把这人 allOrders 里所有 r2_xxx (排除 r2__ 双下划线控制行) 的 quantity 求和
-  //  - 订单明细: 'Clawd×3, Vibing×2' 形式, 代发按这个分装具体款式
+  // 关键: 必须合并 Round2 主单 (allOrders[n], r2_xxx) + 掉落页订单 (allDropOrders[n], drop_xxx),
+  // 因为同一个人可能在两边都下了单 — 代发看到的是"每款合计"才对得上分装数.
+  // drop_xxx 对应 r2_xxx 同款 (line 3386 验证: const dropSid = s.id.replace(/^r2_/, 'drop_'))
   // stickers 数组定义在 line ~540, id 形如 'r2_clawd', name 是中英文友好名
   const stickerNameMap = {};
   stickers.forEach(s => { stickerNameMap[s.id] = s.name; });
   const computeOrderSummary = (name) => {
-    const orders = allOrders[name] || {};
-    const items = Object.entries(orders)
-      .filter(([sid, q]) => sid.startsWith('r2_') && !sid.startsWith('r2__') && q > 0);
+    // 按 r2_xxx (统一 key) 累加两边数据
+    const merged = {};
+    Object.entries(allOrders[name] || {}).forEach(([sid, q]) => {
+      if (sid.startsWith('r2_') && !sid.startsWith('r2__') && q > 0) {
+        merged[sid] = (merged[sid] || 0) + q;
+      }
+    });
+    Object.entries(allDropOrders[name] || {}).forEach(([sid, q]) => {
+      if (sid.startsWith('drop_') && !sid.startsWith('drop__') && q > 0) {
+        const r2Sid = sid.replace(/^drop_/, 'r2_'); // 对齐到主单同款
+        merged[r2Sid] = (merged[r2Sid] || 0) + q;
+      }
+    });
+    const items = Object.entries(merged);
     const totalQty = items.reduce((sum, [, q]) => sum + q, 0);
     // 按数量降序, 同数量按 sticker name 字典序, 输出"名称×数量"列表
     const detail = items
