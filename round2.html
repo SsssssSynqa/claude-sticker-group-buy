@@ -2473,15 +2473,21 @@ function exportAddressesCSV() {
       ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
 
-  // 2026-05-04: 代发不看网站, CSV 必须自带"分多少张" 信息.
-  // 关键: 必须合并 Round2 主单 (allOrders[n], r2_xxx) + 掉落页订单 (allDropOrders[n], drop_xxx),
-  // 因为同一个人可能在两边都下了单 — 代发看到的是"每款合计"才对得上分装数.
-  // drop_xxx 对应 r2_xxx 同款 (line 3386 验证: const dropSid = s.id.replace(/^r2_/, 'drop_'))
-  // stickers 数组定义在 line ~540, id 形如 'r2_clawd', name 是中英文友好名
-  const stickerNameMap = {};
-  stickers.forEach(s => { stickerNameMap[s.id] = s.name; });
-  const computeOrderSummary = (name) => {
-    // 按 r2_xxx (统一 key) 累加两边数据
+  // 2026-05-04: 代发不看网站, CSV 必须自带"每款分多少张"信息, 而且要合并
+  // Round2 主单 (allOrders, r2_xxx) + 掉落页订单 (allDropOrders, drop_xxx).
+  // drop_xxx 对应 r2_xxx 同款 (line 3386 既有映射: s.id.replace(/^r2_/, 'drop_'))
+  //
+  // 5/4 v2: 改宽表 — 每款一列, 而不是合并字符串挤一格.
+  //   优势 1: 代发横向扫一眼某行看每款几张, 不用解析逗号串.
+  //   优势 2: Excel 纵向 SUM 每款列, 直接得到全团该款总数, 跟到货数对账.
+  //   优势 3: 0 张显示空白(不写 0), 非 0 显示数字, 视觉清爽.
+  // 同名款式(Vibing 有 dc+holo / Manifesting 有 holo+glt)列头加 (type) 区分.
+  const nameCount = {};
+  S.forEach(s => { nameCount[s.name] = (nameCount[s.name] || 0) + 1; });
+  const colName = (s) => nameCount[s.name] > 1 ? `${s.name}(${s.type})` : s.name;
+  const stickerColHeaders = S.map(colName);
+
+  const computeRowQtys = (name) => {
     const merged = {};
     Object.entries(allOrders[name] || {}).forEach(([sid, q]) => {
       if (sid.startsWith('r2_') && !sid.startsWith('r2__') && q > 0) {
@@ -2494,23 +2500,21 @@ function exportAddressesCSV() {
         merged[r2Sid] = (merged[r2Sid] || 0) + q;
       }
     });
-    const items = Object.entries(merged);
-    const totalQty = items.reduce((sum, [, q]) => sum + q, 0);
-    // 按数量降序, 同数量按 sticker name 字典序, 输出"名称×数量"列表
-    const detail = items
-      .map(([sid, q]) => ({ name: stickerNameMap[sid] || sid, q }))
-      .sort((a, b) => b.q - a.q || a.name.localeCompare(b.name))
-      .map(it => it.name + '×' + it.q)
-      .join(', ');
-    return { totalQty, detail };
+    // 按 S 数组顺序输出每款数量(跟网站展示顺序一致, 妈妈和团友都熟悉)
+    const qtys = S.map(s => merged[s.id] || 0);
+    const totalQty = qtys.reduce((a, b) => a + b, 0);
+    return { totalQty, qtys };
   };
 
   Object.entries(byTeam).forEach(([team, names]) => {
     names.sort((a, b) => (globalSeqMap[a] || 9999) - (globalSeqMap[b] || 9999));
-    const lines = [['编号', '昵称', '收件人', '手机', '地址', '贴纸总数', '订单明细', '运费', '发货'].map(csvEscape).join(',')];
+    const headerRow = ['编号', '昵称', '收件人', '手机', '地址', '贴纸总数', ...stickerColHeaders, '运费', '发货'];
+    const lines = [headerRow.map(csvEscape).join(',')];
     names.forEach(n => {
       const addr = allAddressesCache[n] || {};
-      const { totalQty, detail } = computeOrderSummary(n);
+      const { totalQty, qtys } = computeRowQtys(n);
+      // 0 张写空字符串, Excel 视觉清爽 + SUM 自动忽略空值
+      const qtyCells = qtys.map(q => q > 0 ? q : '');
       lines.push([
         globalSeqMap[n] || '',
         n,
@@ -2518,7 +2522,7 @@ function exportAddressesCSV() {
         addr.phone || '',
         addr.address || '',
         totalQty,
-        detail,
+        ...qtyCells,
         feeText(shipFeeStatusOf(n)),
         shippedText(allShipped[n])
       ].map(csvEscape).join(','));
