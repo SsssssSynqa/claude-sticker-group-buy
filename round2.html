@@ -2473,17 +2473,40 @@ function exportAddressesCSV() {
       ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
 
+  // 2026-05-04: 代发不看网站, CSV 必须自带"分多少张" 信息.
+  //  - 贴纸总数: 把这人 allOrders 里所有 r2_xxx (排除 r2__ 双下划线控制行) 的 quantity 求和
+  //  - 订单明细: 'Clawd×3, Vibing×2' 形式, 代发按这个分装具体款式
+  // stickers 数组定义在 line ~540, id 形如 'r2_clawd', name 是中英文友好名
+  const stickerNameMap = {};
+  stickers.forEach(s => { stickerNameMap[s.id] = s.name; });
+  const computeOrderSummary = (name) => {
+    const orders = allOrders[name] || {};
+    const items = Object.entries(orders)
+      .filter(([sid, q]) => sid.startsWith('r2_') && !sid.startsWith('r2__') && q > 0);
+    const totalQty = items.reduce((sum, [, q]) => sum + q, 0);
+    // 按数量降序, 同数量按 sticker name 字典序, 输出"名称×数量"列表
+    const detail = items
+      .map(([sid, q]) => ({ name: stickerNameMap[sid] || sid, q }))
+      .sort((a, b) => b.q - a.q || a.name.localeCompare(b.name))
+      .map(it => it.name + '×' + it.q)
+      .join(', ');
+    return { totalQty, detail };
+  };
+
   Object.entries(byTeam).forEach(([team, names]) => {
     names.sort((a, b) => (globalSeqMap[a] || 9999) - (globalSeqMap[b] || 9999));
-    const lines = [['编号', '昵称', '收件人', '手机', '地址', '运费', '发货'].map(csvEscape).join(',')];
+    const lines = [['编号', '昵称', '收件人', '手机', '地址', '贴纸总数', '订单明细', '运费', '发货'].map(csvEscape).join(',')];
     names.forEach(n => {
       const addr = allAddressesCache[n] || {};
+      const { totalQty, detail } = computeOrderSummary(n);
       lines.push([
         globalSeqMap[n] || '',
         n,
         addr.recipient || '',
         addr.phone || '',
         addr.address || '',
+        totalQty,
+        detail,
         feeText(shipFeeStatusOf(n)),
         shippedText(allShipped[n])
       ].map(csvEscape).join(','));
