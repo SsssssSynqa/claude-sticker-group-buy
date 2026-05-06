@@ -502,6 +502,11 @@ section{padding:14px}
   <div class="pay-qr-popup" style="max-width:440px">
     <h3>📦 填写收货地址</h3>
     <p class="pay-qr-leader">代发团专用 · 只有你自己、管理员和代发方可见</p>
+    <div id="addrExisting" style="display:none;background:#F5F0F8;border:1px solid #E4D6EE;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.7;color:#555">
+      <div style="color:#8B6EAE;font-weight:600;margin-bottom:4px;font-size:12px">📍 你已填的地址</div>
+      <div id="addrExistingBody"></div>
+      <div style="color:#999;margin-top:6px;font-size:11px">想修改？直接编辑下方表单后点保存</div>
+    </div>
     <input type="text" id="addrRecipient" placeholder="收件人姓名" maxlength="30" style="width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;margin-bottom:10px;box-sizing:border-box">
     <input type="tel" id="addrPhone" placeholder="手机号" maxlength="15" inputmode="numeric" style="width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;margin-bottom:10px;box-sizing:border-box">
     <textarea id="addrAddress" placeholder="完整地址（省+市+区+街道+门牌号）" maxlength="200" rows="3" style="width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:14px;resize:vertical;font-family:inherit;margin-bottom:10px;box-sizing:border-box"></textarea>
@@ -2128,11 +2133,52 @@ function closeAddressForm() {
   document.getElementById('addressOverlay').classList.remove('on');
   const s = document.getElementById('addrStatus');
   if (s) s.textContent = '';
+  const e = document.getElementById('addrExisting');
+  if (e) { e.style.display = 'none'; }
+  const eb = document.getElementById('addrExistingBody');
+  if (eb) eb.replaceChildren();
   currentAddressTarget = null;
+}
+
+function renderAddrExisting(data) {
+  const wrap = document.getElementById('addrExisting');
+  const body = document.getElementById('addrExistingBody');
+  if (!wrap || !body) return;
+  if (!data) { wrap.style.display = 'none'; body.replaceChildren(); return; }
+  body.replaceChildren();
+  const lines = [
+    ['收件人', data.recipient],
+    ['手机', data.phone],
+    ['地址', data.address]
+  ];
+  lines.forEach(([k, v]) => {
+    const div = document.createElement('div');
+    const label = document.createElement('span');
+    label.style.cssText = 'color:#888;margin-right:6px';
+    label.textContent = k + '：';
+    const val = document.createElement('span');
+    val.style.cssText = 'color:#333';
+    val.textContent = v || '（空）';
+    div.appendChild(label);
+    div.appendChild(val);
+    body.appendChild(div);
+  });
+  if (data.updated_at) {
+    const t = document.createElement('div');
+    t.style.cssText = 'color:#999;font-size:11px;margin-top:6px';
+    let when = data.updated_at;
+    try { when = new Date(data.updated_at).toLocaleString('zh-CN', {hour12: false}); } catch(e) {}
+    t.textContent = '上次更新：' + when;
+    body.appendChild(t);
+  }
+  wrap.style.display = 'block';
 }
 
 async function loadAddressFor(name) {
   if (!sb || !name) return;
+  // 先尝试用本地 cache 立刻渲染预览（避免空窗），再异步从数据库刷新
+  const cached = allAddressesCache && allAddressesCache[name];
+  if (cached) renderAddrExisting(cached);
   const {data, error} = await sb.from('addresses').select('*').eq('name', name).maybeSingle();
   if (error) { console.error('Load address failed:', error); return; }
   const r = document.getElementById('addrRecipient');
@@ -2142,10 +2188,12 @@ async function loadAddressFor(name) {
     if (r) r.value = data.recipient || '';
     if (p) p.value = data.phone || '';
     if (a) a.value = data.address || '';
+    renderAddrExisting(data);
   } else {
     if (r) r.value = '';
     if (p) p.value = '';
     if (a) a.value = '';
+    renderAddrExisting(null);
   }
 }
 async function loadMyAddress() { return loadAddressFor(myName); } // 兼容旧调用
@@ -2179,9 +2227,12 @@ async function saveAddress() {
   }
   status.textContent = isProxy ? ('✓ 已为 ' + targetName + ' 代填') : '✓ 已保存';
   status.style.color = '#2D8B5E';
-  setTimeout(() => closeAddressForm(), 1200);
   // 本地同步 cache，立即反映到面板（realtime 到达前）
-  allAddressesCache[targetName] = {name: targetName, team: targetTeam, recipient, phone, address, updated_at: new Date().toISOString()};
+  const fresh = {name: targetName, team: targetTeam, recipient, phone, address, updated_at: new Date().toISOString()};
+  allAddressesCache[targetName] = fresh;
+  // 即时刷新弹窗里的预览块，让用户在弹窗关闭前看到自己刚填的内容
+  renderAddrExisting(fresh);
+  setTimeout(() => closeAddressForm(), 1200);
   if (canViewAllAddresses(myName)) renderAllAddresses();
 }
 
