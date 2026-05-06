@@ -2467,9 +2467,10 @@ function exportAddressesCSV() {
 
   const feeText = (st) => st === 'confirmed' ? '已确认' : st === 'self' ? '待核实' : '未付';
   const shippedText = (b) => b ? '已发货' : '未发';
-  // 2026-05-04 v3: 改成 HTML 表格 — CSV 嵌不进图, 代发认款式很麻烦.
-  // 现在每款列头下面加一行贴纸图, 浏览器打开就能看图认款 + 横向看每人分多少张.
-  // ⌘+P 还能直接打印为 PDF. 函数名沿用旧的 (避免改太多调用处).
+  // 2026-05-06 v4: 改成"长表" — 每个人每种商品占一行, 收件信息 rowspan 合并.
+  // 代发要这种格式才能打单 (v3 横排款式他们识别不了哪种商品对应哪个数量).
+  // 商品列嵌小贴纸图 + 名字, 表底保留每款合计 (代发对账 + 我们核数都用).
+  // ⌘+P 打印 PDF, 复制粘贴到 Excel 保留合并. 函数名沿用旧的 (避免改太多调用处).
   const htmlEscape = (cell) => String(cell == null ? '' : cell)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -2498,45 +2499,68 @@ function exportAddressesCSV() {
     return { totalQty, qtys };
   };
 
-  // 单个团生成一份 HTML
+  // 单个团生成一份 HTML — 长表: 每人 × 每种商品 = 一行, rowspan 合并收件信息
   const buildTeamHtml = (team, names) => {
-    const stickerHeaderTh = S.map(s =>
-      `<th class="sticker-name">${htmlEscape(colName(s))}</th>`
-    ).join('');
-    const stickerImgTh = S.map(s =>
-      `<th class="sticker-img"><img src="${htmlEscape(s.img)}" alt="${htmlEscape(colName(s))}" loading="lazy"><span class="sz">${htmlEscape(s.size || '')}</span></th>`
-    ).join('');
+    let dataRows = '';
+    let totalPeople = 0;
+    let teamGrandTotal = 0;
+    const colTotals = new Array(S.length).fill(0); // 每款合计 (对账用)
 
-    const dataRows = names.map(n => {
+    names.forEach(n => {
       const addr = allAddressesCache[n] || {};
       const { totalQty, qtys } = computeRowQtys(n);
-      const qtyTds = qtys.map(q =>
-        q > 0 ? `<td class="qty">${q}</td>` : `<td class="qty empty"></td>`
-      ).join('');
-      return `<tr>
-        <td class="seq">${htmlEscape(globalSeqMap[n] || '')}</td>
-        <td class="nick">${htmlEscape(n)}</td>
-        <td>${htmlEscape(addr.recipient || '')}</td>
-        <td>${htmlEscape(addr.phone || '')}</td>
-        <td class="addr">${htmlEscape(addr.address || '')}</td>
-        <td class="qty total">${totalQty}</td>
-        ${qtyTds}
-        <td class="status">${htmlEscape(feeText(shipFeeStatusOf(n)))}</td>
-        <td class="status">${htmlEscape(shippedText(allShipped[n]))}</td>
-      </tr>`;
-    }).join('');
+      if (totalQty === 0) return; // 没下单跳过
 
-    // 列底每款合计 (代发对账用)
-    const totalsByCol = S.map((_, i) =>
-      names.reduce((sum, n) => sum + computeRowQtys(n).qtys[i], 0)
-    );
-    const grandTotal = totalsByCol.reduce((a, b) => a + b, 0);
-    const totalsTr = `<tr class="totals-row">
-      <td colspan="5" style="text-align:right">每款合计 →</td>
-      <td class="qty total">${grandTotal}</td>
-      ${totalsByCol.map(t => `<td class="qty total">${t || ''}</td>`).join('')}
-      <td colspan="2"></td>
-    </tr>`;
+      // 收集这人下了哪些款 (q > 0)
+      const items = [];
+      qtys.forEach((q, i) => {
+        if (q > 0) {
+          items.push({ sticker: S[i], qty: q });
+          colTotals[i] += q;
+        }
+      });
+      if (items.length === 0) return;
+
+      teamGrandTotal += totalQty;
+      totalPeople += 1;
+
+      const rs = items.length;
+      items.forEach((item, idx) => {
+        const isFirst = idx === 0;
+        let row = '<tr>';
+        if (isFirst) {
+          row += `<td class="seq" rowspan="${rs}">${htmlEscape(globalSeqMap[n] || '')}</td>`;
+        }
+        // 商品列: 小贴纸图 + 名字 (代发认款用)
+        row += `<td class="item"><span class="item-row">`
+          + `<img src="${htmlEscape(item.sticker.img)}" alt="${htmlEscape(colName(item.sticker))}" class="item-img" loading="lazy">`
+          + `<span class="item-text">${htmlEscape(colName(item.sticker))}</span>`
+          + `</span></td>`;
+        row += `<td class="qty">${item.qty}</td>`;
+        if (isFirst) {
+          row += `<td class="qty total" rowspan="${rs}">${totalQty}</td>`;
+          row += `<td class="nick" rowspan="${rs}">${htmlEscape(n)}</td>`;
+          row += `<td rowspan="${rs}">${htmlEscape(addr.recipient || '')}</td>`;
+          row += `<td rowspan="${rs}">${htmlEscape(addr.phone || '')}</td>`;
+          row += `<td class="addr" rowspan="${rs}">${htmlEscape(addr.address || '')}</td>`;
+          row += `<td class="status" rowspan="${rs}">${htmlEscape(feeText(shipFeeStatusOf(n)))}</td>`;
+          row += `<td class="status" rowspan="${rs}">${htmlEscape(shippedText(allShipped[n]))}</td>`;
+        }
+        row += '</tr>';
+        dataRows += row;
+      });
+    });
+
+    // 表底每款合计卡片 (代发对账 / 我们核数都看这块)
+    const colTotalsHtml = S.map((s, i) =>
+      colTotals[i] > 0
+        ? `<div class="col-total-item">`
+          + `<img src="${htmlEscape(s.img)}" alt="" class="col-total-img">`
+          + `<span class="col-total-name">${htmlEscape(colName(s))}</span>`
+          + `<strong>${colTotals[i]}</strong>`
+          + `</div>`
+        : ''
+    ).filter(Boolean).join('');
 
     return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -2547,60 +2571,73 @@ function exportAddressesCSV() {
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; padding: 16px; background: #f7f3ec; color: #333; }
   h1 { font-size: 18px; margin: 0 0 4px; color: #8B6EAE; }
-  .meta { font-size: 12px; color: #888; margin-bottom: 12px; }
+  .meta { font-size: 12px; color: #888; margin-bottom: 12px; line-height: 1.7; }
   .meta b { color: #555; }
   .scroll { overflow-x: auto; background: #fff; border-radius: 8px; padding: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
-  table { border-collapse: collapse; font-size: 12px; }
-  th, td { border: 1px solid #d8d2c5; padding: 4px 6px; vertical-align: middle; white-space: nowrap; }
-  thead th { background: #f5f0e8; position: sticky; top: 0; z-index: 2; }
-  tr.sticker-img-row th { background: #fff; padding: 4px; }
-  tr.sticker-img-row img { width: 64px; height: 64px; object-fit: contain; display: block; margin: 0 auto; }
-  tr.sticker-img-row .sz { display: block; font-size: 9px; color: #999; text-align: center; margin-top: 2px; font-weight: normal; }
-  th.sticker-name { writing-mode: vertical-rl; transform: rotate(180deg); min-width: 28px; max-width: 32px; padding: 6px 4px; font-weight: 600; }
-  td.qty, th.qty { text-align: center; min-width: 32px; }
-  td.qty.empty { color: #d8d2c5; }
-  td.qty.total { background: #fff7ed; font-weight: 700; color: #d2691e; }
-  td.seq { text-align: center; color: #888; font-variant-numeric: tabular-nums; }
-  td.nick { font-weight: 600; }
-  td.addr { white-space: normal; min-width: 200px; max-width: 320px; font-size: 11px; }
-  td.status { font-size: 11px; color: #666; text-align: center; }
-  tbody tr:nth-child(odd) { background: #fbfaf6; }
-  tr.totals-row { background: #fff7ed; font-weight: 700; }
-  tr.totals-row td { border-top: 2px solid #d2691e; }
+  table { border-collapse: collapse; font-size: 12px; width: 100%; }
+  th, td { border: 1px solid #d8d2c5; padding: 6px 8px; vertical-align: middle; }
+  thead th { background: #f5f0e8; font-weight: 600; position: sticky; top: 0; z-index: 2; }
+  td.seq { text-align: center; color: #888; font-variant-numeric: tabular-nums; background: #fbfaf6; min-width: 48px; }
+  td.item { white-space: nowrap; min-width: 200px; }
+  .item-row { display: inline-flex; align-items: center; gap: 8px; }
+  .item-img { width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
+  .item-text { font-size: 12px; }
+  td.qty, th.qty { text-align: center; min-width: 40px; font-variant-numeric: tabular-nums; }
+  td.qty.total { background: #fff7ed; font-weight: 700; color: #d2691e; font-size: 14px; }
+  td.nick { font-weight: 600; text-align: center; min-width: 60px; }
+  td.addr { white-space: normal; min-width: 220px; max-width: 320px; font-size: 11px; line-height: 1.4; }
+  td.status { font-size: 11px; color: #666; text-align: center; white-space: nowrap; }
+  /* 隔人变色 (按 rowspan 第一行的背景色, 用 :nth-of-type 不好做, 用 .seq 标记 odd) */
+  tbody tr td.seq[rowspan] { background: #fff; }
+  .col-totals { margin-top: 16px; padding: 14px; background: #fff7ed; border: 1px solid #d8d2c5; border-radius: 8px; }
+  .col-totals h2 { font-size: 13px; margin: 0 0 10px; color: #8B6EAE; }
+  .col-totals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .col-total-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #fff; border: 1px solid #f0e6d6; border-radius: 4px; font-size: 11px; }
+  .col-total-img { width: 28px; height: 28px; object-fit: contain; flex-shrink: 0; }
+  .col-total-name { flex: 1; min-width: 0; word-break: break-all; }
+  .col-total-item strong { color: #d2691e; font-size: 14px; font-variant-numeric: tabular-nums; }
   @media print {
     body { padding: 0; background: #fff; }
     .meta { font-size: 10px; }
-    table { font-size: 10px; }
-    tr.sticker-img-row img { width: 48px; height: 48px; }
+    table { font-size: 10px; page-break-inside: auto; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+    .item-img { width: 24px; height: 24px; }
+    .col-totals { page-break-before: always; }
   }
 </style>
 </head>
 <body>
-<h1>Round2 · 团${team} · 代发表</h1>
-<div class="meta">导出时间 <b>${new Date().toLocaleString('zh-CN')}</b> · 共 <b>${names.length}</b> 人 · 合计 <b>${grandTotal}</b> 张 · 浏览器打开看图认款, ⌘+P 打印为 PDF</div>
+<h1>Round2 · 团${team} · 代发表（每人每款一行）</h1>
+<div class="meta">
+  导出时间 <b>${new Date().toLocaleString('zh-CN')}</b> · 共 <b>${totalPeople}</b> 人 · 合计 <b>${teamGrandTotal}</b> 张<br>
+  ⌘+P 打印为 PDF · 复制粘贴到 Excel 保留合并单元格 · 浏览器打开看图认款
+</div>
 <div class="scroll">
 <table>
   <thead>
     <tr>
-      <th rowspan="2">编号</th>
-      <th rowspan="2">昵称</th>
-      <th rowspan="2">收件人</th>
-      <th rowspan="2">手机</th>
-      <th rowspan="2">地址</th>
-      <th rowspan="2" class="qty">贴纸总数</th>
-      ${stickerHeaderTh}
-      <th rowspan="2">运费</th>
-      <th rowspan="2">发货</th>
-    </tr>
-    <tr class="sticker-img-row">
-      ${stickerImgTh}
+      <th>编号</th>
+      <th>商品</th>
+      <th class="qty">数量</th>
+      <th class="qty">贴纸总数</th>
+      <th>昵称</th>
+      <th>收件人</th>
+      <th>手机</th>
+      <th>地址</th>
+      <th>运费</th>
+      <th>发货</th>
     </tr>
   </thead>
   <tbody>
     ${dataRows}
-    ${totalsTr}
   </tbody>
 </table>
+</div>
+<div class="col-totals">
+  <h2>📊 团${team} 每款合计（共 ${teamGrandTotal} 张 / ${totalPeople} 人下单）</h2>
+  <div class="col-totals-grid">
+    ${colTotalsHtml}
+  </div>
 </div>
 </body>
 </html>`;
