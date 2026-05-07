@@ -2248,10 +2248,20 @@ function updateTrackingBtn() {
   btn.style.display = (myName && DROPSHIP_TEAMS.includes(myTeam)) ? '' : 'none';
 }
 
-function showMyTracking() {
+async function showMyTracking() {
   if (!myName) { alert('请先选择昵称'); return; }
   if (!DROPSHIP_TEAMS.includes(myTeam)) { alert('1/2/3 团由团长直接发货，无在线快递单号查询'); return; }
-  const addr = allAddressesCache[myName];
+  // 2026-05-07 fix (Pluto 反馈): cache miss 时 fallback 单条查 supabase, 防止
+  // init 时机 race / 用户改昵称没同步 cache 等情况误报"没填". 数据库永远是
+  // source of truth, cache 只是加速.
+  let addr = allAddressesCache[myName];
+  if (!addr && sb) {
+    const {data} = await sb.from('addresses').select('*').eq('name', myName).maybeSingle();
+    if (data) {
+      addr = data;
+      allAddressesCache[myName] = data;
+    }
+  }
   if (!addr) { alert('你还没填收货地址。请先点「📦 填写收货地址」填好后再来查。'); return; }
   const tn = (addr.tracking_number || '').trim();
   if (!tn) {
@@ -3996,6 +4006,12 @@ function closeModal() {
   document.getElementById('rateInput').value = rate;
   renderTable();
   recalculate();
+  // 2026-05-07 fix (Pluto 14:12 反馈): 之前 loadAllAddressesCache 只在 admin
+  // canViewAllAddresses 视图按需调, 普通用户登录后 allAddressesCache 永远是空的.
+  // 用户填地址 → saveAddress 把自己存进 cache → 关页面/刷新 → cache 又空 →
+  // showMyTracking() check cache 直接报"没填". 在 init 末尾让所有用户都拉一次,
+  // 526 行内存里也不大, RLS 限制时只拉到自己也够用.
+  loadAllAddressesCache();
 })();
 </script>
 </body>
