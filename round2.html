@@ -2075,6 +2075,7 @@ function showPaymentQR() {
         amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
           + '你需要转账：<span style="font-size:20px">\u00A5' + myActualTotal.toFixed(2) + '</span>'
           + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">实际应付（含0.1%手续费' + (myTax > 0 ? ' + 关税¥' + myTax.toFixed(2) : '') + (shippingFee > 0 ? ' + 代发运费¥' + DROPSHIP_FEE.toFixed(2) + (shipExtra > 0 ? ' + 偏远附加¥' + shipExtra.toFixed(2) : '') : '') + (myPackingFee > 0 ? ' + 包材费¥' + myPackingFee.toFixed(2) : '') + '），已折算SM多款折扣</div>'
+          + (shippingFee > 0 ? '<div style="font-size:11px;color:#E8714A;margin-top:2px">📍 运费按收件地址附加：<strong>北京/上海 +¥1</strong>，<strong>新疆/西藏 +¥13</strong></div>' : '')
           + '<div style="font-size:11px;font-weight:400;color:#bbb;margin-top:2px">原预估 \u00A5' + myEstTotal.toFixed(2) + '</div>'
           + '</div>';
       }
