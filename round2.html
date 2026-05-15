@@ -2299,6 +2299,10 @@ async function loadAllAddressesCache() {
   if (error) { console.error('Load addresses cache failed:', error); return; }
   allAddressesCache = {};
   (data || []).forEach(r => { allAddressesCache[r.name] = r; });
+  // 2026-05-13 fix (シンヤ_r2 反馈): cache 加载完必须 recalculate, 否则 dropshipExtraFor
+  // 第一次 paint 时 cache 还空 → 偏远附加返 0 → 北京/上海团员的 ¥3.45 显示成 base ¥2.45.
+  // 团长视角更明显, 因为他们不会进 "全部地址" 面板凑巧触发其他 recalculate 路径.
+  if (typeof recalculate === 'function') recalculate();
 }
 
 let _renderAddrPanelTimer = null;
