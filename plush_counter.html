@@ -185,7 +185,6 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
   <div class="settings">
     <span class="tag editable" id="nickTag" title="点击修改昵称">未设置账号</span>
     <span class="tag" id="tierTag">当前固定价：不发声 ¥26 / 发声 ¥26.5</span>
-    <span class="grand-info" id="grandInfo">当前全体额外加价：¥0.00</span>
   </div>
 </header>
 
@@ -197,6 +196,7 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
       <div class="hero-meta">
         <span class="pill orange">不发声版 ¥26 / 个</span>
         <span class="pill gold">发声版 ¥26.5 / 个</span>
+        <span class="pill orange">另含运费 ¥4.5 / 件</span>
         <span class="pill green">两种版本都可以同时填写</span>
       </div>
     </div>
@@ -210,14 +210,13 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
       <h3>淘宝原商品链接</h3>
       <p>想直接跳到淘宝原链接看商品详情的话，可以用这里。复制后也能直接发给别人。</p>
       <div class="purchase-linkbox" id="taobaoLinkText">
-        <strong>【淘宝】</strong>
-        <span>退货运费险 https://e.tb.cn/h.ijTf1bnJv05FYln?tk=poSE5cNeE3D MF937 「章鱼小挂件 只包含毛绒小挂件和橙色钥匙圈钥匙链」 点击链接直接打开 或者 淘宝搜索直接打开</span>
+        <span>现在暂不可用，请等待团长开团</span>
       </div>
       <div class="copy-hint" id="copyHint">已复制淘宝链接。</div>
     </div>
     <div class="purchase-actions">
-      <a class="btn btn-outline" href="https://e.tb.cn/h.ijTf1bnJv05FYln?tk=poSE5cNeE3D" target="_blank" rel="noopener noreferrer">打开淘宝</a>
-      <button class="btn btn-primary" id="copyTaobaoBtn" type="button">一键复制</button>
+      <a class="btn btn-outline" href="javascript:void(0)" aria-disabled="true" style="pointer-events:none;opacity:.45;cursor:not-allowed">打开淘宝</a>
+      <button class="btn btn-primary" id="copyTaobaoBtn" type="button" disabled style="opacity:.45;cursor:not-allowed">一键复制</button>
     </div>
   </section>
 
@@ -325,7 +324,7 @@ const MEMBER_KEY = 'plush_member_name';
 const DISPLAY_KEY = 'plush_display_nick';
 const DRAFT_KEY = 'plush_pending_draft';
 const NEXT_SEQ_KEY = 'plush_next_seq';
-const TAOBAO_TEXT = '【淘宝】退货运费险 https://e.tb.cn/h.ijTf1bnJv05FYln?tk=poSE5cNeE3D MF937 「章鱼小挂件 只包含毛绒小挂件和橙色钥匙圈钥匙链」 点击链接直接打开 或者 淘宝搜索直接打开';
+const TAOBAO_TEXT = '现在暂不可用，请等待团长开团';
 const SILENT_UNIT_PRICE = 26;
 const SOUND_UNIT_PRICE = 26.5;
 
@@ -532,7 +531,7 @@ function recalc() {
   document.getElementById('statSilentQty').textContent = totalSilent;
   document.getElementById('statSoundPct').textContent = totalQty ? ('占总数量 ' + Math.round(totalSound / totalQty * 100) + '%') : '还没有记录';
   document.getElementById('statSilentPct').textContent = totalQty ? ('占总数量 ' + Math.round(totalSilent / totalQty * 100) + '%') : '还没有记录';
-  document.getElementById('grandInfo').textContent = '发声版总额外加价：¥' + (totalSound * 0.5).toFixed(2);
+  // 2026-05-19: 妈妈要求删掉 grandInfo chip, 这里不再更新 (DOM 也已删除)
   document.getElementById('tierTag').textContent = '当前固定价：不发声 ¥26 / 发声 ¥26.5';
 
   const tbody = document.getElementById('tbody');
