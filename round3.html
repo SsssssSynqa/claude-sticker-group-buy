@@ -369,13 +369,13 @@ section{padding:14px}
       <p>五个团统一汇总下单购买，数量越多单价越低；但收款、核账和后续发货按各团分别进行</p>
 
       <h4>流程与时间</h4>
-      <p><span class="tag tag-warn">截团通知</span> <strong>4月1日晚24:00截止登记</strong>，截止后网站会更新付款方式</p>
-      <p><span class="tag tag-date">4月2日起</span> 锁单，<strong>不可再更改数量</strong></p>
-      <p><span class="tag tag-date">4月2日-4日</span> 付款时间，预计<strong>4月4日晚截止付款</strong></p>
+      <p><span class="tag tag-warn">截团通知</span> 截止登记时间 <strong>待团长公布</strong>，截止后网站会更新付款方式</p>
+      <p><span class="tag tag-date">锁单时间</span> <strong>待团长公布</strong>，锁单后<strong>不可再更改数量</strong></p>
+      <p><span class="tag tag-date">付款时间</span> <strong>待团长公布</strong>，请关注各团群通知</p>
       <p><span class="tag tag-warn">注意</span> 锁单后点击「📱 查看付款码」查看你所在团的团长收款码</p>
 
       <h4>费用说明</h4>
-      <p>Round3 当前共开放 <strong>25 款</strong> 贴纸，包含第一批 13 款和今天新增的后 12 款</p>
+      <p>Round3 共开放 <strong>25 款</strong> 贴纸</p>
       <p>价格来源：<a href="https://www.stickermule.com/claudecode" target="_blank">Sticker Mule</a>，以 USD 计价，页面会根据总量实时计算当前档位单价</p>
       <p>人民币金额按实际汇率换算；若产生关税，默认按全体团员占比分摊</p>
       <p>国内邮费等到货后另算，到时再按各团实际发货情况处理</p>
@@ -419,15 +419,15 @@ section{padding:14px}
 
 <div class="lock-banner" id="lockBanner">🔒 已锁单 — 所有贴纸数量已锁定，不可修改</div>
 
-<!-- 每次刷新弹出的提示弹窗 -->
+<!-- Round3 登记中提示弹窗 (每次登录弹一次, 用户可关闭) -->
 <div id="reminderOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:3000;display:none;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:16px;padding:28px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center">
-    <div style="font-size:28px;margin-bottom:12px">📢</div>
-    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">进入发货流程</h3>
+  <div style="background:#fff;border-radius:16px;padding:28px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center">
+    <div style="font-size:28px;margin-bottom:12px">📝</div>
+    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">Round3 拼团登记中</h3>
     <div style="text-align:left;font-size:14px;line-height:1.9;color:#333">
-      <p style="margin:0 0 10px"><strong>🧧 1、2、3 团：</strong>走闲鱼补邮费，群内通知，<strong>无需在网站填地址</strong>。</p>
-      <p style="margin:0 0 10px"><strong>📦 4、5 团：</strong>在网站<strong>填收货地址</strong>，点「<strong>📱 查看付款码</strong>」<strong>按页面显示的金额付款</strong>。<span style="color:#E8714A">汇率已从统一 7.1 改成下单时的实际汇率，每人金额不同，请以付款码页面为准</span>，清关费另计按全员占比分摊。</p>
-      <p style="margin:0;background:#FFF4E6;padding:10px 12px;border-radius:8px;border-left:3px solid #E8714A;font-size:13px;line-height:1.6"><strong>💰 付款时请务必备注「编号 + 昵称」</strong>，方便团长核账～</p>
+      <p style="margin:0 0 10px"><strong>现在是登记阶段</strong>，<span style="color:#E8714A">还没有开团付款</span>。先选好你想要的款式和数量保存就行。</p>
+      <p style="margin:0 0 10px"><strong>开团时间</strong>由团长在<strong>各团群里通知</strong>，到时网站会更新付款方式和发货流程。</p>
+      <p style="margin:0;background:#FFF4E6;padding:10px 12px;border-radius:8px;border-left:3px solid #E8714A;font-size:13px;line-height:1.6"><strong>💡 提示</strong>：截团 / 锁单 / 付款 / 发货时间都<strong>待团长公布</strong>，请留意所在团的群消息～</p>
     </div>
     <button onclick="document.getElementById('reminderOverlay').style.display='none'" style="margin-top:20px;padding:10px 36px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3)">我知道了</button>
   </div>
@@ -2241,13 +2241,17 @@ async function saveAddress() {
 function updateAddressBtn() {
   const btn = document.getElementById('btnAddress');
   if (!btn) return;
-  btn.style.display = (myName && DROPSHIP_TEAMS.includes(myTeam)) ? '' : 'none';
+  // 2026-05-21: Round3 登记阶段强制隐藏,等开团进入发货阶段再恢复
+  // 原逻辑: btn.style.display = (myName && DROPSHIP_TEAMS.includes(myTeam)) ? '' : 'none';
+  btn.style.display = 'none';
 }
 
 function updateTrackingBtn() {
   const btn = document.getElementById('btnTracking');
   if (!btn) return;
-  btn.style.display = (myName && DROPSHIP_TEAMS.includes(myTeam)) ? '' : 'none';
+  // 2026-05-21: Round3 登记阶段强制隐藏,等开团进入发货阶段再恢复
+  // 原逻辑: btn.style.display = (myName && DROPSHIP_TEAMS.includes(myTeam)) ? '' : 'none';
+  btn.style.display = 'none';
 }
 
 async function showMyTracking() {
