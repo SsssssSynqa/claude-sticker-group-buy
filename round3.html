@@ -371,13 +371,14 @@ section{padding:14px}
 
       <h4>流程与时间</h4>
       <p><span class="tag tag-warn">截团通知</span> 截止登记时间 <strong>5 月 31 日 中午 12:00</strong>，截止后网站会更新付款方式</p>
-      <p><span class="tag tag-date">锁单时间</span> <strong>待团长公布</strong>，锁单后<strong>不可再更改数量</strong></p>
-      <p><span class="tag tag-date">付款时间</span> <strong>待团长公布</strong>，请关注各团群通知</p>
+      <p><span class="tag tag-date">锁单时间</span> <strong>5 月 31 日 中午 12:00</strong>（截单即锁单），锁单后<strong>不可再更改数量</strong></p>
+      <p><span class="tag tag-date">付款时间</span> <strong>5 月 31 日下午 13:00 左右开始</strong>，付款期 3 天，<strong>6 月 3 日截止</strong>，请关注各团群通知</p>
       <p><span class="tag tag-warn">注意</span> 锁单后点击「📱 查看付款码」查看你所在团的团长收款码</p>
 
       <h4>费用说明</h4>
       <p>Round3 共开放 <strong>25 款</strong> 贴纸</p>
       <p>价格来源：<a href="https://www.stickermule.com/claudecode" target="_blank">Sticker Mule</a>，以 USD 计价，页面会根据总量实时计算当前档位单价</p>
+      <p style="background:#FFF4E6;padding:8px 12px;border-radius:8px;border-left:3px solid #E8714A">💡 <strong>多款折扣</strong>：Sticker Mule 多款一起买有阶梯折扣（Discount for multiple designs），最终单价约为页面显示价的 <strong>7 折左右</strong>，之前觉得价格贵的老师可以考虑加单～</p>
       <p>人民币金额按实际汇率换算；若产生关税，默认按全体团员占比分摊</p>
       <p>国内邮费等到货后另算，到时再按各团实际发货情况处理</p>
 
@@ -428,7 +429,7 @@ section{padding:14px}
     <div style="text-align:left;font-size:14px;line-height:1.9;color:#333">
       <p style="margin:0 0 10px"><strong>现在是登记阶段</strong>，<span style="color:#E8714A">还没有开团付款</span>。先选好你想要的款式和数量保存就行。</p>
       <p style="margin:0 0 10px"><strong>开团时间</strong>由团长在<strong>各团群里通知</strong>，到时网站会更新付款方式和发货流程。</p>
-      <p style="margin:0;background:#FFF4E6;padding:10px 12px;border-radius:8px;border-left:3px solid #E8714A;font-size:13px;line-height:1.6"><strong>⏰ 截团时间</strong>：<strong style="color:#E8714A">5 月 31 日 中午 12:00</strong>，请在截团前选好数量并保存。锁单 / 付款 / 发货时间<strong>待团长公布</strong>，请留意所在团的群消息～</p>
+      <p style="margin:0;background:#FFF4E6;padding:10px 12px;border-radius:8px;border-left:3px solid #E8714A;font-size:13px;line-height:1.6"><strong>⏰ 截团 + 锁单</strong>：<strong style="color:#E8714A">5 月 31 日 中午 12:00</strong>（之后不可改数量）。<strong>💰 付款</strong>：截单后约 13:00 开始、<strong>6 月 3 日截止</strong>。发货时间另行通知，请留意所在团的群消息～</p>
     </div>
     <button onclick="document.getElementById('reminderOverlay').style.display='none'" style="margin-top:20px;padding:10px 36px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3)">我知道了</button>
   </div>
@@ -539,7 +540,7 @@ const TEAM_QR = {4: 'r2-pay-4.png', 5: 'r2-pay-5.png', 6: 'r2-pay-5.png'}; // 1-
 const ROUND2_TEAMS = [1, 2, 3, 4, 5, 6];
 const DROPSHIP_TEAMS = [4, 5, 6];   // 走代发的团，需要填地址 + 加运费
 const DROPSHIP_FEE = 8.75;       // 代发运费基础（¥/单,含首程分摊）+ 北京上海+1 + 新疆西藏+13
-const PAYMENT_FEATURES_ENABLED = true;
+const PAYMENT_FEATURES_ENABLED = false;
 const PAYMENT_QR_ENABLED = true; // 4/5/6团代发运费开放线上收款
 const REGISTRATION_PHASE = true; // 登记阶段（开团付款前）：isRunaway() 短路返回 false，
                                  // 大家都还没付款不能算跑单。开团进入付款阶段后改为 false。
