@@ -3507,7 +3507,7 @@ function exportMyOrder() {
   }
   const isDropship = DROPSHIP_TEAMS.includes(myTeam);
   const shipExtra = isDropship ? dropshipExtraFor(myName) : 0;
-  const shippingFee = isDropship ? r2(DROPSHIP_FEE + shipExtra) : 0;
+  const shippingFee = (COLLECT_SHIPPING && isDropship) ? r2(DROPSHIP_FEE + shipExtra) : 0;  // 运费; COLLECT_SHIPPING=false 全团不收(含导出)
   const myPackingFee = packingFeeFor(myName);
   const estCNY = r2(totalUSD * rate);
   const estFee = r2(estCNY * 0.001);
@@ -3741,7 +3741,7 @@ function showOrderDetail(name) {
     if (dr > 0 && r2TotalUSD > 0) {
       const actBase = r2(r2TotalUSD * dr * rate);
       const actFee = r2(actBase * 0.001);
-      const shippingFee = DROPSHIP_TEAMS.includes(teamNum) ? r2(DROPSHIP_FEE + dropshipExtraFor(name)) : 0;
+      const shippingFee = (COLLECT_SHIPPING && DROPSHIP_TEAMS.includes(teamNum)) ? r2(DROPSHIP_FEE + dropshipExtraFor(name)) : 0;  // 运费; COLLECT_SHIPPING=false 全团不收(团长导出)
       const myPackFee = packingFeeFor(name);
       const actTotal = r2(actBase + actFee + myTax + shippingFee + myPackFee);
       addRow(footer, '实际应付', '\u00a5' + actTotal.toFixed(2), {main: true});
