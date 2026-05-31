@@ -418,12 +418,12 @@ section{padding:14px}
 <!-- Round3 登记中提示弹窗 (每次登录弹一次, 用户可关闭) -->
 <div id="reminderOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:3000;display:none;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:16px;padding:28px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center">
-    <div style="font-size:28px;margin-bottom:12px">📢</div>
-    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">Round3 已锁单 · 付款须知</h3>
+    <div style="font-size:28px;margin-bottom:12px">🎉</div>
+    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">Round3 已开始付款</h3>
     <div style="text-align:left;font-size:14px;line-height:1.9;color:#333">
-      <p style="margin:0 0 10px"><strong>数量已锁定</strong>，不可再修改。<span style="color:#E8714A">即将开放付款</span>，请留意各团群通知。</p>
-      <p style="margin:0 0 10px"><strong>📦 本次全团统一走代发</strong>：付款后点「填写收货地址」填好收件信息，代发方统一打包国内发货。付款 <strong>约 13:00 开始、6 月 3 日截止</strong>，全团统一扫 <strong>鹅鹅</strong> 的码、<strong>不收运费</strong>（到货后另补）。</p>
-      <p style="margin:0;background:#FFEAEA;padding:10px 12px;border-radius:8px;border-left:3px solid #D94040;font-size:13px;line-height:1.7"><strong style="color:#D94040">⚠️ 付款时务必备注「编号 + 昵称」！</strong>否则团长核对不到你的付款。编号显示在你的付款页面顶部。</p>
+      <p style="margin:0 0 10px"><strong>截团锁单完成，现在开始付款！</strong>点「📱 查看付款码」扫码付，<strong>付款截图 + 导出订单发群</strong>。付款 <strong>6 月 3 日截止</strong>，逾期未付按跑单掉落。</p>
+      <p style="margin:0 0 10px;background:#FFEAEA;padding:10px 12px;border-radius:8px;border-left:3px solid #D94040;font-size:13px;line-height:1.7"><strong style="color:#D94040">🔴 两件事必做</strong>：① 付款备注「编号 + 昵称」；② <strong style="color:#D94040">左上角把团号改成你所在微信群的团</strong>！全团统一由鹅鹅收款，团号对得上才能找到你。</p>
+      <p style="margin:0;background:#FFF4E6;padding:10px 12px;border-radius:8px;border-left:3px solid #E8714A;font-size:13px;line-height:1.6"><strong>📦 全团代发</strong>（付款后填地址）。汇率 <strong>7.1</strong>、本次<strong>不收运费</strong>；到货后按购汇实时汇率重算关税/运费，<strong>多退少补，0 盈利团</strong>。</p>
     </div>
     <button onclick="document.getElementById('reminderOverlay').style.display='none'" style="margin-top:20px;padding:10px 36px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3)">我知道了</button>
   </div>
@@ -535,9 +535,9 @@ const ROUND2_TEAMS = [1, 2, 3, 4, 5, 6];
 const DROPSHIP_TEAMS = [1, 2, 3, 4, 5, 6];   // 2026-05-31 全团统一代发, 都填地址(运费这一波由 COLLECT_SHIPPING 关闭, 不收)
 const DROPSHIP_FEE = 8.75;       // 代发运费基础（¥/单,含首程分摊）+ 北京上海+1 + 新疆西藏+13
 const COLLECT_SHIPPING = false;  // 2026-05-31 这一波不收运费(到货后另补); false=全团运费归0, 恢复改 true
-const PAYMENT_FEATURES_ENABLED = false;
+const PAYMENT_FEATURES_ENABLED = true;
 const PAYMENT_QR_ENABLED = true; // 4/5/6团代发运费开放线上收款
-const REGISTRATION_PHASE = true; // 登记阶段（开团付款前）：isRunaway() 短路返回 false，
+const REGISTRATION_PHASE = false; // 2026-05-31 已开付款：isRunaway() 正常判断跑单，
                                  // 大家都还没付款不能算跑单。开团进入付款阶段后改为 false。
 
 // ============ STICKER DATA ============
