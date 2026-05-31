@@ -534,12 +534,13 @@ const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
 const ADMIN_NAMES = ['鹅鹅', '鹅'];
 const ADDRESS_VIEWERS = ['鹅鹅', '鹅', '代发']; // 能查看所有代发地址的白名单（admin + 指定代发账号）
-const TEAM_LEADERS = {1: '豆沙', 2: 'Mori', 3: 'G', 4: 'シンヤ_r2', 5: '鹅鹅', 6: '鹅鹅'};
+const TEAM_LEADERS = {1: '鹅鹅', 2: '鹅鹅', 3: '鹅鹅', 4: '鹅鹅', 5: '鹅鹅', 6: '鹅鹅'}; // 2026-05-31 锁单: 1234团人少, 全团统一鹅鹅一人收款+管理
 // 2026-05-27: 加第 6 团 — 团长鹅鹅自己, 复用 5 团付款码 r2-pay-5.png (鹅鹅同时管 5+6 两个团)
-const TEAM_QR = {4: 'r2-pay-4.png', 5: 'r2-pay-5.png', 6: 'r2-pay-5.png'}; // 1-3团线下结算不需要付款码
+const TEAM_QR = {1: 'r2-pay-5.png', 2: 'r2-pay-5.png', 3: 'r2-pay-5.png', 4: 'r2-pay-5.png', 5: 'r2-pay-5.png', 6: 'r2-pay-5.png'}; // 2026-05-31 全团统一鹅鹅 pay-5 收款码
 const ROUND2_TEAMS = [1, 2, 3, 4, 5, 6];
 const DROPSHIP_TEAMS = [4, 5, 6];   // 走代发的团，需要填地址 + 加运费
 const DROPSHIP_FEE = 8.75;       // 代发运费基础（¥/单,含首程分摊）+ 北京上海+1 + 新疆西藏+13
+const COLLECT_SHIPPING = false;  // 2026-05-31 这一波不收运费(到货后另补); false=全团运费归0, 恢复改 true
 const PAYMENT_FEATURES_ENABLED = false;
 const PAYMENT_QR_ENABLED = true; // 4/5/6团代发运费开放线上收款
 const REGISTRATION_PHASE = true; // 登记阶段（开团付款前）：isRunaway() 短路返回 false，
@@ -2005,7 +2006,7 @@ function showPaymentQR() {
   const myCNY = r2(myUSD * rate);
   const myFee = r2(myCNY * 0.001);
   const shipExtra = isDropship ? dropshipExtraFor(myName) : 0;  // 北京上海+1 / 新疆西藏+13
-  const shippingFee = isDropship ? r2(DROPSHIP_FEE + shipExtra) : 0;  // 4/5/6团代发运费 ¥8.75/单 + 偏远附加
+  const shippingFee = (COLLECT_SHIPPING && isDropship) ? r2(DROPSHIP_FEE + shipExtra) : 0;  // 运费; COLLECT_SHIPPING=false 时全团不收
   const myPackingFee = packingFeeFor(myName); // 1/2/3团包材费分摊
   const myEstTotal = r2(myCNY + myFee + shippingFee + myPackingFee);
   // Actual amounts (with SM multi-design discount + tax) - 跑单者不分摊关税
@@ -2025,11 +2026,11 @@ function showPaymentQR() {
     myActualTotal = r2(myCNY + myFee + myPackingFee);
   }
 
-  document.getElementById('payQrTitle').textContent = isDropship ? ('团' + team + ' 付款码') : ('团' + team + ' 结算');
+  document.getElementById('payQrTitle').textContent = qrSrc ? ('团' + team + ' 付款码') : ('团' + team + ' 结算');
   document.getElementById('payQrLeader').textContent = '团长：' + leader;
   const wrap = document.getElementById('payQrImgWrap');
   wrap.replaceChildren();
-  if (isDropship && qrSrc) {
+  if (qrSrc) {
     const img = document.createElement('img');
     img.src = qrSrc;
     img.alt = '团' + team + '付款码';
@@ -3258,7 +3259,7 @@ function recalculate() {
       const personTax = (taxCNY > 0 && grandUSDActive > 0 && usd > 0 && !isRunaway(name)) ? r2(usd / grandUSDActive * taxCNY) : 0;
       teamTax += personTax;
       // Per-person shipping fee: 4/5/6 团有订单的人固定 ¥6.30/单
-      const personShipfee = (DROPSHIP_TEAMS.includes(g.team) && items > 0) ? r2(DROPSHIP_FEE + dropshipExtraFor(name)) : 0;
+      const personShipfee = (COLLECT_SHIPPING && DROPSHIP_TEAMS.includes(g.team) && items > 0) ? r2(DROPSHIP_FEE + dropshipExtraFor(name)) : 0;
       teamShipfee += personShipfee;
       // Per-person packing fee: 1/2/3 团按订单 USD 比例分摊该团总包材费
       const personPackfee = (items > 0) ? packingFeeFor(name) : 0;
