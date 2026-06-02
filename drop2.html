@@ -499,7 +499,7 @@ const S = [
 ];
 
 // ============ DROP-SPECIFIC DATA ============
-const DROP_STOCK = {"clawd": 0, "ultrathink": 0, "clawd-happy": 0, "vibing-dc": 0, "clawd-shiny": 0, "claudecode": 0, "vibing-holo": 0, "reticulating": 0, "shipping": 0, "manifesting-holo": 0, "baking": 0, "clawd-wave": 0, "manifesting-glt": 0, "clawd-heart": 0, "clawd-headphones": 0, "clawd-wand": 0, "clawd-bubble": 0, "clawd-coffee": 0, "clawd-skateboard": 0, "clawd-book": 0, "clawd-cape": 0, "clawd-dizzy": 0, "clawd-kite": 0, "clawd-lightbulb": 0, "clawd-magnifier": 0}; // ★跑单库存待填,等妈妈给数字(改0为实际剩余)
+let DROP_STOCK = {"clawd": 0, "ultrathink": 0, "clawd-happy": 0, "vibing-dc": 0, "clawd-shiny": 0, "claudecode": 0, "vibing-holo": 0, "reticulating": 0, "shipping": 0, "manifesting-holo": 0, "baking": 0, "clawd-wave": 0, "manifesting-glt": 0, "clawd-heart": 0, "clawd-headphones": 0, "clawd-wand": 0, "clawd-bubble": 0, "clawd-coffee": 0, "clawd-skateboard": 0, "clawd-book": 0, "clawd-cape": 0, "clawd-dizzy": 0, "clawd-kite": 0, "clawd-lightbulb": 0, "clawd-magnifier": 0}; // ★跑单库存待填,等妈妈给数字(改0为实际剩余)
 const DROP_PREFIX = 'drop_r3_'; // R3掉落命名空间,与R2掉落(drop_)+主页(r3_)隔离
 function dropId(sid) { return DROP_PREFIX + sid.replace('r3_', ''); }
 function baseId(did) { return 'r3_' + did.replace(DROP_PREFIX, ''); }
@@ -555,6 +555,35 @@ function getRemainingStock(stickerObj) {
   return Math.max(0, (DROP_STOCK[stockKey(stickerObj)] || 0) - getClaimedQty(stickerObj));
 }
 
+// ============ 实时算跑单库存(网站自跑,无需定时任务/手动填) ============
+const DROP_PAYMENT_DEADLINE = new Date('2026-06-03T14:00:00+08:00'); // 付款截止;此刻前跑单未定→库存0
+const THIRTEEN_PLUS30 = new Set(['clawd','clawd-happy','clawd-shiny','clawd-heart','clawd-headphones','clawd-wand','clawd-coffee','clawd-skateboard','clawd-book','clawd-cape','clawd-dizzy','clawd-lightbulb','clawd-magnifier']); // 13款形象款:库存=跑单数+30;其余12款=跑单数
+async function computeDropStock() {
+  // 付款截止前:跑单还没定,库存全部置0
+  if (Date.now() < DROP_PAYMENT_DEADLINE.getTime()) { S.forEach(s => { DROP_STOCK[stockKey(s)] = 0; }); return; }
+  if (!sb) return;
+  try {
+    let rows = [], from = 0;
+    while (true) {
+      const {data, error} = await sb.from('orders').select('name,sticker_id,quantity').like('sticker_id', 'r3_%').order('id').range(from, from + 999);
+      if (error) throw error;
+      if (!data || !data.length) break;
+      rows = rows.concat(data);
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+    const ord = {}, paid = new Set();
+    for (const r of rows) {
+      const sid = r.sticker_id, nm = r.name, q = r.quantity || 0;
+      if (sid === 'r3__actual_paid') { if (q > 0) paid.add(nm); }
+      else if (sid.indexOf('r3_') === 0 && sid.indexOf('r3__') !== 0 && q > 0) { (ord[nm] = ord[nm] || {})[sid] = q; }
+    }
+    const runqty = {};
+    for (const nm in ord) { if (paid.has(nm)) continue; for (const sid in ord[nm]) { const k = sid.slice(3); runqty[k] = (runqty[k] || 0) + ord[nm][sid]; } }
+    S.forEach(s => { const k = stockKey(s), rn = runqty[k] || 0; DROP_STOCK[k] = THIRTEEN_PLUS30.has(k) ? rn + 30 : rn; });
+  } catch(e) { console.error('computeDropStock failed:', e); }
+}
+
 // ============ SUPABASE ============
 function initSupabaseClient() {
   if (typeof window.supabase === 'undefined') return false;
@@ -563,7 +592,7 @@ function initSupabaseClient() {
 }
 async function initSupabase() {
   if (!sb && !initSupabaseClient()) { setConnected(false); updateStatus('SDK加载失败'); loadOffline(); return; }
-  try { await loadAll(); saveOffline(); subscribeRealtime(); setConnected(true); updateStatus('已连接'); }
+  try { await loadAll(); await computeDropStock(); saveOffline(); subscribeRealtime(); setConnected(true); updateStatus('已连接'); }
   catch(e) { console.error('Init failed:', e); setConnected(false); updateStatus('连接失败'); loadOffline(); }
 }
 
