@@ -314,7 +314,7 @@ section{padding:14px}
     <summary>贴纸掉落说明 · 请先阅读</summary>
     <div class="notice-body">
       <h4>什么是贴纸掉落？</h4>
-      <p>Round3 拼团结束后，部分团员未按时付款（跑单），他们预定的贴纸变成了<strong>剩余库存</strong>。这些贴纸已经购买并到货，现在以<strong>先到先得</strong>的方式开放领取。</p>
+      <p>Round3 拼团结束后，部分团员未按时付款（跑单），他们预定的贴纸变成了<strong>剩余库存</strong>，现在以<strong>先到先得</strong>的方式开放领取。</p>
       <p><span class="tag tag-warn">注意</span> 每款贴纸库存有限，领完即止。页面上会实时显示每款贴纸的剩余数量。</p>
 
       <h4>价格说明</h4>
@@ -331,7 +331,7 @@ section{padding:14px}
 
       <h4>开抢时间</h4>
       <p>为了公平起见，掉落页提前发出让大家浏览，<strong>具体开抢时间以页面顶部倒计时为准</strong>。倒计时归零前谁都不能下单，归零那一刻所有人同时开抢，先到先得。</p>
-      <p>本轮<strong>取消提前选购</strong>，所有人到点一起开抢——团长也不例外，绝对公平 🧡</p>
+      <p>所有人到点一起开抢——团长也不例外，绝对公平 🧡</p>
 
       <div class="notice-divider"></div>
 
@@ -342,7 +342,7 @@ section{padding:14px}
   </details>
 </div>
 
-<div class="lock-banner" id="lockBanner">🔒 已锁单 — 所有贴纸数量已锁定，不可修改</div>
+<div class="lock-banner" id="lockBanner">🔒 你已锁单 — 数量已锁定不可改,可以去扫码付款啦</div>
 <div class="countdown-banner" id="countdownBanner">
   <div class="cd-title">⏰ 贴纸掉落开抢倒计时</div>
   <div class="cd-timer" id="cdTimer">--:--:--</div>
@@ -362,7 +362,7 @@ section{padding:14px}
     <button class="btn-pay-confirm" id="btnPayConfirm" onclick="handlePayBtnClick()">💰 我已完成付款</button>
   </div>
   <div class="table-controls">
-    <button class="btn btn-lock" id="lockBtn" onclick="toggleLock()" style="display:none">🔒 锁单</button>
+    <button class="btn btn-lock" id="lockBtn" onclick="lockMyOrder()">🔒 锁单(锁后即可付款)</button>
     <button class="btn-clear-orders" id="btnClearOrders" onclick="clearMyOrders()">🗑 清空我的订单</button>
     <button class="btn" id="btnHideEmpty" onclick="toggleHideEmpty()" style="background:#F0F4FF;color:#6B7FA3;border:1px dashed #B8C9E0;font-size:11px">👁 隐藏空订单</button>
   </div>
@@ -531,7 +531,9 @@ S.forEach(s => { DROP_UNIT_PRICES[s.id] = unitPrice(s, R3_TOTALS[s.id] || 0); })
 let myName = localStorage.getItem('gb2_nickname') || '';
 let myTeam = parseInt(localStorage.getItem('gb2_team')) || 4;
 let allOrders = {}, allTeams = {}, allJoinOrder = {}, globalSeqMap = {};
-let rate = 7.10, sb = null, connected = false, hideEmptyOrders = true, isLocked = false;
+let rate = 7.10, sb = null, connected = false, hideEmptyOrders = true;
+let allLocked = {}; // {name:true} 个人锁单(存 orders.drop_r3__locked, 锁了不可改/不可解)
+function iAmLocked() { return !!allLocked[myName]; }
 let renderTimer = null, pendingChanges = {};
 let collapsedTeams = {}; // {team: bool} — true=折叠；未设置时默认折叠（除自己那行 .my-row 会穿透显示）
 const PENDING_DRAFT_KEY = 'drop_r3_pending_changes';
@@ -575,7 +577,7 @@ async function loadAll() {
     if (data.length < 1000) break;
     from += 1000;
   }
-  allOrders = {}; allTeams = {}; allPaySelf = {}; allPayLeader = {}; allActualPaid = {};
+  allOrders = {}; allTeams = {}; allPaySelf = {}; allPayLeader = {}; allActualPaid = {}; allLocked = {};
   const joinOrd = {};
   for (const row of orders) {
     if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
@@ -584,13 +586,13 @@ async function loadAll() {
     else if (row.sticker_id === 'drop_r3__payment_self') { if (row.quantity > 0) allPaySelf[row.name] = true; }
     else if (row.sticker_id === 'drop_r3__payment_leader') { if (row.quantity > 0) allPayLeader[row.name] = true; }
     else if (row.sticker_id === 'drop_r3__actual_paid') { if (row.quantity > 0) allActualPaid[row.name] = row.quantity / 100; }
+    else if (row.sticker_id === 'drop_r3__locked') { if (row.quantity > 0) allLocked[row.name] = true; }
     else if (row.quantity > 0) { if (!allOrders[row.name]) allOrders[row.name] = {}; allOrders[row.name][row.sticker_id] = row.quantity; }
   }
   allJoinOrder = joinOrd;
   const {data: settings} = await sb.from('settings').select('*');
   if (settings) for (const s of settings) {
     if (s.key === 'drop_r3_rate') rate = parseFloat(s.value) || 7.10;
-    if (s.key === 'drop_r3_locked') isLocked = s.value === '1';
   }
 }
 
@@ -604,13 +606,13 @@ function subscribeRealtime() {
     if (row.sticker_id === 'drop_r3__payment_self') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allPaySelf[row.name]; else if (p.new && p.new.quantity > 0) allPaySelf[p.new.name] = true; scheduleRender(); saveOffline(); return; }
     if (row.sticker_id === 'drop_r3__payment_leader') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allPayLeader[row.name]; else if (p.new && p.new.quantity > 0) allPayLeader[p.new.name] = true; scheduleRender(); saveOffline(); return; }
     if (row.sticker_id === 'drop_r3__actual_paid') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allActualPaid[row.name]; else if (p.new && p.new.quantity > 0) allActualPaid[p.new.name] = p.new.quantity / 100; scheduleRender(); saveOffline(); return; }
+    if (row.sticker_id === 'drop_r3__locked') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allLocked[row.name]; else if (p.new && p.new.quantity > 0) allLocked[p.new.name] = true; scheduleRender(); saveOffline(); return; }
     if (p.eventType === 'DELETE') { if (allOrders[row.name]) { delete allOrders[row.name][row.sticker_id]; if (!Object.keys(allOrders[row.name]).length) delete allOrders[row.name]; } }
     else { const {name, sticker_id, quantity} = p.new; if (!allOrders[name]) allOrders[name] = {}; if (quantity > 0) allOrders[name][sticker_id] = quantity; else { delete allOrders[name][sticker_id]; if (!Object.keys(allOrders[name]).length) delete allOrders[name]; } }
     scheduleRender(); saveOffline();
   }).on('postgres_changes', {event:'*', schema:'public', table:'settings'}, p => {
     if (!p.new) return;
     if (p.new.key === 'drop_r3_rate') { rate = parseFloat(p.new.value) || 7.10; document.getElementById('rateInput').value = rate; recalculate(); saveOffline(); }
-    if (p.new.key === 'drop_r3_locked') { isLocked = p.new.value === '1'; applyLockState(); saveOffline(); }
   }).subscribe(st => { setConnected(st === 'SUBSCRIBED'); });
 }
 
@@ -626,7 +628,7 @@ function updateSubmitBar() {
   else { bar.classList.remove('show'); clearPendingDraft(); }
 }
 async function submitCart() {
-  if (isLocked) { alert('已锁单，无法修改'); return; }
+  if (iAmLocked()) { alert('已锁单，无法修改'); return; }
   if (!isDropOpen()) { alert('还没到开抢时间哦，请等待倒计时归零～'); return; }
   if (!sb || !myName) return;
   const entries = Object.entries(pendingChanges);
@@ -644,11 +646,11 @@ async function submitCart() {
 }
 
 // ============ OFFLINE ============
-function saveOffline() { try { localStorage.setItem('drop_r3_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, isLocked, allPaySelf, allPayLeader, allActualPaid})); } catch(e) {} }
+function saveOffline() { try { localStorage.setItem('drop_r3_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, allLocked, allPaySelf, allPayLeader, allActualPaid})); } catch(e) {} }
 function savePendingDraft() { try { if (!myName || !Object.keys(pendingChanges).length) { clearPendingDraft(); return; } localStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify({name: myName, changes: pendingChanges})); } catch(e) {} }
 function clearPendingDraft() { try { localStorage.removeItem(PENDING_DRAFT_KEY); } catch(e) {} }
 function restorePendingDraft() { try { const d = JSON.parse(localStorage.getItem(PENDING_DRAFT_KEY)); if (!d || d.name !== myName || !d.changes) return; pendingChanges = d.changes; if (!allOrders[myName]) allOrders[myName] = {}; for (const [sid, qty] of Object.entries(pendingChanges)) { const v = Math.max(0, parseInt(qty) || 0); if (v > 0) allOrders[myName][sid] = v; else delete allOrders[myName][sid]; } } catch(e) {} }
-function loadOffline() { try { const d = JSON.parse(localStorage.getItem('drop_r3_cache')); if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 7.10; isLocked = !!d.isLocked; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; allActualPaid = d.allActualPaid || {}; } } catch(e) {} }
+function loadOffline() { try { const d = JSON.parse(localStorage.getItem('drop_r3_cache')); if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 7.10; allLocked = d.allLocked || {}; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; allActualPaid = d.allActualPaid || {}; } } catch(e) {} }
 
 // ============ UI ============
 function setConnected(on) { connected = on; const d = document.getElementById('connDot'); d.className = 'conn-dot ' + (on ? 'on' : 'off'); d.title = on ? '已连接' : '未连接'; }
@@ -756,7 +758,7 @@ function paymentStatusOf(n) { if (allPayLeader[n]) return 'confirmed'; if (allPa
 function paymentCellHTML(name, team) {
   const st = paymentStatusOf(name), isMe = name === myName, admin = isAdmin(myName);
   let h = st === 'confirmed' ? '<span class="pay-badge pay-confirmed">已确认</span>' : st === 'self' ? '<span class="pay-badge pay-self">待核实</span>' : '<span class="pay-badge pay-unpaid">未付</span>';
-  if (!isLocked) return h;
+  if (!allLocked[name]) return h;
   if (isMe && st === 'unpaid') h += ' <button class="pay-btn" onclick="confirmMyPay()">我已付款</button>';
   if (isMe && st === 'self') h += ' <button class="pay-btn active" onclick="cancelMyPay()">撤销</button>';
   if (admin && st === 'self') h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
@@ -816,69 +818,74 @@ async function adminClearUser(targetName) {
   deletes.push(sb.from('orders').delete().match({name: targetName, sticker_id: 'drop_r3__payment_self'}));
   deletes.push(sb.from('orders').delete().match({name: targetName, sticker_id: 'drop_r3__payment_leader'}));
   deletes.push(sb.from('orders').delete().match({name: targetName, sticker_id: 'drop_r3__actual_paid'}));
+  deletes.push(sb.from('orders').delete().match({name: targetName, sticker_id: 'drop_r3__locked'}));
   const results = await Promise.all(deletes);
   const errs = results.filter(r => r.error);
   if (errs.length) { alert('部分删除失败：' + errs.map(r => r.error.message).join(', ')); }
   else { alert(targetName + ' 的订单已清空'); }
-  delete allOrders[targetName]; delete allPaySelf[targetName]; delete allPayLeader[targetName]; delete allActualPaid[targetName];
+  delete allOrders[targetName]; delete allPaySelf[targetName]; delete allPayLeader[targetName]; delete allActualPaid[targetName]; delete allLocked[targetName];
   renderTable(); recalculate(); saveOffline();
 }
 
 // ============ LOCK ============
-async function toggleLock() {
-  if (!sb || !ADMIN_NAMES.includes(myName)) return;
-  const newVal = isLocked ? '0' : '1';
+async function lockMyOrder() {
+  if (!sb || !myName) return;
+  if (iAmLocked()) return;
+  if (!isDropOpen()) { alert('还没到开抢时间,先选好数量,等倒计时归零再锁～'); return; }
+  if (!confirm('锁单后你的数量就不能再改了,确定吗?(锁完马上可以扫码付款)')) return;
+  if (Object.keys(pendingChanges).length) { await submitCart(); }
   const lockBtn = document.getElementById('lockBtn');
   if (lockBtn) { lockBtn.disabled = true; lockBtn.textContent = '处理中...'; }
   try {
-    const {error} = await sb.from('settings').upsert(
-      {key: 'drop_r3_locked', value: newVal, updated_at: new Date().toISOString()},
-      {onConflict: 'key'}
+    const {error} = await sb.from('orders').upsert(
+      {name: myName, sticker_id: 'drop_r3__locked', quantity: 1, updated_at: new Date().toISOString()},
+      {onConflict: 'name,sticker_id'}
     );
     if (error) throw error;
-    isLocked = !isLocked;
+    allLocked[myName] = true;
     applyLockState();
     saveOffline();
   } catch(e) {
-    console.error('Lock toggle failed:', e);
-    alert('锁单操作失败：' + e.message);
+    console.error('Lock failed:', e);
+    alert('锁单失败：' + e.message);
+    if (lockBtn) lockBtn.disabled = false;
   }
-  if (lockBtn) lockBtn.disabled = false;
 }
 
 function applyLockState() {
+  const locked = iAmLocked();
   const banner = document.getElementById('lockBanner');
   const lockBtn = document.getElementById('lockBtn');
-  if (banner) banner.classList.toggle('show', isLocked);
+  if (banner) banner.classList.toggle('show', locked);
   if (lockBtn) {
-    if (ADMIN_NAMES.includes(myName)) {
-      lockBtn.style.display = '';
-      if (isLocked) {
-        lockBtn.textContent = '🔓 解锁';
-        lockBtn.className = 'btn btn-lock unlocked';
-      } else {
-        lockBtn.textContent = '🔒 锁单';
-        lockBtn.className = 'btn btn-lock';
-      }
+    lockBtn.style.display = '';
+    if (locked) {
+      lockBtn.textContent = '✓ 你已锁单';
+      lockBtn.className = 'btn btn-lock unlocked';
+      lockBtn.disabled = true;
+    } else {
+      lockBtn.textContent = '🔒 锁单(锁后即可付款)';
+      lockBtn.className = 'btn btn-lock';
+      lockBtn.disabled = false;
     }
   }
   document.querySelectorAll('.qty-btn').forEach(b => {
-    b.disabled = isLocked;
-    b.style.opacity = isLocked ? '.4' : '';
-    b.style.pointerEvents = isLocked ? 'none' : '';
+    b.disabled = locked;
+    b.style.opacity = locked ? '.4' : '';
+    b.style.pointerEvents = locked ? 'none' : '';
   });
   document.querySelectorAll('#orderTable input[type="number"]').forEach(inp => {
-    if (inp.dataset.ap) return; // actual-paid inputs stay editable after lock
-    inp.disabled = isLocked;
-    inp.style.opacity = isLocked ? '.5' : '';
+    if (inp.dataset.ap) return;
+    inp.disabled = locked;
+    inp.style.opacity = locked ? '.5' : '';
   });
   const clearBtn = document.getElementById('btnClearOrders');
   if (clearBtn) {
-    clearBtn.disabled = isLocked;
-    clearBtn.style.opacity = isLocked ? '.4' : '';
-    clearBtn.style.pointerEvents = isLocked ? 'none' : '';
+    clearBtn.disabled = locked;
+    clearBtn.style.opacity = locked ? '.4' : '';
+    clearBtn.style.pointerEvents = locked ? 'none' : '';
   }
-  if (isLocked) {
+  if (locked) {
     const bar = document.getElementById('submitBar');
     if (bar) bar.classList.remove('show');
     pendingChanges = {};
@@ -889,7 +896,7 @@ function applyLockState() {
 // ============ PAYMENT QR ============
 function showPaymentQR() {
   if (!PAYMENT_QR_ENABLED) { alert('付款码已关闭。'); return; }
-  if (!isLocked) { alert('截单后才能查看付款码哦～请等待团长锁单'); return; }
+  if (!iAmLocked()) { alert('请先点上方的「🔒 锁单」,锁单后才能查看付款码～'); return; }
   const team = myTeam;
   const leader = TEAM_LEADERS[team] || '未知';
   const qrSrc = TEAM_QR[team];
@@ -933,7 +940,7 @@ function closePaymentQR() {
 }
 
 function handlePayBtnClick() {
-  if (!isLocked) { alert('截单后才能确认付款哦～请等待团长锁单'); return; }
+  if (!iAmLocked()) { alert('请先点上方的「🔒 锁单」,锁单后才能确认付款～'); return; }
   const st = paymentStatusOf(myName);
   if (st === 'confirmed') return;
   if (st === 'self') cancelMyPay();
@@ -945,8 +952,8 @@ function updatePaymentBtns() {
   const qrBtn = document.getElementById('btnPayQR');
   if (!btn) return;
 
-  if (!isLocked) {
-    btn.textContent = '🔒 截单后付款';
+  if (!iAmLocked()) {
+    btn.textContent = '🔒 先锁单再付款';
     btn.className = 'btn-pay-confirm';
     btn.disabled = true;
     if (qrBtn) { qrBtn.style.opacity = '0.5'; qrBtn.style.pointerEvents = 'none'; }
@@ -977,7 +984,7 @@ function updatePaymentBtns() {
 // ============ FLUSH ON EXIT ============
 function flushPendingOnExit() {
   if (!sb || !myName || Object.keys(pendingChanges).length === 0) return;
-  if (isLocked) { savePendingDraft(); return; }
+  if (iAmLocked()) { savePendingDraft(); return; }
   savePendingDraft();
   const rows = Object.entries(pendingChanges).map(([sid, qty]) => ({
     name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()
@@ -1179,7 +1186,7 @@ function recalculate() {
 document.getElementById('orderTable').addEventListener('input', function(e) {
   const el = e.target;
   if (!el.matches('input[type="number"]') || !el.dataset.si) return;
-  if (isLocked) return;
+  if (iAmLocked()) return;
   const did = el.dataset.si;
   let v = Math.max(0, parseInt(el.value) || 0);
   // Stock check
@@ -1262,7 +1269,7 @@ function showOrderDetail(name) {
 }
 
 function clearMyOrders() {
-  if (isLocked) { alert('已锁单，无法修改'); return; }
+  if (iAmLocked()) { alert('已锁单，无法修改'); return; }
   if (!confirm('确定要清空你的所有订单吗？')) return;
   const sids = Object.keys(allOrders[myName] || {});
   delete allOrders[myName]; renderTable(); recalculate(); saveOffline();
@@ -1280,7 +1287,7 @@ function clearMyOrders() {
   document.getElementById('stickerGrid').addEventListener('click', function(e) {
     const btn = e.target.closest('.qty-btn');
     if (!btn || !myName) return;
-    if (isLocked) { alert('已锁单，无法修改'); return; }
+    if (iAmLocked()) { alert('已锁单，无法修改'); return; }
     const sid = btn.dataset.sid, dir = parseInt(btn.dataset.dir), did = dropId(sid);
     if (!allOrders[myName]) allOrders[myName] = {};
     const cur = allOrders[myName][did] || 0;
