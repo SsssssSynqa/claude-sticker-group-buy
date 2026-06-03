@@ -563,9 +563,11 @@ async function computeDropStock() {
   if (Date.now() < DROP_PAYMENT_DEADLINE.getTime()) { S.forEach(s => { DROP_STOCK[stockKey(s)] = 0; }); return; }
   if (!sb) return;
   try {
+    // 一次查"真款订单+实付名单"(同一快照·不分两次读,消掉时间差);只取这两类、绕开高频写入的其它伪列
+    const ids = S.map(s => s.id).concat('r3__actual_paid');
     let rows = [], from = 0;
     while (true) {
-      const {data, error} = await sb.from('orders').select('name,sticker_id,quantity').like('sticker_id', 'r3_%').order('id').range(from, from + 999);
+      const {data, error} = await sb.from('orders').select('name,sticker_id,quantity').in('sticker_id', ids).gt('quantity', 0).order('id').range(from, from + 999);
       if (error) throw error;
       if (!data || !data.length) break;
       rows = rows.concat(data);
@@ -573,11 +575,7 @@ async function computeDropStock() {
       from += 1000;
     }
     const ord = {}, paid = new Set();
-    for (const r of rows) {
-      const sid = r.sticker_id, nm = r.name, q = r.quantity || 0;
-      if (sid === 'r3__actual_paid') { if (q > 0) paid.add(nm); }
-      else if (sid.indexOf('r3_') === 0 && sid.indexOf('r3__') !== 0 && q > 0) { (ord[nm] = ord[nm] || {})[sid] = q; }
-    }
+    for (const r of rows) { if (r.sticker_id === 'r3__actual_paid') paid.add(r.name); else (ord[r.name] = ord[r.name] || {})[r.sticker_id] = r.quantity; }
     const runqty = {};
     for (const nm in ord) { if (paid.has(nm)) continue; for (const sid in ord[nm]) { const k = sid.slice(3); runqty[k] = (runqty[k] || 0) + ord[nm][sid]; } }
     S.forEach(s => { const k = stockKey(s), rn = runqty[k] || 0; DROP_STOCK[k] = THIRTEEN_PLUS30.has(k) ? rn + 30 : rn; });
