@@ -526,8 +526,14 @@ function unitPrice(sticker, qty) {
   const ratio = (qty - lower[0]) / (upper[0] - lower[0]);
   return (lower[1] + ratio * (upper[1] - lower[1])) / qty;
 }
+// Round3 SM多款折扣(Discount for multiple designs):真实单价 = 单款价 × 折扣比例
+// 折扣比例 = SM实际成交总价 ÷ 理论总价(各款单款价×数量),与主页 round3.html 同公式
+const DROP_ACTUAL_USD = 2004.5; // = 主页 settings.r3_actual_usd(SM购物车实际成交价);★若此值变动需同步
+let _dropGrandUSD = 0;
+S.forEach(s => { _dropGrandUSD += Math.round(unitPrice(s, R3_TOTALS[s.id] || 0) * (R3_TOTALS[s.id] || 0) * 100) / 100; });
+const DROP_DISCOUNT_RATIO = (DROP_ACTUAL_USD > 0 && _dropGrandUSD > 0) ? DROP_ACTUAL_USD / _dropGrandUSD : 1;
 const DROP_UNIT_PRICES = {};
-S.forEach(s => { DROP_UNIT_PRICES[s.id] = unitPrice(s, R3_TOTALS[s.id] || 0); });
+S.forEach(s => { DROP_UNIT_PRICES[s.id] = unitPrice(s, R3_TOTALS[s.id] || 0) * DROP_DISCOUNT_RATIO; });
 
 // ============ STATE ============
 let myName = localStorage.getItem('gb2_nickname') || '';
