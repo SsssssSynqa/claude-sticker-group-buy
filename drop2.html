@@ -325,8 +325,9 @@ section{padding:14px}
       <ol>
         <li>注册或登录账号（如果你是 Round3 老用户，可以直接用原昵称和密码登录）</li>
         <li>在贴纸卡片上点 <strong>+/-</strong> 按钮选择想要的数量（不能超过剩余库存）</li>
-        <li><strong>改完数量记得点底部的「保存」按钮！</strong></li>
-        <li>锁单后点击「查看付款码」扫码付款（统一付给鹅鹅）</li>
+        <li><strong>选好后点「🔒 锁单」</strong>——锁单会自动帮你保存，<strong>锁定后数量就不能再改了</strong></li>
+        <li><strong>锁完立刻就能付款</strong>：点「查看付款码」扫码付给鹅鹅，各锁各付、不用等别人</li>
+        <li><span class="tag tag-warn">重要</span> <strong>付款时务必备注「编号＋昵称」</strong>，方便核账（付款码页面会显示你的编号）</li>
       </ol>
 
       <h4>开抢时间</h4>
@@ -390,10 +391,11 @@ section{padding:14px}
 <div id="reminderOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:3000;display:none;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:16px;padding:28px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center">
     <div style="font-size:28px;margin-bottom:12px">⚠️</div>
-    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">选团提醒</h3>
+    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">开抢提醒 · 必看</h3>
     <div style="text-align:left;font-size:14px;line-height:1.8;color:#333">
-      <p style="margin:0 0 10px"><strong>你在哪个群就选哪个团！</strong>掉落的贴纸会和 Round3 的订单一起发货。</p>
-      <p style="margin:0"><strong>选错团会导致发货混乱，请务必确认！</strong></p>
+      <p style="margin:0 0 10px"><strong>① 你在哪个群就选哪个团！</strong>掉落贴纸和 Round3 订单一起发货，选错团发货会乱。</p>
+      <p style="margin:0 0 10px"><strong>② 选好后自己点「🔒 锁单」</strong>，锁定后不能改，但<strong>锁完马上就能付款</strong>，各锁各付不用等人。</p>
+      <p style="margin:0"><strong>③ 付款务必备注「编号＋昵称」</strong>，方便对账！</p>
     </div>
     <button onclick="document.getElementById('reminderOverlay').style.display='none';document.getElementById('countdownBanner').scrollIntoView({behavior:'smooth',block:'center'})" style="margin-top:20px;padding:10px 36px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3)">我知道了</button>
   </div>
@@ -415,7 +417,7 @@ const PAYMENT_QR_ENABLED = true;
 
 // ============ COUNTDOWN ============
 // 开抢时间：归零前所有人都不能选，归零后全员同时开抢（无提前选购）
-const DROP_OPEN_TIME = new Date('2026-06-01T00:00:00+08:00'); // ★★临时测试中★★ 正式值: 2026-06-03T20:00:00+08:00
+const DROP_OPEN_TIME = new Date('2026-06-03T20:00:00+08:00'); // 6/3晚8点开抢
 function isDropOpen() { return Date.now() >= DROP_OPEN_TIME.getTime(); }
 // 取消提前选购：无人有提前权，倒计时期间所有人(含admin/团长)一律不能选
 
@@ -556,7 +558,7 @@ function getRemainingStock(stickerObj) {
 }
 
 // ============ 实时算跑单库存(网站自跑,无需定时任务/手动填) ============
-const DROP_PAYMENT_DEADLINE = new Date('2026-06-01T00:00:00+08:00'); // ★★临时测试中★★ 正式值: 2026-06-03T14:00:00+08:00
+const DROP_PAYMENT_DEADLINE = new Date('2026-06-03T14:00:00+08:00'); // 付款截止;此刻前跑单未定→库存0
 const THIRTEEN_PLUS30 = new Set(['clawd','clawd-happy','clawd-shiny','clawd-heart','clawd-headphones','clawd-wand','clawd-coffee','clawd-skateboard','clawd-book','clawd-cape','clawd-dizzy','clawd-lightbulb','clawd-magnifier']); // 13款形象款:库存=跑单数+30;其余12款=跑单数
 async function computeDropStock() {
   // 付款截止前:跑单还没定,库存全部置0
