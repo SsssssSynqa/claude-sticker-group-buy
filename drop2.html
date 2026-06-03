@@ -577,7 +577,7 @@ async function computeDropStock() {
     const ord = {}, paid = new Set();
     for (const r of rows) { if (r.sticker_id === 'r3__actual_paid') paid.add(r.name); else (ord[r.name] = ord[r.name] || {})[r.sticker_id] = r.quantity; }
     const runqty = {};
-    for (const nm in ord) { if (paid.has(nm)) continue; for (const sid in ord[nm]) { const k = sid.slice(3); runqty[k] = (runqty[k] || 0) + ord[nm][sid]; } }
+    for (const nm in ord) { if (paid.has(nm) && !ADMIN_NAMES.includes(nm)) continue; /* admin(鹅/鹅鹅)的凑整订单无视付款状态、永远进掉落库存 */ for (const sid in ord[nm]) { const k = sid.slice(3); runqty[k] = (runqty[k] || 0) + ord[nm][sid]; } }
     S.forEach(s => { const k = stockKey(s), rn = runqty[k] || 0; DROP_STOCK[k] = THIRTEEN_PLUS30.has(k) ? rn + 30 : rn; });
   } catch(e) { console.error('computeDropStock failed:', e); }
 }
