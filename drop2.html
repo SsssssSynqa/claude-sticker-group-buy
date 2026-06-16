@@ -639,6 +639,14 @@ function hasAddr(name) {
   return !!(a && a.address);
 }
 
+function shippingFeeInfoFor(name, items) {
+  if (!COLLECT_SHIPPING || items <= 0) return {text: '—', amount: 0, status: 'none'};
+  if (r3PaidNames.has(name)) return {text: '随R3', amount: 0, status: 'r3'};
+  if (!hasAddr(name)) return {text: '待地址', amount: 0, status: 'missing'};
+  const amount = r2(DROPSHIP_FEE + dropshipExtraFor(name));
+  return {text: '¥' + amount.toFixed(2), amount, status: 'ready'};
+}
+
 // ============ 实时算跑单库存(网站自跑,无需定时任务/手动填) ============
 const DROP_PAYMENT_DEADLINE = new Date('2026-06-03T14:00:00+08:00'); // 付款截止;此刻前跑单未定→库存0
 const THIRTEEN_PLUS30 = new Set(['clawd','clawd-happy','clawd-shiny','clawd-heart','clawd-headphones','clawd-wand','clawd-coffee','clawd-skateboard','clawd-book','clawd-cape','clawd-dizzy','clawd-lightbulb','clawd-magnifier']); // 13款形象款:库存=跑单数+30;其余12款=跑单数
@@ -1584,7 +1592,7 @@ function renderTable() {
 
   let h = '<thead><tr><th class="col-idx">#</th><th class="col-name">昵称</th>';
   S.forEach(s => { h += '<th style="min-width:62px">' + s.name + '<span class="th-type ' + TYPE_CLS[s.type] + '">' + TYPE_LABEL[s.type] + '</span></th>'; });
-  h += '<th>总件数</th><th>USD</th><th>CNY</th><th>实付</th><th>应补/应退</th><th class="col-pay">付款</th></tr></thead><tbody>';
+  h += '<th>总件数</th><th>USD</th><th>CNY</th><th>运费</th><th>实付</th><th>应补/应退</th><th class="col-pay">付款</th></tr></thead><tbody>';
 
   const sorted = Object.entries(allJoinOrder).sort((a,b) => a[1] - b[1]);
   const seqMap = {}; sorted.forEach(([n], i) => { seqMap[n] = i + 1; }); globalSeqMap = seqMap;
@@ -1596,7 +1604,7 @@ function renderTable() {
     if (!vis.length) return;
     h += '<tr class="team-header-row" data-team="' + g.team + '" onclick="toggleTeamCollapse(' + g.team + ')"><td class="col-idx"></td><td class="col-name"><span class="collapse-arrow">▶</span>' + label + '（' + vis.length + ' 人）</td>';
     S.forEach(() => { h += '<td></td>'; });
-    h += '<td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+    h += '<td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
     vis.forEach(name => {
       const isMe = name === myName, o = allOrders[name] || {};
@@ -1606,7 +1614,7 @@ function renderTable() {
         const did = dropId(s.id), v = o[did] || 0;
         h += isMe ? '<td><input type="number" min="0" value="' + (v||'') + '" data-si="' + did + '"></td>' : '<td>' + (v||'') + '</td>';
       });
-      h += '<td class="pt-items" id="pi-' + pi + '">0</td><td class="pt-usd" id="pu-' + pi + '">\u2014</td><td class="pt-cny" id="pc-' + pi + '">\u2014</td>';
+      h += '<td class="pt-items" id="pi-' + pi + '">0</td><td class="pt-usd" id="pu-' + pi + '">\u2014</td><td class="pt-cny" id="pc-' + pi + '">\u2014</td><td class="pt-shipfee" id="psf-' + pi + '">\u2014</td>';
       // Actual paid column — editable by admin only
       const apVal = allActualPaid[name];
       const canEditAP = isAdmin(myName);
@@ -1622,7 +1630,7 @@ function renderTable() {
 
     h += '<tr class="team-subtotal"><td class="col-idx"></td><td class="col-name">' + label + '小计</td>';
     S.forEach(s => { h += '<td id="tsq-' + g.team + '-' + s.id + '"></td>'; });
-    h += '<td id="tsi-' + g.team + '"></td><td id="tsu-' + g.team + '"></td><td id="tsc-' + g.team + '"></td><td id="tsap-' + g.team + '"></td><td id="tsow-' + g.team + '"></td><td></td></tr>';
+    h += '<td id="tsi-' + g.team + '"></td><td id="tsu-' + g.team + '"></td><td id="tsc-' + g.team + '"></td><td id="tss-' + g.team + '"></td><td id="tsap-' + g.team + '"></td><td id="tsow-' + g.team + '"></td><td></td></tr>';
   });
   h += '</tbody>';
 
@@ -1669,7 +1677,7 @@ function recalculate() {
   const td = getTeamsData();
   let pi = 0, gItems = 0, gUSD = 0, gCNY = 0;
   td.forEach(g => {
-    let tItems = 0, tUSD = 0, tCNY = 0, tActualPaid = 0;
+    let tItems = 0, tUSD = 0, tCNY = 0, tShippingKnown = 0, tActualPaid = 0;
     const tsq = {}; S.forEach(s => { tsq[s.id] = 0; });
     const vis = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
     if (!vis.length) return;
@@ -1683,6 +1691,13 @@ function recalculate() {
       if (pie) pie.textContent = items;
       if (pue) pue.textContent = items > 0 ? '$' + usd.toFixed(2) : '\u2014';
       if (pce) pce.textContent = items > 0 ? '\u00A5' + tot.toFixed(2) : '\u2014';
+      const shipInfo = shippingFeeInfoFor(name, items);
+      const psfe = document.getElementById('psf-' + pi);
+      if (psfe) {
+        psfe.textContent = shipInfo.text;
+        psfe.style.color = shipInfo.status === 'ready' ? '#8B6EAE' : shipInfo.status === 'missing' ? '#E8714A' : '#999';
+      }
+      tShippingKnown += shipInfo.amount;
       // Owe/refund column
       const paid = allActualPaid[name] || 0;
       if (allActualPaid[name] !== undefined) tActualPaid += allActualPaid[name];
@@ -1703,6 +1718,8 @@ function recalculate() {
     if (ti) ti.textContent = tItems;
     if (tu) tu.textContent = tItems > 0 ? '$' + tUSD.toFixed(2) : '\u2014';
     if (tc) tc.textContent = tItems > 0 ? '\u00A5' + tCNY.toFixed(2) : '\u2014';
+    const tssEl = document.getElementById('tss-' + g.team);
+    if (tssEl) tssEl.textContent = tShippingKnown > 0 ? '\u00A5' + tShippingKnown.toFixed(2) : '\u2014';
     const tsapEl = document.getElementById('tsap-' + g.team);
     if (tsapEl) tsapEl.textContent = tActualPaid > 0 ? '\u00A5' + tActualPaid.toFixed(2) : '\u2014';
     const tsowEl = document.getElementById('tsow-' + g.team);
