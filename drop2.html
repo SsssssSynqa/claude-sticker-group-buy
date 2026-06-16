@@ -422,15 +422,16 @@ section{padding:14px}
   <button class="submit-bar-btn" id="submitBtn" onclick="submitCart()">保存</button>
 </div>
 
-<!-- 每次刷新弹出的选团提示弹窗 -->
+<!-- 每次刷新弹出的掉落页填地址+补运费提示弹窗 -->
 <div id="reminderOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:3000;display:none;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:16px;padding:28px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center">
-    <div style="font-size:28px;margin-bottom:12px">⚠️</div>
-    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">开抢提醒 · 必看</h3>
-    <div style="text-align:left;font-size:14px;line-height:1.8;color:#333">
-      <p style="margin:0 0 10px"><strong>① 你在哪个群就选哪个团！</strong>掉落贴纸和 Round3 订单一起发货，选错团发货会乱。</p>
-      <p style="margin:0 0 10px"><strong>② 选好后自己点「🔒 锁单」</strong>，锁定后不能改，但<strong>锁完马上就能付款</strong>，各锁各付不用等人。</p>
-      <p style="margin:0"><strong>③ 付款务必备注「编号＋昵称」</strong>，方便对账！</p>
+  <div style="background:#fff;border-radius:16px;padding:28px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center">
+    <div style="font-size:28px;margin-bottom:12px">📦</div>
+    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">掉落贴纸到货 · 填地址 + 补运费</h3>
+    <div style="text-align:left;font-size:14px;line-height:1.9;color:#333">
+      <p style="margin:0 0 10px">贴纸已经到国内啦！<strong>只在掉落页下单、Round3 没有订单的人</strong>，请在本页先点「📦 填写收货地址」，再点「📱 查看付款码」按页面显示金额补运费。</p>
+      <p style="margin:0 0 10px;background:#FFEAEA;padding:10px 12px;border-radius:8px;border-left:3px solid #D94040;font-size:13px;line-height:1.7"><strong style="color:#D94040">🔴 如果你 Round3 有订单</strong>：请回 <strong>Round3 页面</strong> 填地址和补运费，掉落贴纸会和 Round3 订单一起发货，<strong>不要在两个页面重复付款</strong>。</p>
+      <p style="margin:0 0 10px;background:#FFF4E6;padding:10px 12px;border-radius:8px;border-left:3px solid #E8714A;font-size:13px;line-height:1.7">📍 运费按收件地区计算：基础 <strong>¥8.5/单</strong> + 偏远附加（<strong>北京/上海 +¥1</strong>，<strong>新疆/西藏 +¥13</strong>，其余地区不加）。没填地址不会显示应补金额。</p>
+      <p style="margin:0"><strong>付款备注仍然写「编号＋昵称」</strong>，方便鹅鹅核账。</p>
     </div>
     <button onclick="document.getElementById('reminderOverlay').style.display='none';document.getElementById('countdownBanner').scrollIntoView({behavior:'smooth',block:'center'})" style="margin-top:20px;padding:10px 36px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3)">我知道了</button>
   </div>
