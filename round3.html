@@ -465,7 +465,7 @@ section{padding:14px}
 <section id="allAddressesSection" style="display:none">
   <details id="allAddressesPanel">
     <summary style="cursor:pointer;font-weight:600;font-size:15px;color:#8B6EAE;padding:12px 16px;background:#F0EBF5;border-radius:10px;list-style:none;display:flex;align-items:center;flex-wrap:wrap;gap:8px">
-      <span style="flex:1;min-width:200px">📦 4/5/6团代发总览（仅管理员可见）</span>
+      <span style="flex:1;min-width:200px">📦 全团代发总览（仅管理员可见）</span>
       <button onclick="loadAllAddresses();event.preventDefault();event.stopPropagation()" style="padding:3px 10px;background:#fff;color:#8B6EAE;border:1px solid #B8A9C9;border-radius:6px;font-size:12px;cursor:pointer">🔄 刷新</button>
       <button onclick="exportAddressesCSV();event.preventDefault();event.stopPropagation()" style="padding:3px 10px;background:#8B6EAE;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">📥 导出代发表(含贴纸图)</button>
     </summary>
@@ -1152,6 +1152,12 @@ function dropshipExtraFor(name) {
   if (addr.includes('新疆') || addr.includes('西藏')) return 13;
   if (addr.includes('北京') || addr.includes('上海')) return 1;
   return 0;
+}
+
+// 2026-06-15: 是否已填收货地址——开收运费后, 没填地址算不出按地区的运费, 显示"待填"而非默认 ¥8.5
+function hasAddr(name) {
+  const a = allAddressesCache[name];
+  return !!(a && a.address);
 }
 
 // ============ LOCK ============
@@ -2245,9 +2251,8 @@ async function saveAddress() {
 function updateAddressBtn() {
   const btn = document.getElementById('btnAddress');
   if (!btn) return;
-  // 2026-05-21: Round3 登记阶段强制隐藏,等开团进入发货阶段再恢复
-  // 原逻辑: btn.style.display = (myName && DROPSHIP_TEAMS.includes(myTeam)) ? '' : 'none';
-  btn.style.display = 'none';
+  // 2026-06-15: 贴纸到货进入发货阶段, 恢复显示——全团(DROPSHIP_TEAMS=1-6)都要填地址
+  btn.style.display = (myName && DROPSHIP_TEAMS.includes(myTeam)) ? '' : 'none';
 }
 
 function updateTrackingBtn() {
@@ -2336,7 +2341,7 @@ function renderAllAddresses() {
     const team = allTeams[name] ?? allDropTeams[name];
     return DROPSHIP_TEAMS.includes(team);
   });
-  if (candidates.length === 0) { body.textContent = '暂无已实付的 4/5/6 团成员'; return; }
+  if (candidates.length === 0) { body.textContent = '暂无已实付的代发团成员'; return; }
 
   const byTeam = {};
   candidates.forEach(name => { const t = allTeams[name] ?? allDropTeams[name]; (byTeam[t] = byTeam[t] || []).push(name); });
@@ -2349,7 +2354,7 @@ function renderAllAddresses() {
   summary.textContent = '共 ' + totalCount + ' 人已实付 · 已填地址 ' + filledCount + ' 人 · 待填 ' + (totalCount - filledCount) + ' 人 · 已发货 ' + shippedCount + ' 人';
   body.appendChild(summary);
 
-  [4, 5].forEach(team => {
+  Object.keys(byTeam).map(Number).sort((a, b) => a - b).forEach(team => {
     const rows = byTeam[team];
     if (!rows || rows.length === 0) return;
     rows.sort((a, b) => (globalSeqMap[a] || 9999) - (globalSeqMap[b] || 9999));
@@ -3256,8 +3261,9 @@ function recalculate() {
       // Per-person tax: proportional to their USD share (跑单人员不分摊)
       const personTax = (taxCNY > 0 && grandUSDActive > 0 && usd > 0 && !isRunaway(name)) ? r2(usd / grandUSDActive * taxCNY) : 0;
       teamTax += personTax;
-      // Per-person shipping fee: 4/5/6 团有订单的人固定 ¥6.30/单
-      const personShipfee = (COLLECT_SHIPPING && DROPSHIP_TEAMS.includes(g.team) && items > 0) ? r2(DROPSHIP_FEE + dropshipExtraFor(name)) : 0;
+      // Per-person shipping fee: 代发团有订单且已填地址 = 基础¥8.5 + 地区附加; 没填地址→待定, 不计入总额
+      const shipPending = COLLECT_SHIPPING && DROPSHIP_TEAMS.includes(g.team) && items > 0 && !hasAddr(name);
+      const personShipfee = (COLLECT_SHIPPING && DROPSHIP_TEAMS.includes(g.team) && items > 0 && hasAddr(name)) ? r2(DROPSHIP_FEE + dropshipExtraFor(name)) : 0;
       teamShipfee += personShipfee;
       // Per-person packing fee: 1/2/3 团按订单 USD 比例分摊该团总包材费
       const personPackfee = (items > 0) ? packingFeeFor(name) : 0;
@@ -3302,8 +3308,10 @@ function recalculate() {
       if (pxEl) pxEl.textContent = personTax > 0 ? '\u00A5' + personTax.toFixed(2) : '\u2014';
       if (pxEl && personTax > 0) pxEl.style.color = '#E74C3C';
       const psfEl = document.getElementById('psf-' + personIdx);
-      if (psfEl) psfEl.textContent = personShipfee > 0 ? '\u00A5' + personShipfee.toFixed(2) : '\u2014';
-      if (psfEl && personShipfee > 0) psfEl.style.color = '#8B6EAE';
+      if (psfEl) {
+        psfEl.textContent = shipPending ? '\u5F85\u586B\u5730\u5740' : (personShipfee > 0 ? '\u00A5' + personShipfee.toFixed(2) : '\u2014');
+        psfEl.style.color = shipPending ? '#E8714A' : (personShipfee > 0 ? '#8B6EAE' : '');
+      }
       const ppkEl = document.getElementById('ppk-' + personIdx);
       if (ppkEl) ppkEl.textContent = personPackfee > 0 ? '\u00A5' + personPackfee.toFixed(2) : '\u2014';
       if (ppkEl && personPackfee > 0) ppkEl.style.color = '#8B6EAE';
@@ -3547,8 +3555,10 @@ function exportMyOrder() {
     lines.push(...details);
   }
   const isDropship = DROPSHIP_TEAMS.includes(myTeam);
+  const myHasAddr = hasAddr(myName);
+  const shipPending = COLLECT_SHIPPING && isDropship && !myHasAddr; // 没填地址→运费待定
   const shipExtra = isDropship ? dropshipExtraFor(myName) : 0;
-  const shippingFee = (COLLECT_SHIPPING && isDropship) ? r2(DROPSHIP_FEE + shipExtra) : 0;  // 运费; COLLECT_SHIPPING=false 全团不收(含导出)
+  const shippingFee = (COLLECT_SHIPPING && isDropship && myHasAddr) ? r2(DROPSHIP_FEE + shipExtra) : 0;  // 运费; 没填地址不计入, 待填后再算
   const myPackingFee = packingFeeFor(myName);
   const estCNY = r2(totalUSD * rate);
   const estFee = r2(estCNY * 0.001);
@@ -3559,6 +3569,7 @@ function exportMyOrder() {
   const dr = cachedDiscountRatio;
   const myTax = (taxCNY > 0 && grandUSDActive > 0 && totalUSD > 0 && !isRunaway(myName)) ? r2(totalUSD / grandUSDActive * taxCNY) : 0;
   lines.push('', '总件数：' + totalItems);
+  if (shipPending) lines.push('⚠️ 运费待定：请先在拼团页填写收货地址，运费按收件地区计算，填好后金额才完整');
   if (dr > 0 && totalUSD > 0) {
     const actBase = r2(totalUSD * dr * rate);
     const actFee = r2(actBase * 0.001);
@@ -3782,7 +3793,7 @@ function showOrderDetail(name) {
     if (dr > 0 && r2TotalUSD > 0) {
       const actBase = r2(r2TotalUSD * dr * rate);
       const actFee = r2(actBase * 0.001);
-      const shippingFee = (COLLECT_SHIPPING && DROPSHIP_TEAMS.includes(teamNum)) ? r2(DROPSHIP_FEE + dropshipExtraFor(name)) : 0;  // 运费; COLLECT_SHIPPING=false 全团不收(团长导出)
+      const shippingFee = (COLLECT_SHIPPING && DROPSHIP_TEAMS.includes(teamNum) && hasAddr(name)) ? r2(DROPSHIP_FEE + dropshipExtraFor(name)) : 0;  // 运费; 没填地址不计入(待填后再算)
       const myPackFee = packingFeeFor(name);
       const actTotal = r2(actBase + actFee + myTax + shippingFee + myPackFee);
       addRow(footer, '实际应付', '\u00a5' + actTotal.toFixed(2), {main: true});
