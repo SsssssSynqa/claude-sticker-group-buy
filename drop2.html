@@ -359,6 +359,7 @@ section{padding:14px}
   <div class="section-title">领取统计表 <span style="font-size:12px;color:#999;font-weight:400" id="memberCount"></span></div>
   <div class="pay-action-bar">
     <button class="btn-pay-qr" id="btnPayQR" onclick="showPaymentQR()">📱 查看付款码</button>
+    <button class="btn-pay-qr" id="btnAddress" onclick="openAddressForm()" style="display:none">📦 填写收货地址</button>
     <button class="btn-my-export" onclick="exportMyOrder()">📋 导出我的订单</button>
     <button class="btn-pay-confirm" id="btnPayConfirm" onclick="handlePayBtnClick()">💰 我已完成付款</button>
   </div>
@@ -372,6 +373,16 @@ section{padding:14px}
   </div>
 </section>
 
+<section id="allAddressesSection" style="display:none">
+  <details id="allAddressesPanel">
+    <summary style="cursor:pointer;font-weight:600;font-size:15px;color:#8B6EAE;padding:12px 16px;background:#F0EBF5;border-radius:10px;list-style:none;display:flex;align-items:center;flex-wrap:wrap;gap:8px">
+      <span style="flex:1;min-width:200px">📦 掉落-only 代发总览（仅管理员可见）</span>
+      <button onclick="loadAllAddresses();event.preventDefault();event.stopPropagation()" style="padding:3px 10px;background:#fff;color:#8B6EAE;border:1px solid #B8A9C9;border-radius:6px;font-size:12px;cursor:pointer">🔄 刷新</button>
+    </summary>
+    <div id="allAddressesBody" style="padding:14px;background:#fff;border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px">点击上面的「刷新」加载地址</div>
+  </details>
+</section>
+
 <div class="pay-qr-overlay" id="payQrOverlay" onclick="if(event.target===this)closePaymentQR()">
   <div class="pay-qr-popup">
     <h3 id="payQrTitle">付款二维码</h3>
@@ -379,6 +390,30 @@ section{padding:14px}
     <div id="payQrImgWrap"></div>
     <p class="pay-qr-hint" id="payQrHint"></p>
     <button onclick="closePaymentQR()">关闭</button>
+  </div>
+</div>
+
+<div class="pay-qr-overlay" id="addressOverlay" onclick="if(event.target===this)closeAddressForm()">
+  <div class="pay-qr-popup" style="max-width:440px">
+    <h3>📦 填写收货地址</h3>
+    <p class="pay-qr-leader">掉落-only 用户专用 · 只有你自己和管理员可见</p>
+    <div id="addrExisting" style="display:none;background:#F5F0F8;border:1px solid #E4D6EE;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.7;color:#555">
+      <div style="color:#8B6EAE;font-weight:600;margin-bottom:4px;font-size:12px">📍 你已填的地址</div>
+      <div id="addrExistingBody"></div>
+      <div style="color:#999;margin-top:6px;font-size:11px">想修改？直接编辑下方表单后点保存</div>
+    </div>
+    <input type="text" id="addrRecipient" placeholder="收件人姓名" maxlength="30" style="width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;margin-bottom:10px;box-sizing:border-box">
+    <input type="tel" id="addrPhone" placeholder="手机号" maxlength="15" inputmode="numeric" style="width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;margin-bottom:10px;box-sizing:border-box">
+    <textarea id="addrAddress" placeholder="完整地址（省+市+区+街道+门牌号）" maxlength="200" rows="3" style="width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:14px;resize:vertical;font-family:inherit;margin-bottom:10px;box-sizing:border-box"></textarea>
+    <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#555;margin-bottom:10px;text-align:left;cursor:pointer;line-height:1.5">
+      <input type="checkbox" id="addrOnlyDropConfirm" style="margin-top:3px;flex:0 0 auto;accent-color:#8B6EAE">
+      <span>☑️ 我只在掉落页下单，没在 Round3 页面下单</span>
+    </label>
+    <div id="addrStatus" style="font-size:13px;margin-bottom:10px;min-height:18px;text-align:center"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeAddressForm()" style="flex:1;padding:10px;background:#f0f0f0;color:#666;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">关闭</button>
+      <button onclick="saveAddress()" style="flex:1;padding:10px;background:linear-gradient(135deg,#9B6EAE,#8B5E9E);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">保存地址</button>
+    </div>
   </div>
 </div>
 
@@ -414,6 +449,11 @@ const TEAM_LEADERS = {1: '鹅鹅', 2: '鹅鹅', 3: '鹅鹅', 4: '鹅鹅', 5: '�
 const ROUND2_TEAMS = [1, 2, 3, 4, 5, 6];
 const TEAM_QR = {1: 'r2-pay-5.png', 2: 'r2-pay-5.png', 3: 'r2-pay-5.png', 4: 'r2-pay-5.png', 5: 'r2-pay-5.png', 6: 'r2-pay-5.png'};
 const PAYMENT_QR_ENABLED = true;
+
+// ============ SHIPPING (ported from round3.html) ============
+// 掉落-only 用户(R3无已确认订单)在本页填地址+付运费; R3已付的人运费随R3一起付,这里不收。
+const COLLECT_SHIPPING = true;   // true=收掉落-only用户的运费(按地区), false=全不收
+const DROPSHIP_FEE = 8.5;        // 代发运费基础(¥/单) + 北京上海+1 + 新疆西藏+13 (同 R3 口径)
 
 // ============ COUNTDOWN ============
 // 开抢时间：归零前所有人都不能选，归零后全员同时开抢（无提前选购）
@@ -546,6 +586,10 @@ let renderTimer = null, pendingChanges = {};
 let collapsedTeams = {}; // {team: bool} — true=折叠；未设置时默认折叠（除自己那行 .my-row 会穿透显示）
 const PENDING_DRAFT_KEY = 'drop_r3_pending_changes';
 let allPaySelf = {}, allPayLeader = {}, allActualPaid = {};
+// R3已确认订单的人(名字在 r3__actual_paid 名单里)→ 运费随R3一起付,本页不填地址/不付运费
+let r3PaidNames = new Set();
+function hasR3Order() { return r3PaidNames.has(myName); }
+let allAddressesCache = {}; // {name: {recipient, phone, address, ...}} — 掉落-only用户地址
 
 // ============ HELPERS ============
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -561,6 +605,21 @@ function getClaimedQty(stickerObj) {
 }
 function getRemainingStock(stickerObj) {
   return Math.max(0, (DROP_STOCK[stockKey(stickerObj)] || 0) - getClaimedQty(stickerObj));
+}
+
+// ============ SHIPPING HELPERS (ported from round3.html) ============
+// 掉落-only 用户运费的偏远地区附加(按地址字符串判定); R3已付的人这里不收运费,extra无意义
+function dropshipExtraFor(name) {
+  const addr = (allAddressesCache[name] && allAddressesCache[name].address) || '';
+  if (!addr) return 0;
+  if (addr.includes('新疆') || addr.includes('西藏')) return 13;
+  if (addr.includes('北京') || addr.includes('上海')) return 1;
+  return 0;
+}
+// 是否已填收货地址——没填地址算不出按地区的运费,付款门会拦住
+function hasAddr(name) {
+  const a = allAddressesCache[name];
+  return !!(a && a.address);
 }
 
 // ============ 实时算跑单库存(网站自跑,无需定时任务/手动填) ============
@@ -583,7 +642,7 @@ async function computeDropStock() {
       from += 1000;
     }
     const ord = {}, paid = new Set();
-    for (const r of rows) { if (r.sticker_id === 'r3__actual_paid') paid.add(r.name); else (ord[r.name] = ord[r.name] || {})[r.sticker_id] = r.quantity; }
+    for (const r of rows) { if (r.sticker_id === 'r3__actual_paid') { paid.add(r.name); r3PaidNames.add(r.name); } else (ord[r.name] = ord[r.name] || {})[r.sticker_id] = r.quantity; }
     const runqty = {};
     for (const nm in ord) { if (paid.has(nm) && !ADMIN_NAMES.includes(nm)) continue; /* admin(鹅/鹅鹅)的凑整订单无视付款状态、永远进掉落库存 */ for (const sid in ord[nm]) { const k = sid.slice(3); runqty[k] = (runqty[k] || 0) + ord[nm][sid]; } }
     S.forEach(s => { const k = stockKey(s), rn = runqty[k] || 0; DROP_STOCK[k] = THIRTEEN_PLUS30.has(k) ? rn + 30 : rn; });
@@ -629,12 +688,41 @@ async function loadAll() {
   if (settings) for (const s of settings) {
     if (s.key === 'drop_r3_rate') rate = parseFloat(s.value) || 7.10;
   }
+  // R3 已确认订单名单(r3__actual_paid)——这些人运费随R3一起付,掉落页不填地址/不收运费。
+  // 始终加载(不受掉落库存截止日影响),作为跨页判定的 source of truth。
+  try {
+    r3PaidNames = new Set();
+    let rp = [], rpFrom = 0;
+    while (true) {
+      const {data, error} = await sb.from('orders').select('name,quantity').eq('sticker_id', 'r3__actual_paid').gt('quantity', 0).order('id').range(rpFrom, rpFrom + 999);
+      if (error) throw error;
+      if (!data || !data.length) break;
+      rp = rp.concat(data);
+      if (data.length < 1000) break;
+      rpFrom += 1000;
+    }
+    rp.forEach(r => r3PaidNames.add(r.name));
+  } catch(e) { console.error('Load r3 paid names failed:', e); }
+  // 掉落-only 用户的收货地址 cache(管理员总览 + 自己付款门用)
+  try {
+    const {data: addrs, error: addrErr} = await sb.from('addresses').select('*');
+    if (addrErr) throw addrErr;
+    allAddressesCache = {};
+    (addrs || []).forEach(r => { allAddressesCache[r.name] = r; });
+  } catch(e) { console.error('Load addresses cache failed:', e); }
 }
 
 function subscribeRealtime() {
   sb.channel('drop-r3-sync').on('postgres_changes', {event:'*', schema:'public', table:'orders'}, p => {
     const row = p.new || p.old;
-    if (!row || !row.sticker_id || !row.sticker_id.startsWith('drop_r3_')) return;
+    if (!row || !row.sticker_id) return;
+    // R3 已确认订单名单(r3__actual_paid)变化 → 同步 r3PaidNames(跨页判定),不属于 drop_r3_ 命名空间
+    if (row.sticker_id === 'r3__actual_paid') {
+      if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) r3PaidNames.delete(row.name);
+      else if (p.new && p.new.quantity > 0) r3PaidNames.add(p.new.name);
+      scheduleRender(); return;
+    }
+    if (!row.sticker_id.startsWith('drop_r3_')) return;
     if (row.sticker_id === 'drop_r3__pin') return;
     if (p.new && p.new.id) { const n = p.new.name; if (!allJoinOrder[n] || p.new.id < allJoinOrder[n]) allJoinOrder[n] = p.new.id; }
     if (row.sticker_id === 'drop_r3__team') { if (p.eventType === 'DELETE') delete allTeams[row.name]; else allTeams[p.new.name] = p.new.quantity; scheduleRender(); saveOffline(); return; }
@@ -648,6 +736,13 @@ function subscribeRealtime() {
   }).on('postgres_changes', {event:'*', schema:'public', table:'settings'}, p => {
     if (!p.new) return;
     if (p.new.key === 'drop_r3_rate') { rate = parseFloat(p.new.value) || 7.10; document.getElementById('rateInput').value = rate; recalculate(); saveOffline(); }
+  }).on('postgres_changes', {event:'*', schema:'public', table:'addresses'}, p => {
+    const row = p.new || p.old;
+    if (!row || !row.name) return;
+    if (p.eventType === 'DELETE') delete allAddressesCache[row.name];
+    else allAddressesCache[p.new.name] = p.new;
+    recalculate();
+    if (isAdmin(myName)) renderAllAddresses();
   }).subscribe(st => { setConnected(st === 'SUBSCRIBED'); });
 }
 
@@ -839,6 +934,286 @@ async function saveActualPaid(memberName, amount) {
   ).select();
   if (error) { console.error('Save actual paid failed:', error); alert('保存实付金额失败：' + error.message); }
   else { updateStatus('已更新 ' + memberName + ' 的实付金额'); }
+  if (isAdmin(myName)) renderAllAddresses();
+}
+
+// ============ ADDRESS FORM (ported from round3.html, DOM-built) ============
+function openAddressForm() {
+  // 跨页拦截：R3 有已确认订单的人,运费随R3一起付,本页不填地址
+  if (hasR3Order()) {
+    alert('你在 Round3 有已确认订单，请去 Round3 页面填地址付运费，掉落贴纸会和 Round3 一起发货，这里不用填');
+    return;
+  }
+  const overlay = document.getElementById('addressOverlay');
+  if (!overlay) return;
+  loadAddressFor(myName);
+  overlay.classList.add('on');
+}
+
+function closeAddressForm() {
+  const overlay = document.getElementById('addressOverlay');
+  if (overlay) overlay.classList.remove('on');
+  const s = document.getElementById('addrStatus');
+  if (s) s.textContent = '';
+  const e = document.getElementById('addrExisting');
+  if (e) e.style.display = 'none';
+  const eb = document.getElementById('addrExistingBody');
+  if (eb) eb.replaceChildren();
+}
+
+function renderAddrExisting(data) {
+  const wrap = document.getElementById('addrExisting');
+  const body = document.getElementById('addrExistingBody');
+  if (!wrap || !body) return;
+  if (!data) { wrap.style.display = 'none'; body.replaceChildren(); return; }
+  body.replaceChildren();
+  const lines = [['收件人', data.recipient], ['手机', data.phone], ['地址', data.address]];
+  lines.forEach(([k, v]) => {
+    const div = document.createElement('div');
+    const label = document.createElement('span');
+    label.style.cssText = 'color:#888;margin-right:6px';
+    label.textContent = k + '：';
+    const val = document.createElement('span');
+    val.style.cssText = 'color:#333';
+    val.textContent = v || '（空）';
+    div.appendChild(label); div.appendChild(val);
+    body.appendChild(div);
+  });
+  if (data.updated_at) {
+    const t = document.createElement('div');
+    t.style.cssText = 'color:#999;font-size:11px;margin-top:6px';
+    let when = data.updated_at;
+    try { when = new Date(data.updated_at).toLocaleString('zh-CN', {hour12: false}); } catch(e) {}
+    t.textContent = '上次更新：' + when;
+    body.appendChild(t);
+  }
+  wrap.style.display = 'block';
+}
+
+async function loadAddressFor(name) {
+  if (!sb || !name) return;
+  const cached = allAddressesCache && allAddressesCache[name];
+  if (cached) renderAddrExisting(cached);
+  const {data, error} = await sb.from('addresses').select('*').eq('name', name).maybeSingle();
+  if (error) { console.error('Load address failed:', error); return; }
+  const r = document.getElementById('addrRecipient');
+  const p = document.getElementById('addrPhone');
+  const a = document.getElementById('addrAddress');
+  if (data) {
+    if (r) r.value = data.recipient || '';
+    if (p) p.value = data.phone || '';
+    if (a) a.value = data.address || '';
+    allAddressesCache[name] = data;
+    renderAddrExisting(data);
+  } else {
+    if (r) r.value = '';
+    if (p) p.value = '';
+    if (a) a.value = '';
+    renderAddrExisting(null);
+  }
+}
+
+async function saveAddress() {
+  if (!sb) return;
+  // 兜底：未勾选"只在掉落页下单"→ 阻止保存,提示去 R3 填
+  const okCheck = document.getElementById('addrOnlyDropConfirm');
+  if (okCheck && !okCheck.checked) {
+    const status0 = document.getElementById('addrStatus');
+    if (status0) { status0.textContent = '⚠️ 如果你在 Round3 也下单了，请去 Round3 填地址付运费，这里不用填'; status0.style.color = '#E74C3C'; }
+    return;
+  }
+  const recipient = (document.getElementById('addrRecipient').value || '').trim();
+  const phone = (document.getElementById('addrPhone').value || '').trim();
+  const address = (document.getElementById('addrAddress').value || '').trim();
+  const status = document.getElementById('addrStatus');
+  if (!recipient || !phone || !address) {
+    if (status) { status.textContent = '⚠️ 收件人、手机、地址都要填'; status.style.color = '#E74C3C'; }
+    return;
+  }
+  if (status) { status.textContent = '保存中...'; status.style.color = '#999'; }
+  const {error} = await sb.from('addresses').upsert({
+    name: myName, team: myTeam, recipient, phone, address,
+    updated_at: new Date().toISOString()
+  }, {onConflict: 'name'}).select();
+  if (error) {
+    if (status) { status.textContent = '⚠️ 保存失败：' + (error.message || '未知错误'); status.style.color = '#E74C3C'; }
+    return;
+  }
+  if (status) { status.textContent = '✓ 已保存'; status.style.color = '#2D8B5E'; }
+  const fresh = {name: myName, team: myTeam, recipient, phone, address, updated_at: new Date().toISOString()};
+  allAddressesCache[myName] = fresh;
+  renderAddrExisting(fresh);
+  recalculate();
+  if (isAdmin(myName)) renderAllAddresses();
+  setTimeout(() => closeAddressForm(), 1200);
+}
+
+// 只对"掉落-only"用户(hasR3Order()===false)且已锁单显示;R3已付的人隐藏
+function updateAddressBtn() {
+  const btn = document.getElementById('btnAddress');
+  if (!btn) return;
+  const show = !!myName && !hasR3Order() && iAmLocked();
+  btn.style.display = show ? '' : 'none';
+}
+
+// ============ ADMIN: 掉落-only 代发总览 (ported from round3.html, DOM-built) ============
+// 候选 = 掉落已付款(allActualPaid=drop_r3__actual_paid) 且不在 r3PaidNames 的人(掉落-only)
+function dropOnlyAddrCandidates() {
+  const out = [];
+  Object.keys(allActualPaid || {}).forEach(n => {
+    if (allActualPaid[n] > 0 && !r3PaidNames.has(n)) out.push(n);
+  });
+  return out;
+}
+
+async function saveDropTracking(targetName, value) {
+  if (!sb) { alert('未连接到数据库'); return; }
+  if (!isAdmin(myName)) { alert('仅管理员可填快递单号'); return; }
+  const v = (value || '').trim();
+  const existing = allAddressesCache[targetName];
+  if (!existing) { alert('该用户还没填地址，无法填单号'); return; }
+  try {
+    const {error} = await sb.from('addresses').upsert(
+      {name: targetName, team: existing.team || allTeams[targetName] || null, recipient: existing.recipient, phone: existing.phone, address: existing.address, tracking_number: v || null, updated_at: new Date().toISOString()},
+      {onConflict: 'name'}
+    );
+    if (error) throw error;
+    allAddressesCache[targetName] = {...existing, tracking_number: v || null};
+  } catch(e) { console.error('saveDropTracking failed:', e); alert('保存失败：' + e.message); }
+}
+
+function renderAllAddresses() {
+  const section = document.getElementById('allAddressesSection');
+  if (section) section.style.display = isAdmin(myName) ? '' : 'none';
+  if (!isAdmin(myName)) return;
+  const body = document.getElementById('allAddressesBody');
+  if (!body) return;
+  body.replaceChildren();
+
+  const candidates = dropOnlyAddrCandidates();
+  candidates.sort((a, b) => (globalSeqMap[a] || 9999) - (globalSeqMap[b] || 9999));
+  if (candidates.length === 0) { body.textContent = '暂无已付款的掉落-only 成员'; return; }
+
+  const filledCount = candidates.filter(n => hasAddr(n)).length;
+  const summary = document.createElement('div');
+  summary.style.cssText = 'margin-bottom:12px;font-size:13px;color:#666;line-height:1.7';
+  summary.textContent = '共 ' + candidates.length + ' 人已付款(掉落-only) · 已填地址 ' + filledCount + ' 人 · 待填 ' + (candidates.length - filledCount) + ' 人';
+  body.appendChild(summary);
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'overflow-x:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:8px';
+  const table = document.createElement('table');
+  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;min-width:760px';
+
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  ['#', '昵称', '收件人', '手机', '地址', '运费', '快递单号'].forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    th.style.cssText = 'padding:8px 10px;background:#F0EBF5;color:#8B6EAE;text-align:left;border-bottom:1px solid var(--border);font-weight:600;white-space:nowrap';
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  candidates.forEach((name, idx) => {
+    const tr = document.createElement('tr');
+    tr.style.cssText = 'border-bottom:1px solid #f0f0f0;' + (idx % 2 ? 'background:#FAF7FC' : '');
+
+    const idxTd = document.createElement('td');
+    idxTd.textContent = globalSeqMap[name] || '—';
+    idxTd.style.cssText = 'padding:8px 10px;color:#999;white-space:nowrap';
+    tr.appendChild(idxTd);
+
+    const nameTd = document.createElement('td');
+    nameTd.style.cssText = 'padding:8px 10px;white-space:nowrap;font-weight:600';
+    nameTd.appendChild(document.createTextNode(name));
+    nameTd.appendChild(document.createTextNode(' '));
+    const detailBtn = document.createElement('button');
+    detailBtn.className = 'order-detail-btn';
+    detailBtn.title = '查看订单详情';
+    detailBtn.textContent = '📋';
+    detailBtn.onclick = () => showOrderDetail(name);
+    nameTd.appendChild(detailBtn);
+    tr.appendChild(nameTd);
+
+    const addr = allAddressesCache[name];
+    if (addr && addr.address) {
+      const recTd = document.createElement('td');
+      recTd.textContent = addr.recipient || '';
+      recTd.style.cssText = 'padding:8px 10px';
+      tr.appendChild(recTd);
+      const phoneTd = document.createElement('td');
+      phoneTd.textContent = addr.phone || '';
+      phoneTd.style.cssText = 'padding:8px 10px;font-family:monospace;white-space:nowrap';
+      tr.appendChild(phoneTd);
+      const addrTd = document.createElement('td');
+      addrTd.textContent = addr.address || '';
+      addrTd.style.cssText = 'padding:8px 10px;min-width:220px;line-height:1.5';
+      tr.appendChild(addrTd);
+    } else {
+      const emptyTd = document.createElement('td');
+      emptyTd.colSpan = 3;
+      emptyTd.style.cssText = 'padding:8px 10px;color:#bbb;font-style:italic;text-align:center;background:#FAFAFA';
+      emptyTd.textContent = '暂无地址';
+      tr.appendChild(emptyTd);
+    }
+
+    // 运费列：没地址显示"待填地址"不显示数字、不计入；有地址显示按地区算的运费
+    const feeTd = document.createElement('td');
+    feeTd.style.cssText = 'padding:8px 10px;white-space:nowrap';
+    if (hasAddr(name)) {
+      const fee = r2(DROPSHIP_FEE + dropshipExtraFor(name));
+      feeTd.textContent = '¥' + fee.toFixed(2);
+    } else {
+      feeTd.textContent = '待填地址';
+      feeTd.style.color = '#bbb';
+    }
+    tr.appendChild(feeTd);
+
+    // 快递单号列（管理员可编辑，失焦保存）
+    const trackTd = document.createElement('td');
+    trackTd.style.cssText = 'padding:8px 10px;white-space:nowrap';
+    const trackInput = document.createElement('input');
+    trackInput.type = 'text';
+    trackInput.placeholder = '未填';
+    trackInput.value = (addr && addr.tracking_number) || '';
+    trackInput.style.cssText = 'width:140px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:monospace;background:#fff';
+    trackInput.disabled = !(addr && addr.address);
+    if (addr && addr.tracking_number) { trackInput.style.background = '#F3F8E8'; trackInput.style.borderColor = '#B5CC8E'; }
+    let lastSaved = trackInput.value;
+    trackInput.addEventListener('blur', async () => {
+      const v = trackInput.value.trim();
+      if (v === lastSaved) return;
+      await saveDropTracking(name, v);
+      lastSaved = v;
+      if (v) { trackInput.style.background = '#F3F8E8'; trackInput.style.borderColor = '#B5CC8E'; }
+      else { trackInput.style.background = '#fff'; trackInput.style.borderColor = 'var(--border)'; }
+    });
+    trackInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') trackInput.blur(); });
+    trackTd.appendChild(trackInput);
+    tr.appendChild(trackTd);
+
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  body.appendChild(wrap);
+}
+
+async function loadAllAddresses() {
+  if (!isAdmin(myName)) return;
+  const body = document.getElementById('allAddressesBody');
+  if (body) body.textContent = '加载中...';
+  try {
+    const {data, error} = await sb.from('addresses').select('*');
+    if (error) throw error;
+    allAddressesCache = {};
+    (data || []).forEach(r => { allAddressesCache[r.name] = r; });
+    recalculate();
+  } catch(e) { console.error('Load addresses failed:', e); }
+  renderAllAddresses();
 }
 
 // ============ ADMIN CLEAR USER ============
@@ -860,6 +1235,7 @@ async function adminClearUser(targetName) {
   else { alert(targetName + ' 的订单已清空'); }
   delete allOrders[targetName]; delete allPaySelf[targetName]; delete allPayLeader[targetName]; delete allActualPaid[targetName]; delete allLocked[targetName];
   renderTable(); recalculate(); saveOffline();
+  if (isAdmin(myName)) renderAllAddresses();
 }
 
 // ============ LOCK ============
@@ -929,44 +1305,148 @@ function applyLockState() {
 }
 
 // ============ PAYMENT QR ============
-function showPaymentQR() {
+// 付款说明区(编号备注 + 3步流程),DOM 构造,追加到 payQrHint 末尾
+function appendPayInstructions(hint) {
+  const mySeq = globalSeqMap[myName] || '?';
+  const strong = document.createElement('strong');
+  strong.textContent = '付款说明';
+  hint.appendChild(strong);
+  hint.appendChild(document.createElement('br'));
+  const memoBox = document.createElement('div');
+  memoBox.style.cssText = 'background:#FDEAEA;border:2px solid #E74C3C;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:13px;color:#C0392B;font-weight:600';
+  const memoLine = document.createElement('span');
+  memoLine.appendChild(document.createTextNode('⚠️ 转账时必须备注：'));
+  const memoVal = document.createElement('span');
+  memoVal.style.fontSize = '16px';
+  memoVal.textContent = '#' + mySeq + ' ' + myName;
+  memoLine.appendChild(memoVal);
+  memoBox.appendChild(memoLine);
+  memoBox.appendChild(document.createElement('br'));
+  const memoSub = document.createElement('span');
+  memoSub.style.cssText = 'font-weight:400;font-size:12px;color:#999';
+  memoSub.textContent = '（编号 + 昵称，方便团长核账）';
+  memoBox.appendChild(memoSub);
+  hint.appendChild(memoBox);
+  const steps = [
+    '1. 请按上方金额向团长转账，备注编号和昵称',
+    '2. 完成转账后，点击表格中你名字旁的📋复制订单，连同付款截图一起发到群里',
+    '3. 回到本页点击「💰 我已完成付款」确认'
+  ];
+  steps.forEach((txt, i) => {
+    hint.appendChild(document.createTextNode(txt));
+    if (i < steps.length - 1) hint.appendChild(document.createElement('br'));
+  });
+}
+
+async function showPaymentQR() {
   if (!PAYMENT_QR_ENABLED) { alert('付款码已关闭。'); return; }
   if (!iAmLocked()) { alert('请先点上方的「🔒 锁单」,锁单后才能查看付款码～'); return; }
   const team = myTeam;
-  const leader = TEAM_LEADERS[team] || '未知';
   const qrSrc = TEAM_QR[team];
 
   let myUSD = 0;
   const orders = allOrders[myName] || {};
   S.forEach(s => { const did = dropId(s.id), q = orders[did] || 0; if (q > 0) myUSD += r2(q * DROP_UNIT_PRICES[s.id]); });
-  const myCNY = r2(myUSD * rate);
-  const myFee = r2(myCNY * 0.001);
-  const myTotal = r2(myCNY + myFee);
+
+  const isDropOnly = !hasR3Order();  // R3无已确认订单 = 掉落-only,要填地址付运费
 
   document.getElementById('payQrTitle').textContent = '掉落付款码';
   document.getElementById('payQrLeader').textContent = '统一收款：鹅鹅';
-  const wrap = document.getElementById('payQrImgWrap');
-  if (qrSrc) { wrap.innerHTML = '<img src="' + qrSrc + '" alt="团' + team + '付款码">'; }
-  else { wrap.innerHTML = '<div class="pay-qr-no-img">付款码准备中…<br>请联系团长获取</div>'; }
 
-  let amountHTML = '';
-  if (myUSD > 0) {
-    amountHTML = '<div style="background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5">'
-      + '你需要转账：<span style="font-size:20px">\u00A5' + myTotal.toFixed(2) + '</span>'
-      + '<div style="font-size:11px;font-weight:400;color:#999;margin-top:4px">含0.1%手续费</div></div>';
-  } else {
-    amountHTML = '<div style="background:#f5f5f5;border-radius:10px;padding:12px;margin:10px 0;color:#999;font-size:13px">你还没有选购贴纸</div>';
+  // 地址门：掉落-only 用户,选了贴纸但没填地址 → 不显示金额和付款码,只提示去填地址。
+  // cache miss 时 fallback 单条查 DB (DB 是 source of truth,防 init race / 改昵称误判)。
+  if (isDropOnly && COLLECT_SHIPPING && myUSD > 0 && !hasAddr(myName)) {
+    let myAddr = allAddressesCache[myName];
+    if (!myAddr && sb) {
+      const {data} = await sb.from('addresses').select('*').eq('name', myName).maybeSingle();
+      if (data) { myAddr = data; allAddressesCache[myName] = data; }
+    }
+    if (!myAddr || !myAddr.address) {
+      const wrap0 = document.getElementById('payQrImgWrap');
+      wrap0.replaceChildren();
+      const ph = document.createElement('div');
+      ph.className = 'pay-qr-no-img';
+      ph.style.whiteSpace = 'pre-line';
+      ph.textContent = '📍 请先填收货地址\n运费按地区算';
+      wrap0.appendChild(ph);
+      const hint0 = document.getElementById('payQrHint');
+      hint0.replaceChildren();
+      const box = document.createElement('div');
+      box.style.cssText = 'background:linear-gradient(135deg,#FFF4E6,#FFE0CC);border-radius:10px;padding:14px 16px;margin:10px 0;font-size:14px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5';
+      const t1 = document.createElement('div');
+      t1.textContent = '📍 请先填收货地址，运费按地区算，填好才出应补金额';
+      const btnWrap = document.createElement('div');
+      btnWrap.style.cssText = 'margin-top:12px;text-align:center';
+      const goBtn = document.createElement('button');
+      goBtn.textContent = '📦 去填收货地址';
+      goBtn.style.cssText = 'padding:10px 18px;background:linear-gradient(135deg,#9B6EAE,#8B5E9E);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer';
+      goBtn.onclick = function() { closePaymentQR(); openAddressForm(); };
+      btnWrap.appendChild(goBtn);
+      box.appendChild(t1); box.appendChild(btnWrap);
+      hint0.appendChild(box);
+      document.getElementById('payQrOverlay').classList.add('on');
+      return;
+    }
   }
 
-  const mySeq = globalSeqMap[myName] || '?';
-  document.getElementById('payQrHint').innerHTML = amountHTML
-    + '<strong>付款说明</strong><br>'
-    + '<div style="background:#FDEAEA;border:2px solid #E74C3C;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:13px;color:#C0392B;font-weight:600">'
-    + '\u26a0\ufe0f 转账时必须备注：<span style="font-size:16px">#' + mySeq + ' ' + esc(myName) + '</span><br>'
-    + '<span style="font-weight:400;font-size:12px;color:#999">（编号 + 昵称，方便团长核账）</span></div>'
-    + '1. 请按上方金额向团长转账，<b>备注编号和昵称</b><br>'
-    + '2. 完成转账后，点击表格中你名字旁的📋复制订单，连同<b>付款截图</b>一起发到群里<br>'
-    + '3. 回到本页点击「\ud83d\udcb0 我已完成付款」确认';
+  // 运费：掉落-only 算运费(此时已确认有地址);R3已付的人不含运费(随R3一起付)
+  const shipExtra = isDropOnly ? dropshipExtraFor(myName) : 0;
+  const shippingFee = (isDropOnly && COLLECT_SHIPPING) ? r2(DROPSHIP_FEE + shipExtra) : 0;
+  const myCNY = r2(myUSD * rate);
+  const myFee = r2(myCNY * 0.001);
+  const myTotal = r2(myCNY + myFee + shippingFee);
+
+  const wrap = document.getElementById('payQrImgWrap');
+  wrap.replaceChildren();
+  if (qrSrc) {
+    const img = document.createElement('img');
+    img.src = qrSrc;
+    img.alt = '团' + team + '付款码';
+    wrap.appendChild(img);
+  } else {
+    const div = document.createElement('div');
+    div.className = 'pay-qr-no-img';
+    div.style.whiteSpace = 'pre-line';
+    div.textContent = '付款码准备中…\n请联系团长获取';
+    wrap.appendChild(div);
+  }
+
+  const hint = document.getElementById('payQrHint');
+  hint.replaceChildren();
+
+  if (myUSD > 0) {
+    const amtBox = document.createElement('div');
+    amtBox.style.cssText = 'background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5';
+    amtBox.appendChild(document.createTextNode('你需要转账：'));
+    const amtVal = document.createElement('span');
+    amtVal.style.fontSize = '20px';
+    amtVal.textContent = '¥' + myTotal.toFixed(2);
+    amtBox.appendChild(amtVal);
+    const sub = document.createElement('div');
+    sub.style.cssText = 'font-size:11px;font-weight:400;color:#999;margin-top:4px';
+    sub.textContent = '含0.1%手续费' + (shippingFee > 0 ? ' + 代发运费¥' + DROPSHIP_FEE.toFixed(2) + (shipExtra > 0 ? ' + 偏远附加¥' + shipExtra.toFixed(2) : '') : '');
+    amtBox.appendChild(sub);
+    if (isDropOnly && shippingFee > 0) {
+      const ship = document.createElement('div');
+      ship.style.cssText = 'font-size:11px;color:#E8714A;margin-top:2px';
+      ship.textContent = '📍 运费按收件地址附加：北京/上海 +¥1，新疆/西藏 +¥13';
+      amtBox.appendChild(ship);
+    }
+    if (!isDropOnly) {
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:11px;font-weight:400;color:#999;margin-top:2px';
+      note.textContent = '运费随 Round3 一起付，这里只付掉落贴纸的钱';
+      amtBox.appendChild(note);
+    }
+    hint.appendChild(amtBox);
+  } else {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'background:#f5f5f5;border-radius:10px;padding:12px;margin:10px 0;color:#999;font-size:13px';
+    empty.textContent = '你还没有选购贴纸';
+    hint.appendChild(empty);
+  }
+
+  appendPayInstructions(hint);
   document.getElementById('payQrOverlay').classList.add('on');
 }
 
@@ -983,6 +1463,7 @@ function handlePayBtnClick() {
 }
 
 function updatePaymentBtns() {
+  updateAddressBtn();
   const btn = document.getElementById('btnPayConfirm');
   const qrBtn = document.getElementById('btnPayQR');
   if (!btn) return;
@@ -1350,6 +1831,7 @@ function clearMyOrders() {
   renderTable(); recalculate();
   applyLockState();
   updatePaymentBtns();
+  renderAllAddresses();
   startCountdown();
   // 每次刷新弹出选团提醒
   if (myName) {
