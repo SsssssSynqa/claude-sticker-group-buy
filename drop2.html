@@ -589,7 +589,24 @@ let allPaySelf = {}, allPayLeader = {}, allActualPaid = {};
 // R3已确认订单的人(名字在 r3__actual_paid 名单里)→ 运费随R3一起付,本页不填地址/不付运费
 let r3PaidNames = new Set();
 function hasR3Order() { return r3PaidNames.has(myName); }
-let allAddressesCache = {}; // {name: {recipient, phone, address, ...}} — 掉落-only用户地址
+let allAddressesCache = {}; // {displayName: {recipient, phone, address, ...}} — Round3-only 地址
+const ROUND3_ADDRESS_PREFIX = 'r3__';
+
+function addressStorageKey(name) {
+  return ROUND3_ADDRESS_PREFIX + name;
+}
+
+function addressDisplayName(storageName) {
+  if (!storageName || !storageName.startsWith(ROUND3_ADDRESS_PREFIX)) return null;
+  return storageName.slice(ROUND3_ADDRESS_PREFIX.length);
+}
+
+function cacheRound3Address(row) {
+  const displayName = addressDisplayName(row && row.name);
+  if (!displayName) return null;
+  allAddressesCache[displayName] = {...row, name: displayName};
+  return displayName;
+}
 
 // ============ HELPERS ============
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -708,7 +725,7 @@ async function loadAll() {
     const {data: addrs, error: addrErr} = await sb.from('addresses').select('*');
     if (addrErr) throw addrErr;
     allAddressesCache = {};
-    (addrs || []).forEach(r => { allAddressesCache[r.name] = r; });
+    (addrs || []).forEach(r => { cacheRound3Address(r); });
   } catch(e) { console.error('Load addresses cache failed:', e); }
 }
 
@@ -739,8 +756,10 @@ function subscribeRealtime() {
   }).on('postgres_changes', {event:'*', schema:'public', table:'addresses'}, p => {
     const row = p.new || p.old;
     if (!row || !row.name) return;
-    if (p.eventType === 'DELETE') delete allAddressesCache[row.name];
-    else allAddressesCache[p.new.name] = p.new;
+    const displayName = addressDisplayName(row.name);
+    if (!displayName) return;
+    if (p.eventType === 'DELETE') delete allAddressesCache[displayName];
+    else cacheRound3Address(p.new);
     recalculate();
     if (isAdmin(myName)) renderAllAddresses();
   }).subscribe(st => { setConnected(st === 'SUBSCRIBED'); });
@@ -994,17 +1013,18 @@ async function loadAddressFor(name) {
   if (!sb || !name) return;
   const cached = allAddressesCache && allAddressesCache[name];
   if (cached) renderAddrExisting(cached);
-  const {data, error} = await sb.from('addresses').select('*').eq('name', name).maybeSingle();
+  const {data, error} = await sb.from('addresses').select('*').eq('name', addressStorageKey(name)).maybeSingle();
   if (error) { console.error('Load address failed:', error); return; }
   const r = document.getElementById('addrRecipient');
   const p = document.getElementById('addrPhone');
   const a = document.getElementById('addrAddress');
   if (data) {
+    cacheRound3Address(data);
+    const fresh = allAddressesCache[name] || data;
     if (r) r.value = data.recipient || '';
     if (p) p.value = data.phone || '';
     if (a) a.value = data.address || '';
-    allAddressesCache[name] = data;
-    renderAddrExisting(data);
+    renderAddrExisting(fresh);
   } else {
     if (r) r.value = '';
     if (p) p.value = '';
@@ -1032,7 +1052,7 @@ async function saveAddress() {
   }
   if (status) { status.textContent = '保存中...'; status.style.color = '#999'; }
   const {error} = await sb.from('addresses').upsert({
-    name: myName, team: myTeam, recipient, phone, address,
+    name: addressStorageKey(myName), team: myTeam, recipient, phone, address,
     updated_at: new Date().toISOString()
   }, {onConflict: 'name'}).select();
   if (error) {
@@ -1074,7 +1094,7 @@ async function saveDropTracking(targetName, value) {
   if (!existing) { alert('该用户还没填地址，无法填单号'); return; }
   try {
     const {error} = await sb.from('addresses').upsert(
-      {name: targetName, team: existing.team || allTeams[targetName] || null, recipient: existing.recipient, phone: existing.phone, address: existing.address, tracking_number: v || null, updated_at: new Date().toISOString()},
+      {name: addressStorageKey(targetName), team: existing.team || allTeams[targetName] || null, recipient: existing.recipient, phone: existing.phone, address: existing.address, tracking_number: v || null, updated_at: new Date().toISOString()},
       {onConflict: 'name'}
     );
     if (error) throw error;
@@ -1210,7 +1230,7 @@ async function loadAllAddresses() {
     const {data, error} = await sb.from('addresses').select('*');
     if (error) throw error;
     allAddressesCache = {};
-    (data || []).forEach(r => { allAddressesCache[r.name] = r; });
+    (data || []).forEach(r => { cacheRound3Address(r); });
     recalculate();
   } catch(e) { console.error('Load addresses failed:', e); }
   renderAllAddresses();
@@ -1358,8 +1378,8 @@ async function showPaymentQR() {
   if (isDropOnly && COLLECT_SHIPPING && myUSD > 0 && !hasAddr(myName)) {
     let myAddr = allAddressesCache[myName];
     if (!myAddr && sb) {
-      const {data} = await sb.from('addresses').select('*').eq('name', myName).maybeSingle();
-      if (data) { myAddr = data; allAddressesCache[myName] = data; }
+      const {data} = await sb.from('addresses').select('*').eq('name', addressStorageKey(myName)).maybeSingle();
+      if (data) { cacheRound3Address(data); myAddr = allAddressesCache[myName]; }
     }
     if (!myAddr || !myAddr.address) {
       const wrap0 = document.getElementById('payQrImgWrap');

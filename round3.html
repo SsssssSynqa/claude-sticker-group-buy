@@ -647,7 +647,7 @@ let allRefunded = {}; // {name: cny_amount} — already refunded amount set by t
 let allShipFeeSelf = {}; // {name: true} — self-confirmed shipping fee paid
 let allShipFeeLeader = {}; // {name: true} — leader-confirmed shipping fee paid
 let allShipped = {}; // {name: true} — leader-confirmed shipped
-let allAddressesCache = {}; // {name: {team, recipient, phone, address}} — for 4/5/6 团代发总览面板
+let allAddressesCache = {}; // {displayName: {team, recipient, phone, address}} — Round3-only address cache
 let currentAddressTarget = null; // 地址 modal 当前操作对象（null 表示自己填；其他值表示为别人代填，仅 admin）
 // Drop 掉落订单数据（只给代发总览面板用，不参与 round3 主统计）
 let allDropOrders = {};      // {name: {sticker_id: qty}} 以 drop_r3_ 开头的贴纸订单
@@ -658,6 +658,23 @@ let collapsedTeams = {}; // {team: bool} — true 表示折叠；未设置时默
 let writeTimers = {};
 let renderTimer = null;
 const PENDING_DRAFT_KEY = 'gb2_pending_changes';
+const ROUND3_ADDRESS_PREFIX = 'r3__';
+
+function addressStorageKey(name) {
+  return ROUND3_ADDRESS_PREFIX + name;
+}
+
+function addressDisplayName(storageName) {
+  if (!storageName || !storageName.startsWith(ROUND3_ADDRESS_PREFIX)) return null;
+  return storageName.slice(ROUND3_ADDRESS_PREFIX.length);
+}
+
+function cacheRound3Address(row) {
+  const displayName = addressDisplayName(row && row.name);
+  if (!displayName) return null;
+  allAddressesCache[displayName] = {...row, name: displayName};
+  return displayName;
+}
 
 // ============ SUPABASE ============
 function initSupabaseClient() {
@@ -795,10 +812,12 @@ function subscribeRealtime() {
 function handleAddressEvent(payload) {
   const row = payload.new || payload.old;
   if (!row) return;
+  const displayName = addressDisplayName(row.name);
+  if (!displayName) return;
   if (payload.eventType === 'DELETE') {
-    delete allAddressesCache[row.name];
+    delete allAddressesCache[displayName];
   } else if (payload.new) {
-    allAddressesCache[payload.new.name] = payload.new;
+    cacheRound3Address(payload.new);
   }
   scheduleRenderAllAddresses();
   recalculate(); // 地址变化可能影响 4/5/6 团代发运费的偏远附加
@@ -1970,8 +1989,8 @@ async function showPaymentQR() {
   if (isDropship && COLLECT_SHIPPING && myUSD > 0) {
     let myAddr = allAddressesCache[myName];
     if (!myAddr && sb) {
-      const {data} = await sb.from('addresses').select('*').eq('name', myName).maybeSingle();
-      if (data) { myAddr = data; allAddressesCache[myName] = data; }
+      const {data} = await sb.from('addresses').select('*').eq('name', addressStorageKey(myName)).maybeSingle();
+      if (data) { cacheRound3Address(data); myAddr = allAddressesCache[myName]; }
     }
     if (!myAddr || !myAddr.address) {
       // 没填地址 → 不显示金额和付款码, 只提示先填地址 (DOM 构造, 不用 innerHTML)
@@ -2191,16 +2210,18 @@ async function loadAddressFor(name) {
   // 先尝试用本地 cache 立刻渲染预览（避免空窗），再异步从数据库刷新
   const cached = allAddressesCache && allAddressesCache[name];
   if (cached) renderAddrExisting(cached);
-  const {data, error} = await sb.from('addresses').select('*').eq('name', name).maybeSingle();
+  const {data, error} = await sb.from('addresses').select('*').eq('name', addressStorageKey(name)).maybeSingle();
   if (error) { console.error('Load address failed:', error); return; }
   const r = document.getElementById('addrRecipient');
   const p = document.getElementById('addrPhone');
   const a = document.getElementById('addrAddress');
   if (data) {
+    cacheRound3Address(data);
+    const fresh = allAddressesCache[name] || data;
     if (r) r.value = data.recipient || '';
     if (p) p.value = data.phone || '';
     if (a) a.value = data.address || '';
-    renderAddrExisting(data);
+    renderAddrExisting(fresh);
   } else {
     if (r) r.value = '';
     if (p) p.value = '';
@@ -2229,7 +2250,7 @@ async function saveAddress() {
   status.textContent = '保存中...';
   status.style.color = '#999';
   const {error} = await sb.from('addresses').upsert({
-    name: targetName, team: targetTeam, recipient, phone, address,
+    name: addressStorageKey(targetName), team: targetTeam, recipient, phone, address,
     updated_at: new Date().toISOString()
   }, {onConflict: 'name'}).select();
   if (error) {
@@ -2271,10 +2292,10 @@ async function showMyTracking() {
   // source of truth, cache 只是加速.
   let addr = allAddressesCache[myName];
   if (!addr && sb) {
-    const {data} = await sb.from('addresses').select('*').eq('name', myName).maybeSingle();
+    const {data} = await sb.from('addresses').select('*').eq('name', addressStorageKey(myName)).maybeSingle();
     if (data) {
-      addr = data;
-      allAddressesCache[myName] = data;
+      cacheRound3Address(data);
+      addr = allAddressesCache[myName];
     }
   }
   if (!addr) { alert('你还没填收货地址。请先点「📦 填写收货地址」填好后再来查。'); return; }
@@ -2297,7 +2318,7 @@ async function saveTracking(targetName, value) {
   const team = existing.team || allTeams[targetName] || null;
   try {
     const {error} = await sb.from('addresses').upsert(
-      {name: targetName, team, recipient: existing.recipient, phone: existing.phone, address: existing.address, tracking_number: v || null, updated_at: new Date().toISOString()},
+      {name: addressStorageKey(targetName), team, recipient: existing.recipient, phone: existing.phone, address: existing.address, tracking_number: v || null, updated_at: new Date().toISOString()},
       {onConflict: 'name'}
     );
     if (error) throw error;
@@ -2313,7 +2334,7 @@ async function loadAllAddressesCache() {
   const {data, error} = await sb.from('addresses').select('*');
   if (error) { console.error('Load addresses cache failed:', error); return; }
   allAddressesCache = {};
-  (data || []).forEach(r => { allAddressesCache[r.name] = r; });
+  (data || []).forEach(r => { cacheRound3Address(r); });
   // 2026-05-13 fix (シンヤ_r2 反馈): cache 加载完必须 recalculate, 否则 dropshipExtraFor
   // 第一次 paint 时 cache 还空 → 偏远附加返 0 → 北京/上海团员的 ¥3.45 显示成 base ¥2.45.
   // 团长视角更明显, 因为他们不会进 "全部地址" 面板凑巧触发其他 recalculate 路径.
