@@ -1335,12 +1335,20 @@ function applyLockState() {
 
 // ============ PAYMENT QR ============
 // 付款说明区(编号备注 + 3步流程),DOM 构造,追加到 payQrHint 末尾
-function appendPayInstructions(hint) {
+function appendPayInstructions(hint, amountDue) {
+  const needsTransfer = amountDue > 0.005;
   const mySeq = globalSeqMap[myName] || '?';
   const strong = document.createElement('strong');
-  strong.textContent = '付款说明';
+  strong.textContent = needsTransfer ? '付款说明' : '核账说明';
   hint.appendChild(strong);
   hint.appendChild(document.createElement('br'));
+  if (!needsTransfer) {
+    const note = document.createElement('div');
+    note.style.cssText = 'background:#E8F5E9;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:13px;color:#2E7D32;line-height:1.7';
+    note.textContent = '页面已显示无需补款时，不要重复转账；如需要留档，复制订单文本发到群里即可。';
+    hint.appendChild(note);
+    return;
+  }
   const memoBox = document.createElement('div');
   memoBox.style.cssText = 'background:#FDEAEA;border:2px solid #E74C3C;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:13px;color:#C0392B;font-weight:600';
   const memoLine = document.createElement('span');
@@ -1356,10 +1364,13 @@ function appendPayInstructions(hint) {
   memoSub.textContent = '（编号 + 昵称，方便团长核账）';
   memoBox.appendChild(memoSub);
   hint.appendChild(memoBox);
+  const step3 = paymentStatusOf(myName) === 'confirmed'
+    ? '3. 如果按钮已显示「团长已确认」，把付款截图发到群里即可，不用重复点确认'
+    : '3. 回到本页点击「💰 我已完成付款」确认';
   const steps = [
     '1. 请按上方金额向团长转账，备注编号和昵称',
     '2. 完成转账后，点击表格中你名字旁的📋复制订单，连同付款截图一起发到群里',
-    '3. 回到本页点击「💰 我已完成付款」确认'
+    step3
   ];
   steps.forEach((txt, i) => {
     hint.appendChild(document.createTextNode(txt));
@@ -1373,9 +1384,15 @@ async function showPaymentQR() {
   const team = myTeam;
   const qrSrc = TEAM_QR[team];
 
-  let myUSD = 0;
+  let myUSD = 0, myItems = 0;
   const orders = allOrders[myName] || {};
-  S.forEach(s => { const did = dropId(s.id), q = orders[did] || 0; if (q > 0) myUSD += r2(q * DROP_UNIT_PRICES[s.id]); });
+  S.forEach(s => {
+    const did = dropId(s.id), q = orders[did] || 0;
+    if (q > 0) {
+      myItems += q;
+      myUSD += r2(q * DROP_UNIT_PRICES[s.id]);
+    }
+  });
 
   const isDropOnly = !hasR3Order();  // R3无已确认订单 = 掉落-only,要填地址付运费
 
@@ -1420,10 +1437,12 @@ async function showPaymentQR() {
 
   // 运费：掉落-only 算运费(此时已确认有地址);R3已付的人不含运费(随R3一起付)
   const shipExtra = isDropOnly ? dropshipExtraFor(myName) : 0;
-  const shippingFee = (isDropOnly && COLLECT_SHIPPING) ? r2(DROPSHIP_FEE + shipExtra) : 0;
   const myCNY = r2(myUSD * rate);
   const myFee = r2(myCNY * 0.001);
-  const myTotal = r2(myCNY + myFee + shippingFee);
+  const productTotal = r2(myCNY + myFee);
+  const paySummary = dropPaymentSummaryFor(myName, myItems, productTotal);
+  const shippingFee = paySummary.shippingFee;
+  const myTotal = paySummary.total;
 
   const wrap = document.getElementById('payQrImgWrap');
   wrap.replaceChildren();
@@ -1445,15 +1464,34 @@ async function showPaymentQR() {
 
   if (myUSD > 0) {
     const amtBox = document.createElement('div');
-    amtBox.style.cssText = 'background:linear-gradient(135deg,#FFF3E0,#FFE0CC);border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600;color:#D4623E;border:1px solid #FFD0B5';
-    amtBox.appendChild(document.createTextNode('你需要转账：'));
+    const isSettled = paySummary.isSettled || paySummary.overpaid > 0;
+    amtBox.style.cssText = (isSettled
+      ? 'background:linear-gradient(135deg,#E8F5E9,#C8E6C9);color:#2E7D32;border:1px solid #A5D6A7'
+      : 'background:linear-gradient(135deg,#FFF3E0,#FFE0CC);color:#D4623E;border:1px solid #FFD0B5')
+      + ';border-radius:10px;padding:12px 16px;margin:10px 0;font-size:15px;font-weight:600';
+    let amountLabel = '你需要转账：';
+    let amountText = '¥' + paySummary.amountDue.toFixed(2);
+    if (paySummary.hasPaid && paySummary.amountDue > 0) {
+      amountLabel = '你需要补交：';
+    } else if (paySummary.overpaid > 0) {
+      amountLabel = '你已多付：';
+      amountText = '¥' + paySummary.overpaid.toFixed(2);
+    } else if (paySummary.isSettled) {
+      amountLabel = '你已付清：';
+      amountText = '无需补款';
+    }
+    amtBox.appendChild(document.createTextNode(amountLabel));
     const amtVal = document.createElement('span');
     amtVal.style.fontSize = '20px';
-    amtVal.textContent = '¥' + myTotal.toFixed(2);
+    amtVal.textContent = amountText;
     amtBox.appendChild(amtVal);
     const sub = document.createElement('div');
     sub.style.cssText = 'font-size:11px;font-weight:400;color:#999;margin-top:4px';
-    sub.textContent = '含0.1%手续费' + (shippingFee > 0 ? ' + 代发运费¥' + DROPSHIP_FEE.toFixed(2) + (shipExtra > 0 ? ' + 偏远附加¥' + shipExtra.toFixed(2) : '') : '');
+    if (paySummary.hasPaid) {
+      sub.textContent = '掉落合计 ¥' + myTotal.toFixed(2) + '，已付 ¥' + paySummary.paid.toFixed(2);
+    } else {
+      sub.textContent = '含0.1%手续费' + (shippingFee > 0 ? ' + 代发运费¥' + DROPSHIP_FEE.toFixed(2) + (shipExtra > 0 ? ' + 偏远附加¥' + shipExtra.toFixed(2) : '') : '');
+    }
     amtBox.appendChild(sub);
     if (isDropOnly && shippingFee > 0) {
       const ship = document.createElement('div');
@@ -1475,7 +1513,7 @@ async function showPaymentQR() {
     hint.appendChild(empty);
   }
 
-  appendPayInstructions(hint);
+  appendPayInstructions(hint, myUSD > 0 ? paySummary.amountDue : 0);
   document.getElementById('payQrOverlay').classList.add('on');
 }
 
@@ -1791,15 +1829,48 @@ function exportMyOrder() {
     .catch(() => { prompt('请手动复制：', text); });
 }
 
-function appendDropShippingLines(lines, name, totalItems, productTotal) {
+function dropPaymentSummaryFor(name, totalItems, productTotal) {
   const shipInfo = shippingFeeInfoFor(name, totalItems);
+  const shippingFee = shipInfo.status === 'ready' ? shipInfo.amount : 0;
+  const total = r2(productTotal + shippingFee);
+  const paid = allActualPaid[name] || 0;
+  const hasPaid = allActualPaid[name] !== undefined && paid > 0;
+  const diff = r2(total - paid);
+  return {
+    shipInfo,
+    shippingFee,
+    total,
+    paid,
+    hasPaid,
+    amountDue: diff > 0.005 ? diff : 0,
+    overpaid: diff < -0.005 ? r2(-diff) : 0,
+    isSettled: hasPaid && Math.abs(diff) <= 0.005
+  };
+}
+
+function appendDropShippingLines(lines, name, totalItems, productTotal) {
+  const paySummary = dropPaymentSummaryFor(name, totalItems, productTotal);
+  const shipInfo = paySummary.shipInfo;
   if (shipInfo.status === 'ready') {
     lines.push('运费：' + shipInfo.text);
-    lines.push('合计（含运费）：¥' + r2(productTotal + shipInfo.amount).toFixed(2));
+    lines.push('合计（含运费）：¥' + paySummary.total.toFixed(2));
   } else if (shipInfo.status === 'missing') {
     lines.push('⚠️ 运费待定：请先在掉落页填写收货地址，运费按收件地区计算，填好后金额才完整');
   } else if (shipInfo.status === 'r3') {
     lines.push('运费：随 Round3 一起付，本页不重复收');
+  }
+  if (paySummary.hasPaid) {
+    lines.push('已付：¥' + paySummary.paid.toFixed(2));
+    if (shipInfo.status === 'missing') return;
+    if (paySummary.amountDue > 0) {
+      lines.push('本次应补：¥' + paySummary.amountDue.toFixed(2));
+    } else if (paySummary.overpaid > 0) {
+      lines.push('已多付：¥' + paySummary.overpaid.toFixed(2) + '，无需补款');
+    } else {
+      lines.push('无需补款');
+    }
+  } else if (shipInfo.status !== 'missing' && paySummary.amountDue > 0) {
+    lines.push('本次应付：¥' + paySummary.amountDue.toFixed(2));
   }
 }
 
@@ -1828,13 +1899,24 @@ function showOrderDetail(name) {
   if (!items) items = '<div style="padding:20px;text-align:center;color:#999">暂无选购</div>';
   const cny = r2(totalUSD * rate), fee = r2(cny * 0.001), tot = r2(cny + fee);
   let foot = '<div class="od-total"><span>总件数</span><span>' + totalItems + ' 件</span></div><div class="od-total"><span>USD</span><span>$' + totalUSD.toFixed(2) + '</span></div><div class="od-total main"><span>CNY（含手续费）</span><span>\u00A5' + tot.toFixed(2) + '</span></div>';
-  const shipInfo = shippingFeeInfoFor(name, totalItems);
+  const paySummary = dropPaymentSummaryFor(name, totalItems, tot);
+  const shipInfo = paySummary.shipInfo;
   if (shipInfo.status === 'ready') {
-    foot += '<div class="od-total"><span>运费</span><span>' + shipInfo.text + '</span></div><div class="od-total main"><span>合计（含运费）</span><span>\u00A5' + r2(tot + shipInfo.amount).toFixed(2) + '</span></div>';
+    foot += '<div class="od-total"><span>运费</span><span>' + shipInfo.text + '</span></div><div class="od-total main"><span>合计（含运费）</span><span>\u00A5' + paySummary.total.toFixed(2) + '</span></div>';
   } else if (shipInfo.status === 'missing') {
     foot += '<div class="od-total" style="color:#E8714A;font-weight:700"><span>运费</span><span>待填地址</span></div>';
   } else if (shipInfo.status === 'r3') {
     foot += '<div class="od-total"><span>运费</span><span>随 Round3 一起付</span></div>';
+  }
+  if (paySummary.hasPaid) {
+    foot += '<div class="od-total"><span>已付</span><span>\u00A5' + paySummary.paid.toFixed(2) + '</span></div>';
+    if (shipInfo.status !== 'missing') {
+      if (paySummary.amountDue > 0) foot += '<div class="od-total main"><span>本次应补</span><span>\u00A5' + paySummary.amountDue.toFixed(2) + '</span></div>';
+      else if (paySummary.overpaid > 0) foot += '<div class="od-total main"><span>已多付</span><span>\u00A5' + paySummary.overpaid.toFixed(2) + '</span></div>';
+      else foot += '<div class="od-total main"><span>本次应补</span><span>无需补款</span></div>';
+    }
+  } else if (shipInfo.status !== 'missing' && paySummary.amountDue > 0) {
+    foot += '<div class="od-total main"><span>本次应付</span><span>\u00A5' + paySummary.amountDue.toFixed(2) + '</span></div>';
   }
   foot += '<button onclick="copyOrderText(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')" style="margin-top:12px;width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">📋 复制订单文本</button>';
   const ov = document.createElement('div'); ov.className = 'od-overlay';
