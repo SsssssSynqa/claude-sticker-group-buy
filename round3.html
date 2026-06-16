@@ -415,15 +415,15 @@ section{padding:14px}
 
 <div class="lock-banner" id="lockBanner">🔒 已锁单 — 所有贴纸数量已锁定，不可修改</div>
 
-<!-- Round3 登记中提示弹窗 (每次登录弹一次, 用户可关闭) -->
+<!-- Round3 到货补运费提示弹窗 (每次登录弹一次, 用户可关闭) — 2026-06-15 贴纸到货, 改为填地址+补运费公告 -->
 <div id="reminderOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:3000;display:none;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:16px;padding:28px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center">
     <div style="font-size:28px;margin-bottom:12px">🎉</div>
-    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">Round3 已开始付款</h3>
+    <h3 style="font-size:17px;font-weight:700;color:#E8714A;margin:0 0 16px">📦 贴纸到货！现在填地址 + 补运费</h3>
     <div style="text-align:left;font-size:14px;line-height:1.9;color:#333">
-      <p style="margin:0 0 10px"><strong>截团锁单完成，现在开始付款！</strong>点「📱 查看付款码」扫码付，<strong>付款截图 + 导出订单发群</strong>。付款 <strong>6 月 3 日截止</strong>，逾期未付按跑单掉落。</p>
-      <p style="margin:0 0 10px;background:#FFEAEA;padding:10px 12px;border-radius:8px;border-left:3px solid #D94040;font-size:13px;line-height:1.7"><strong style="color:#D94040">🔴 两件事必做</strong>：① 付款备注「编号 + 昵称」；② <strong style="color:#D94040">左上角把团号改成你所在微信群的团</strong>！全团统一由鹅鹅收款，团号对得上才能找到你。</p>
-      <p style="margin:0;background:#FFF4E6;padding:10px 12px;border-radius:8px;border-left:3px solid #E8714A;font-size:13px;line-height:1.6"><strong>📦 全团代发</strong>（付款后填地址）。汇率 <strong>7.1</strong>、本次<strong>不收运费</strong>；到货后按购汇实时汇率重算关税/运费，<strong>多退少补，0 盈利团</strong>。</p>
+      <p style="margin:0 0 10px">贴纸已经到国内啦！现在请大家<strong>先填收货地址，再补缴运费</strong>：①&nbsp;点「📦 填写收货地址」填好收件人 / 手机 / 完整地址；②&nbsp;点「📱 查看付款码」按页面显示的<strong>应补运费金额</strong>扫码付。</p>
+      <p style="margin:0 0 10px;background:#FFF4E6;padding:10px 12px;border-radius:8px;border-left:3px solid #E8714A;font-size:13px;line-height:1.7">📍 <strong>运费按收件地区计算，没填地址不会显示金额</strong>，所以务必先填地址再看付款码。运费 = 基础 <strong>¥8.5/单</strong> + 偏远附加（<strong>北京/上海 +¥1</strong>，<strong>新疆/西藏 +¥13</strong>，其余地区不加）。<strong>多退少补，0 盈利团</strong>。</p>
+      <p style="margin:0;background:#FFEAEA;padding:10px 12px;border-radius:8px;border-left:3px solid #D94040;font-size:13px;line-height:1.7"><strong style="color:#D94040">🔴 两件事必做</strong>：① 付款备注「编号 + 昵称」；② 确认左上角团号 = 你所在的微信群团。全团统一由鹅鹅收款，团号对得上才能找到你。</p>
     </div>
     <button onclick="document.getElementById('reminderOverlay').style.display='none'" style="margin-top:20px;padding:10px 36px;background:linear-gradient(135deg,#E8714A,#D4623E);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(232,113,74,.3)">我知道了</button>
   </div>
