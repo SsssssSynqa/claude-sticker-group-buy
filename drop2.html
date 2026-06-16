@@ -1784,10 +1784,23 @@ function exportMyOrder() {
   if (!totalItems) { lines.push('暂无选购'); }
   const cny = r2(totalUSD * rate), fee = r2(cny * 0.001), tot = r2(cny + fee);
   lines.push('', '总件数：' + totalItems, 'CNY（含0.1%手续费）：¥' + tot.toFixed(2));
+  appendDropShippingLines(lines, myName, totalItems, tot);
   const text = lines.join('\n');
   navigator.clipboard.writeText(text)
     .then(() => alert('已复制到剪贴板，可以直接粘贴到群里！'))
     .catch(() => { prompt('请手动复制：', text); });
+}
+
+function appendDropShippingLines(lines, name, totalItems, productTotal) {
+  const shipInfo = shippingFeeInfoFor(name, totalItems);
+  if (shipInfo.status === 'ready') {
+    lines.push('运费：' + shipInfo.text);
+    lines.push('合计（含运费）：¥' + r2(productTotal + shipInfo.amount).toFixed(2));
+  } else if (shipInfo.status === 'missing') {
+    lines.push('⚠️ 运费待定：请先在掉落页填写收货地址，运费按收件地区计算，填好后金额才完整');
+  } else if (shipInfo.status === 'r3') {
+    lines.push('运费：随 Round3 一起付，本页不重复收');
+  }
 }
 
 function getOrderText(name) {
@@ -1797,6 +1810,7 @@ function getOrderText(name) {
   S.forEach(s => { const did = dropId(s.id), q = o[did] || 0; if (q > 0) { const sub = r2(q * DROP_UNIT_PRICES[s.id]); totalItems += q; totalUSD += sub; lines.push(s.name + '(' + TYPE_LABEL[s.type] + ') x' + q); } });
   const cny = r2(totalUSD * rate), fee = r2(cny * 0.001), tot = r2(cny + fee);
   lines.push('', '总件数: ' + totalItems + ' 件', 'USD: $' + totalUSD.toFixed(2), 'CNY（含手续费）: ¥' + tot.toFixed(2));
+  appendDropShippingLines(lines, name, totalItems, tot);
   return lines.join('\n');
 }
 
@@ -1814,6 +1828,14 @@ function showOrderDetail(name) {
   if (!items) items = '<div style="padding:20px;text-align:center;color:#999">暂无选购</div>';
   const cny = r2(totalUSD * rate), fee = r2(cny * 0.001), tot = r2(cny + fee);
   let foot = '<div class="od-total"><span>总件数</span><span>' + totalItems + ' 件</span></div><div class="od-total"><span>USD</span><span>$' + totalUSD.toFixed(2) + '</span></div><div class="od-total main"><span>CNY（含手续费）</span><span>\u00A5' + tot.toFixed(2) + '</span></div>';
+  const shipInfo = shippingFeeInfoFor(name, totalItems);
+  if (shipInfo.status === 'ready') {
+    foot += '<div class="od-total"><span>运费</span><span>' + shipInfo.text + '</span></div><div class="od-total main"><span>合计（含运费）</span><span>\u00A5' + r2(tot + shipInfo.amount).toFixed(2) + '</span></div>';
+  } else if (shipInfo.status === 'missing') {
+    foot += '<div class="od-total" style="color:#E8714A;font-weight:700"><span>运费</span><span>待填地址</span></div>';
+  } else if (shipInfo.status === 'r3') {
+    foot += '<div class="od-total"><span>运费</span><span>随 Round3 一起付</span></div>';
+  }
   foot += '<button onclick="copyOrderText(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')" style="margin-top:12px;width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">📋 复制订单文本</button>';
   const ov = document.createElement('div'); ov.className = 'od-overlay';
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
