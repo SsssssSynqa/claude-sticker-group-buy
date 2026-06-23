@@ -14,6 +14,17 @@
 *.tmp
 *.bak
 
+# === 文档（报关委托书/快递单，含地址、公司信息） ===
+*.pdf
+
+# === 本地工作目录（生成的表、审计、日志、付款码暂存，非拼团页内容） ===
+outputs/
+audit_*/
+logs/
+付款码/
+
 # === Python ===
 __pycache__/
 *.pyc
+
+# 注意：favicon.png / qr-wechat-group.png / r2-pay-* 等是拼团页公开扫码图，已追踪、勿挡
