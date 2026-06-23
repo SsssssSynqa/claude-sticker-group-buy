@@ -27,4 +27,14 @@ logs/
 __pycache__/
 *.pyc
 
+# === 内部方案/审计/笔记 markdown（含漏洞分析、密码等敏感内容；README/CHANGELOG 等公开文档不在此列） ===
+plan_*.md
+audit_*.md
+*安全*.md
+*审计*.md
+*漏洞*.md
+*hardening*.md
+notes_*.md
+todo_*.md
+
 # 注意：favicon.png / qr-wechat-group.png / r2-pay-* 等是拼团页公开扫码图，已追踪、勿挡
