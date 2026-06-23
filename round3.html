@@ -2279,9 +2279,8 @@ function updateAddressBtn() {
 function updateTrackingBtn() {
   const btn = document.getElementById('btnTracking');
   if (!btn) return;
-  // 2026-05-21: Round3 登记阶段强制隐藏,等开团进入发货阶段再恢复
-  // 原逻辑: btn.style.display = (myName && DROPSHIP_TEAMS.includes(myTeam)) ? '' : 'none';
-  btn.style.display = 'none';
+  // 2026-05-21 登记阶段曾强制隐藏; 2026-06-23 贴纸已发货、单号已回填, 恢复显示
+  btn.style.display = (myName && DROPSHIP_TEAMS.includes(myTeam)) ? '' : 'none';
 }
 
 async function showMyTracking() {

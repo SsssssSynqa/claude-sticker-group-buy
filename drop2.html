@@ -360,6 +360,7 @@ section{padding:14px}
   <div class="pay-action-bar">
     <button class="btn-pay-qr" id="btnPayQR" onclick="showPaymentQR()">📱 查看付款码</button>
     <button class="btn-pay-qr" id="btnAddress" onclick="openAddressForm()" style="display:none">📦 填写收货地址</button>
+    <button class="btn-pay-qr" id="btnTracking" onclick="showMyTracking()" style="display:none;background:linear-gradient(135deg,#7CB342,#558B2F)">📮 查看快递单号</button>
     <button class="btn-my-export" onclick="exportMyOrder()">📋 导出我的订单</button>
     <button class="btn-pay-confirm" id="btnPayConfirm" onclick="handlePayBtnClick()">💰 我已完成付款</button>
   </div>
@@ -1085,6 +1086,30 @@ function updateAddressBtn() {
   btn.style.display = show ? '' : 'none';
 }
 
+// 2026-06-23: 掉落-only 用户(走 drop2 填地址发货)登录后显示查单号按钮; R3 有订单的人去 round3 查
+function updateTrackingBtn() {
+  const btn = document.getElementById('btnTracking');
+  if (!btn) return;
+  btn.style.display = (!!myName && !hasR3Order()) ? '' : 'none';
+}
+
+// 掉落-only 用户查自己的快递单号(与 round3 共用 addresses 表, tracking_number 已回填)
+async function showMyTracking() {
+  if (!myName) { alert('请先选择昵称'); return; }
+  let addr = allAddressesCache[myName];
+  if (!addr && typeof sb !== 'undefined' && sb) {
+    const {data} = await sb.from('addresses').select('*').eq('name', addressStorageKey(myName)).maybeSingle();
+    if (data) addr = data;
+  }
+  if (!addr) { alert('你还没填收货地址。请先点「📦 填写收货地址」填好后再来查。'); return; }
+  const tn = (addr.tracking_number || '').trim();
+  if (!tn) {
+    alert('📮 团长还没填你的快递单号，请耐心等等～\n\n收件人：' + (addr.recipient || '') + '\n手机：' + (addr.phone || '') + '\n地址：' + (addr.address || ''));
+    return;
+  }
+  alert('📮 你的快递信息\n\n快递单号：' + tn + '\n\n收件人：' + (addr.recipient || '') + '\n手机：' + (addr.phone || '') + '\n地址：' + (addr.address || ''));
+}
+
 // ============ ADMIN: 掉落-only 代发总览 (ported from round3.html, DOM-built) ============
 // 候选 = 掉落已付款(allActualPaid=drop_r3__actual_paid) 且不在 r3PaidNames 的人(掉落-only)
 function dropOnlyAddrCandidates() {
@@ -1531,6 +1556,7 @@ function handlePayBtnClick() {
 
 function updatePaymentBtns() {
   updateAddressBtn();
+  updateTrackingBtn();
   const btn = document.getElementById('btnPayConfirm');
   const qrBtn = document.getElementById('btnPayQR');
   if (!btn) return;
