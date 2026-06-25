@@ -1098,7 +1098,7 @@ async function saveRate() {
   const saveBtn = document.getElementById('btnRateSave');
   if (saveBtn) { saveBtn.textContent = '保存中...'; saveBtn.style.pointerEvents = 'none'; }
   try {
-    await sb.from('settings').upsert({key: 'r3_rate', value: String(newRate), updated_at: new Date().toISOString()}, {onConflict: 'key'});
+    await callAdminEF('set_setting', {key: 'r3_rate', value: String(newRate)}); // 2026-06-24 走 admin EF
     rate = newRate;
     recalculate();
     saveOffline();
@@ -1120,7 +1120,7 @@ async function saveActualUSD() {
   const saveBtn = document.getElementById('btnActualUsdSave');
   if (saveBtn) { saveBtn.textContent = '保存中...'; saveBtn.style.pointerEvents = 'none'; }
   try {
-    await sb.from('settings').upsert({key: 'r3_actual_usd', value: String(val), updated_at: new Date().toISOString()}, {onConflict: 'key'});
+    await callAdminEF('set_setting', {key: 'r3_actual_usd', value: String(val)}); // 2026-06-24 走 admin EF
     actualUSD = val;
     recalculate();
     saveOffline();
@@ -1142,7 +1142,7 @@ async function saveTaxCNY() {
   const saveBtn = document.getElementById('btnTaxCnySave');
   if (saveBtn) { saveBtn.textContent = '保存中...'; saveBtn.style.pointerEvents = 'none'; }
   try {
-    await sb.from('settings').upsert({key: 'r3_tax_cny', value: String(val), updated_at: new Date().toISOString()}, {onConflict: 'key'});
+    await callAdminEF('set_setting', {key: 'r3_tax_cny', value: String(val)}); // 2026-06-24 走 admin EF
     taxCNY = val;
     recalculate();
     saveOffline();
@@ -1204,11 +1204,7 @@ async function toggleLock() {
   const lockBtn = document.getElementById('lockBtn');
   if (lockBtn) { lockBtn.disabled = true; lockBtn.textContent = '处理中...'; }
   try {
-    const {error} = await sb.from('settings').upsert(
-      {key: 'r3_locked', value: newVal, updated_at: new Date().toISOString()},
-      {onConflict: 'key'}
-    );
-    if (error) throw error;
+    await callAdminEF('set_setting', {key: 'r3_locked', value: newVal}); // 2026-06-24 走 admin EF
     isLocked = !isLocked;
     applyLockState();
     saveOffline();
@@ -1444,12 +1440,10 @@ function changeTeam() {
   localStorage.setItem('gb2_team', myTeam);
   allTeams[myName] = myTeam;
   updateNickDisplay();
-  if (sb) {
-    sb.from('orders').upsert(
-      {name: myName, sticker_id: 'r3__team', quantity: myTeam, updated_at: new Date().toISOString()},
-      {onConflict: 'name,sticker_id'}
-    ).select().then(r => { if (r.error) console.error('team change failed:', r.error); });
-  }
+  // 2026-06-24 走 auth change_team EF (服务端验 token, 同步 accounts.team + orders r3__team)
+  callEF('auth', {action: 'change_team', team: myTeam}).then(res => {
+    if (res.token) efSaveToken(res.token);
+  }).catch(e => console.error('change_team failed:', e));
   renderTable();
   recalculate();
 }
@@ -1459,19 +1453,9 @@ function updateNickDisplay() {
   if (el) el.textContent = myName;
   const tEl = document.getElementById('teamTag');
   if (tEl) tEl.textContent = '团' + myTeam;
-  // Show/hide PIN tag
+  // 2026-06-24 PIN 已搬 user_pins (bcrypt hash, anon 永远摸不到), 直接显示"改密码"
   const pEl = document.getElementById('pinTag');
-  if (pEl && myName && sb) {
-    sb.from('orders').select('quantity').eq('name', myName).eq('sticker_id', 'r3__pin').then(({data}) => {
-      if (data && data.length > 0) {
-        pEl.textContent = '改密码';
-        pEl.style.display = '';
-      } else {
-        pEl.textContent = '设密码';
-        pEl.style.display = '';
-      }
-    });
-  }
+  if (pEl && myName) { pEl.textContent = '改密码'; pEl.style.display = ''; }
   // Rate input: admin-only editing
   applyRatePermission();
   // Address features: dropship teams button + admin/designated viewer panel
@@ -1504,35 +1488,20 @@ function applyRatePermission() {
   // 包材费设置框已移除 2026-05-31（包材到货后并入应补运费统一核算）
 }
 
+// 2026-06-24 重写: 走 auth change_pin EF (服务端用 bcrypt 验旧密码, hash 新密码)
 async function changePin() {
-  if (!sb || !myName) return;
-  const {data: existing} = await sb.from('orders').select('quantity').eq('name', myName).eq('sticker_id', 'r3__pin');
-  const hasPin = existing && existing.length > 0;
-
-  if (hasPin) {
-    const oldPin = prompt('请输入当前密码:');
-    if (!oldPin) return;
-    if (existing[0].quantity !== parseInt(oldPin)) {
-      alert('当前密码不正确');
-      return;
-    }
-  }
-  const newPin = prompt(hasPin ? '请输入新的4~6位数字密码:' : '请设置4~6位数字密码（用于换设备时找回账号）:');
+  if (!myName) return;
+  const oldPin = prompt('请输入当前密码:');
+  if (!oldPin) return;
+  const newPin = prompt('请输入新的4~6位数字密码:');
   if (!newPin) return;
   const cleaned = newPin.replace(/\D/g, '');
-  if (cleaned.length < 4 || cleaned.length > 6) {
-    alert('密码需要4~6位数字');
-    return;
-  }
-  const {error} = await sb.from('orders').upsert(
-    {name: myName, sticker_id: 'r3__pin', quantity: parseInt(cleaned), updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    alert('密码设置失败: ' + error.message);
-  } else {
-    alert(hasPin ? '密码已修改！' : '密码设置成功！下次换设备时可以用这个密码登录。');
-    updateNickDisplay();
+  if (cleaned.length < 4 || cleaned.length > 6) { alert('新密码需要4~6位数字'); return; }
+  try {
+    await callEF('auth', {action: 'change_pin', old_pin: oldPin, new_pin: cleaned});
+    alert('密码已修改！');
+  } catch(e) {
+    alert('密码修改失败：' + e.message);
   }
 }
 
