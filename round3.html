@@ -526,6 +526,23 @@ section{padding:14px}
 // ============ CONFIG ============
 const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
+// 2026-06-24 EF 接入: 登录/注册/写地址/管理操作走 Edge Function, anon 只读公开数据
+const EF_BASE = SUPA_URL + '/functions/v1';
+function efAuthHeaders() {
+  const t = localStorage.getItem('gb2_ef_token');
+  const h = {'apikey': SUPA_KEY, 'Content-Type': 'application/json'};
+  if (t) h['Authorization'] = 'Bearer ' + t;
+  return h;
+}
+async function callEF(fn, body) {
+  const r = await fetch(EF_BASE + '/' + fn, { method: 'POST', headers: efAuthHeaders(), body: JSON.stringify(body) });
+  let data; try { data = await r.json(); } catch { data = { error: 'HTTP ' + r.status }; }
+  if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+  return data;
+}
+function efSaveToken(t) { if (t) localStorage.setItem('gb2_ef_token', t); }
+function efClearToken() { localStorage.removeItem('gb2_ef_token'); }
+function efHasToken() { return !!localStorage.getItem('gb2_ef_token'); }
 const ADMIN_NAMES = ['鹅鹅', '鹅'];
 const ADDRESS_VIEWERS = ['鹅鹅', '鹅']; // 能查看所有代发地址的白名单（2026-06-24 移除「代发」账号、收紧 admin 攻击面）
 const TEAM_LEADERS = {1: '鹅鹅', 2: '鹅鹅', 3: '鹅鹅', 4: '鹅鹅', 5: '鹅鹅', 6: '鹅鹅'}; // 2026-05-31 锁单: 1234团人少, 全团统一鹅鹅一人收款+管理
@@ -1370,32 +1387,13 @@ async function submitAuth() {
   }
 }
 
+// 2026-06-24 重写: 走 auth Edge Function, PIN 已搬到 user_pins bcrypt, 不再 anon SELECT PIN
 async function doRegister(name, pin) {
-  if (!sb) throw new Error('未连接到服务器，请刷新后重试');
-
-  // Check if nickname already exists (with PIN or with any orders)
-  const {data: pinCheck} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r3__pin');
-  if (pinCheck && pinCheck.length > 0) {
-    throw new Error('该昵称已被注册，请换一个昵称或切换到「已有账号」登录');
-  }
-  const {data: anyCheck} = await sb.from('orders').select('sticker_id').eq('name', name).like('sticker_id', 'r3_%').limit(1);
-  if (anyCheck && anyCheck.length > 0) {
-    throw new Error('该昵称已有订单记录，请切换到「已有账号」登录');
-  }
-
   const team = parseInt(document.querySelector('input[name="team"]:checked')?.value) || 4;
   if (!ROUND2_TEAMS.includes(team)) throw new Error('请选择有效的分团');
-
-  // Save PIN and team to Supabase
-  const {error} = await sb.from('orders').upsert([
-    {name, sticker_id: 'r3__pin', quantity: parseInt(pin), updated_at: new Date().toISOString()},
-    {name, sticker_id: 'r3__team', quantity: team, updated_at: new Date().toISOString()}
-  ], {onConflict: 'name,sticker_id'}).select();
-  if (error) throw new Error('注册失败: ' + error.message);
-
-  // Success
-  myName = name;
-  myTeam = team;
+  const res = await callEF('auth', {action: 'register', name, pin, team});
+  efSaveToken(res.token);
+  myName = res.name; myTeam = res.team;
   localStorage.setItem('gb2_nickname', myName);
   localStorage.setItem('gb2_team', myTeam);
   allTeams[myName] = myTeam;
@@ -1403,65 +1401,37 @@ async function doRegister(name, pin) {
   updateNickDisplay();
   renderTable();
   recalculate();
-  // 登录后不自动滚动，保持在页面顶部的拼团须知
 }
 
 async function doLogin(name, pin) {
-  if (!sb) throw new Error('未连接到服务器，请刷新后重试');
-
-  // Verify PIN
-  const {data: pinRows} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r3__pin');
-  if (!pinRows || pinRows.length === 0) {
-    const {data: anyRows} = await sb.from('orders').select('sticker_id').eq('name', name).like('sticker_id', 'r3_%').limit(1);
-    if (anyRows && anyRows.length > 0) {
-      throw new Error('该昵称是旧账号且尚未设置密码。为避免账号被冒领，当前已关闭自动设密码登录，请联系团长处理。');
-    } else {
-      throw new Error('该昵称不存在，请检查拼写或切换到「新用户注册」');
-    }
-  } else if (pinRows[0].quantity !== parseInt(pin)) {
-    throw new Error('密码错误，请重试');
-  }
-
-  // Success — load their data
-  myName = name;
+  const res = await callEF('auth', {action: 'login', name, pin});
+  efSaveToken(res.token);
+  myName = res.name; myTeam = res.team;
   localStorage.setItem('gb2_nickname', myName);
-
-  // Get their team
-  const {data: teamRows} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r3__team');
-  if (teamRows && teamRows.length > 0) {
-    myTeam = teamRows[0].quantity;
-    localStorage.setItem('gb2_team', myTeam);
-  }
-
+  if (res.team) localStorage.setItem('gb2_team', myTeam);
   document.getElementById('nickOverlay').style.display = 'none';
   updateNickDisplay();
   renderTable();
   recalculate();
-  // 登录后不自动滚动，保持在页面顶部的拼团须知
 }
 
-function changeNick() {
-  const newName = prompt('修改昵称:', myName);
-  if (newName && newName.trim() && newName.trim() !== myName) {
-    const oldName = myName;
-    myName = newName.trim();
-    localStorage.setItem('gb2_nickname', myName);
-    if (allOrders[oldName]) {
-      allOrders[myName] = allOrders[oldName];
-      delete allOrders[oldName];
-    }
-    if (allTeams[oldName]) {
-      allTeams[myName] = allTeams[oldName];
-      delete allTeams[oldName];
-    }
-    if (sb) {
-      sb.from('orders').update({name: myName, updated_at: new Date().toISOString()}).eq('name', oldName).like('sticker_id', 'r3_%')
-        .then(({error}) => { if (error) console.error('Nickname migration failed:', error); });
-    }
-    updateNickDisplay();
-    renderTable();
-    recalculate();
+// 2026-06-24 重写: 只改 display_name (走 auth rename, name_key 不变防接管)
+async function changeNick() {
+  const newName = prompt('修改昵称（仅改显示名，登录账号不变）:', myName);
+  if (!newName || !newName.trim() || newName.trim() === myName) return;
+  try {
+    const res = await callEF('auth', {action: 'rename', new_name: newName.trim()});
+    alert('显示名已更新为「' + res.display_name + '」\n（登录账号 ' + myName + ' 不变）');
+    document.getElementById('nickTag').textContent = res.display_name + ' ✓';
+  } catch(e) {
+    alert('修改失败：' + e.message);
   }
+}
+
+// 通用 admin EF helper（admin 写操作模板）
+async function callAdminEF(action, params) {
+  try { return await callEF('admin', {action, ...(params || {})}); }
+  catch(e) { console.error('admin EF '+action+' failed:', e); alert(action + ' 失败：' + e.message); throw e; }
 }
 
 function changeTeam() {
@@ -1926,28 +1896,16 @@ async function dropshipUnmarkShipped(memberName) {
 }
 
 // ============ ACTUAL PAID ============
+// 2026-06-24 走 admin EF (token 验 admin role, anon 无法伪造实付)
 async function saveActualPaid(memberName, amount) {
-  if (!sb) return;
   const memberTeam = allTeams[memberName] || 4;
   if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
-  const cents = Math.round(amount * 100);
-  if (cents > 0) {
-    allActualPaid[memberName] = amount;
-  } else {
-    delete allActualPaid[memberName];
-  }
-  recalculate();
-  saveOffline();
-  const {error} = await sb.from('orders').upsert(
-    {name: memberName, sticker_id: 'r3__actual_paid', quantity: cents, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    console.error('Save actual paid failed:', error);
-    alert('保存实付金额失败：' + error.message);
-  } else {
+  if (amount > 0) { allActualPaid[memberName] = amount; } else { delete allActualPaid[memberName]; }
+  recalculate(); saveOffline();
+  try {
+    await callAdminEF('set_actual_paid', {target_name: memberName, which: 'r3', value: amount});
     updateStatus('已更新 ' + memberName + ' 的实付金额');
-  }
+  } catch(e) { /* helper 已 alert */ }
 }
 
 async function saveRefunded(memberName, amount) {
@@ -2232,8 +2190,8 @@ async function loadAddressFor(name) {
 }
 async function loadMyAddress() { return loadAddressFor(myName); } // 兼容旧调用
 
+// 2026-06-24 重写: 自己走 my-data EF，代填走 admin EF（token 验 role，anon 无写权）
 async function saveAddress() {
-  if (!sb) return;
   const targetName = currentAddressTarget || myName;
   const isProxy = targetName !== myName;
   if (isProxy && !canViewAllAddresses(myName)) { alert('无权代填他人地址'); return; }
@@ -2244,27 +2202,22 @@ async function saveAddress() {
   const address = (document.getElementById('addrAddress').value || '').trim();
   const status = document.getElementById('addrStatus');
   if (!recipient || !phone || !address) {
-    status.textContent = '⚠️ 收件人、手机、地址都要填';
-    status.style.color = '#E74C3C';
-    return;
+    status.textContent = '⚠️ 收件人、手机、地址都要填'; status.style.color = '#E74C3C'; return;
   }
-  status.textContent = '保存中...';
-  status.style.color = '#999';
-  const {error} = await sb.from('addresses').upsert({
-    name: addressStorageKey(targetName), team: targetTeam, recipient, phone, address,
-    updated_at: new Date().toISOString()
-  }, {onConflict: 'name'}).select();
-  if (error) {
-    status.textContent = '⚠️ 保存失败：' + (error.message || '未知错误');
-    status.style.color = '#E74C3C';
-    return;
+  status.textContent = '保存中...'; status.style.color = '#999';
+  try {
+    if (isProxy) {
+      await callEF('admin', {action: 'save_address_for', target_name: targetName, recipient, phone, address, team: targetTeam});
+    } else {
+      await callEF('my-data', {action: 'save_address', recipient, phone, address, team: targetTeam});
+    }
+  } catch(e) {
+    status.textContent = '⚠️ 保存失败：' + e.message; status.style.color = '#E74C3C'; return;
   }
   status.textContent = isProxy ? ('✓ 已为 ' + targetName + ' 代填') : '✓ 已保存';
   status.style.color = '#2D8B5E';
-  // 本地同步 cache，立即反映到面板（realtime 到达前）
   const fresh = {name: targetName, team: targetTeam, recipient, phone, address, updated_at: new Date().toISOString()};
   allAddressesCache[targetName] = fresh;
-  // 即时刷新弹窗里的预览块，让用户在弹窗关闭前看到自己刚填的内容
   renderAddrExisting(fresh);
   setTimeout(() => closeAddressForm(), 1200);
   if (canViewAllAddresses(myName)) renderAllAddresses();
@@ -2308,36 +2261,31 @@ async function showMyTracking() {
   alert('📮 你的快递信息\n\n' + shippedTag + '快递单号：' + tn + '\n\n收件人：' + (addr.recipient || '') + '\n手机：' + (addr.phone || '') + '\n地址：' + (addr.address || ''));
 }
 
+// 2026-06-24 走 admin EF (token 验 admin)
 async function saveTracking(targetName, value) {
-  if (!sb) { alert('未连接到数据库'); return; }
   if (!canViewAllAddresses(myName)) { alert('仅管理员可填快递单号'); return; }
   const v = (value || '').trim();
-  // 先确保 addresses 行存在（如果该用户还没地址行，不能upsert tracking_number）
   const existing = allAddressesCache[targetName];
   if (!existing) { alert('该用户还没填地址，请先代填地址再填单号'); return; }
-  const team = existing.team || allTeams[targetName] || null;
   try {
-    const {error} = await sb.from('addresses').upsert(
-      {name: addressStorageKey(targetName), team, recipient: existing.recipient, phone: existing.phone, address: existing.address, tracking_number: v || null, updated_at: new Date().toISOString()},
-      {onConflict: 'name'}
-    );
-    if (error) throw error;
+    await callAdminEF('save_tracking', {target_name: targetName, value: v});
     allAddressesCache[targetName] = {...existing, tracking_number: v || null};
-  } catch(e) {
-    console.error('saveTracking failed:', e);
-    alert('保存失败：' + e.message);
-  }
+  } catch(e) { /* helper 已 alert */ }
 }
 
+// 2026-06-24 重写: admin 走 EF overview (token 验)，普通用户走 my-data get_bootstrap (只自己)
+// 根治"启动即整表脱库 555 条 PII"
 async function loadAllAddressesCache() {
-  if (!sb) return;
-  const {data, error} = await sb.from('addresses').select('*');
-  if (error) { console.error('Load addresses cache failed:', error); return; }
   allAddressesCache = {};
-  (data || []).forEach(r => { cacheRound3Address(r); });
-  // 2026-05-13 fix (シンヤ_r2 反馈): cache 加载完必须 recalculate, 否则 dropshipExtraFor
-  // 第一次 paint 时 cache 还空 → 偏远附加返 0 → 北京/上海团员的 ¥3.45 显示成 base ¥2.45.
-  // 团长视角更明显, 因为他们不会进 "全部地址" 面板凑巧触发其他 recalculate 路径.
+  try {
+    if (efHasToken() && canViewAllAddresses(myName)) {
+      const res = await callEF('admin', {action: 'overview'});
+      (res.addresses || []).forEach(r => { cacheRound3Address(r); });
+    } else if (efHasToken()) {
+      const res = await callEF('my-data', {action: 'get_bootstrap'});
+      (res.my_addresses || []).forEach(r => { cacheRound3Address(r); });
+    }
+  } catch(e) { console.error('loadAllAddressesCache via EF failed:', e); }
   if (typeof recalculate === 'function') recalculate();
 }
 
