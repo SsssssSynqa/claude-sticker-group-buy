@@ -446,6 +446,26 @@ section{padding:14px}
 // ============ CONFIG ============
 const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
+// 2026-06-24 EF 接入: 登录/注册/写地址/管理操作走 Edge Function
+const EF_BASE = SUPA_URL + '/functions/v1';
+function efAuthHeaders() {
+  const t = localStorage.getItem('gb2_ef_token');
+  const h = {'apikey': SUPA_KEY, 'Content-Type': 'application/json'};
+  if (t) h['Authorization'] = 'Bearer ' + t;
+  return h;
+}
+async function callEF(fn, body) {
+  const r = await fetch(EF_BASE + '/' + fn, { method: 'POST', headers: efAuthHeaders(), body: JSON.stringify(body) });
+  let data; try { data = await r.json(); } catch { data = { error: 'HTTP ' + r.status }; }
+  if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+  return data;
+}
+function efSaveToken(t) { if (t) localStorage.setItem('gb2_ef_token', t); }
+function efHasToken() { return !!localStorage.getItem('gb2_ef_token'); }
+async function callAdminEF(action, params) {
+  try { return await callEF('admin', {action, ...(params || {})}); }
+  catch(e) { console.error('admin EF '+action+' failed:', e); alert(action + ' 失败：' + e.message); throw e; }
+}
 const ADMIN_NAMES = ['鹅鹅', '鹅'];
 const TEAM_LEADERS = {1: '鹅鹅', 2: '鹅鹅', 3: '鹅鹅', 4: '鹅鹅', 5: '鹅鹅', 6: '鹅鹅'};
 const ROUND2_TEAMS = [1, 2, 3, 4, 5, 6];
@@ -730,13 +750,19 @@ async function loadAll() {
     }
     rp.forEach(r => r3PaidNames.add(r.name));
   } catch(e) { console.error('Load r3 paid names failed:', e); }
-  // 掉落-only 用户的收货地址 cache(管理员总览 + 自己付款门用)
+  // 2026-06-24 走 EF (admin overview / my-data get_bootstrap), 根治启动整表脱库
   try {
-    const {data: addrs, error: addrErr} = await sb.from('addresses').select('*');
-    if (addrErr) throw addrErr;
     allAddressesCache = {};
-    (addrs || []).forEach(r => { cacheRound3Address(r); });
-  } catch(e) { console.error('Load addresses cache failed:', e); }
+    if (efHasToken()) {
+      if (isAdmin(myName)) {
+        const res = await callEF('admin', {action: 'overview'});
+        (res.addresses || []).forEach(r => cacheRound3Address(r));
+      } else {
+        const res = await callEF('my-data', {action: 'get_bootstrap'});
+        (res.my_addresses || []).forEach(r => cacheRound3Address(r));
+      }
+    }
+  } catch(e) { console.error('addresses EF load failed:', e); }
 }
 
 function subscribeRealtime() {
@@ -847,39 +873,22 @@ async function submitAuth() {
   try { if (authMode === 'register') await doRegister(name, pin); else await doLogin(name, pin); }
   catch(e) { const el = document.getElementById('authErr'); el.textContent = e.message; el.classList.add('show'); btn.disabled = false; btn.textContent = authMode === 'register' ? '领取贴纸' : '登录'; }
 }
+// 2026-06-24 重写: 走 auth EF, PIN 已搬 user_pins/bcrypt, 全局账号体系(R3+drop 共用 account_id)
 async function doRegister(name, pin) {
-  if (!sb) throw new Error('未连接到服务器');
-  const {data: dp} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'drop_r3__pin');
-  if (dp && dp.length > 0) throw new Error('该昵称已注册，请切换到「已有账号」');
-  const {data: rp} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r3__pin');
-  if (rp && rp.length > 0) throw new Error('该昵称已在Round3注册过，请用原密码登录');
   const team = parseInt(document.querySelector('input[name="team"]:checked')?.value) || 4;
-  const {error} = await sb.from('orders').upsert([
-    {name, sticker_id: 'drop_r3__pin', quantity: parseInt(pin), updated_at: new Date().toISOString()},
-    {name, sticker_id: 'drop_r3__team', quantity: team, updated_at: new Date().toISOString()}
-  ], {onConflict: 'name,sticker_id'}).select();
-  if (error) throw new Error('注册失败: ' + error.message);
-  myName = name; myTeam = team;
+  const res = await callEF('auth', {action: 'register', name, pin, team});
+  efSaveToken(res.token);
+  myName = res.name; myTeam = res.team;
   localStorage.setItem('gb2_nickname', myName); localStorage.setItem('gb2_team', myTeam);
   allTeams[myName] = myTeam;
   document.getElementById('nickOverlay').style.display = 'none';
   updateNickDisplay(); renderTable(); recalculate();
 }
 async function doLogin(name, pin) {
-  if (!sb) throw new Error('未连接到服务器');
-  let ok = false;
-  const {data: dp} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'drop_r3__pin');
-  if (dp && dp.length > 0) { if (dp[0].quantity !== parseInt(pin)) throw new Error('密码错误'); ok = true; }
-  if (!ok) {
-    const {data: rp} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r3__pin');
-    if (rp && rp.length > 0) { if (rp[0].quantity !== parseInt(pin)) throw new Error('密码错误'); ok = true;
-      await sb.from('orders').upsert({name, sticker_id: 'drop_r3__pin', quantity: parseInt(pin), updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
-    }
-  }
-  if (!ok) throw new Error('该昵称不存在');
-  myName = name; localStorage.setItem('gb2_nickname', myName);
-  const {data: dt} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'drop_r3__team');
-  if (dt && dt.length > 0) myTeam = dt[0].quantity;
+  const res = await callEF('auth', {action: 'login', name, pin});
+  efSaveToken(res.token);
+  myName = res.name; localStorage.setItem('gb2_nickname', myName);
+  if (res.team) myTeam = res.team;
   else {
     const {data: rt} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r3__team');
     if (rt && rt.length > 0) myTeam = rt[0].quantity;
@@ -889,14 +898,15 @@ async function doLogin(name, pin) {
   document.getElementById('nickOverlay').style.display = 'none';
   updateNickDisplay(); renderTable(); recalculate();
 }
-function changeNick() {
-  const n = prompt('修改昵称:', myName);
+// 2026-06-24 重写: 只改 display_name (走 auth rename, name_key 不变防接管)
+async function changeNick() {
+  const n = prompt('修改昵称（仅改显示名，登录账号不变）:', myName);
   if (!n || !n.trim() || n.trim() === myName) return;
-  const old = myName; myName = n.trim(); localStorage.setItem('gb2_nickname', myName);
-  if (allOrders[old]) { allOrders[myName] = allOrders[old]; delete allOrders[old]; }
-  if (allTeams[old]) { allTeams[myName] = allTeams[old]; delete allTeams[old]; }
-  if (sb) sb.from('orders').update({name: myName, updated_at: new Date().toISOString()}).eq('name', old).like('sticker_id', 'drop_r3_%').then(r => { if (r.error) console.error(r.error); });
-  updateNickDisplay(); renderTable(); recalculate();
+  try {
+    const res = await callEF('auth', {action: 'rename', new_name: n.trim()});
+    alert('显示名已更新为「' + res.display_name + '」\n（登录账号 ' + myName + ' 不变）');
+    const tag = document.getElementById('nickTag'); if (tag) tag.textContent = res.display_name + ' ✓';
+  } catch(e) { alert('修改失败：' + e.message); }
 }
 function changeTeam() {
   const c = prompt('当前：团' + myTeam + '\n输入新团号（' + ROUND2_TEAMS.filter(t => t !== myTeam).join('/') + '）：');
@@ -951,18 +961,15 @@ async function leaderRevoke(mem) {
 }
 
 // ============ ACTUAL PAID ============
+// 2026-06-24 走 admin EF (which='drop')
 async function saveActualPaid(memberName, amount) {
-  if (!sb) return;
   if (!isAdmin(myName)) { alert('只有管理员可以操作'); return; }
-  const cents = Math.round(amount * 100);
-  if (cents > 0) { allActualPaid[memberName] = amount; } else { delete allActualPaid[memberName]; }
+  if (amount > 0) { allActualPaid[memberName] = amount; } else { delete allActualPaid[memberName]; }
   recalculate(); saveOffline();
-  const {error} = await sb.from('orders').upsert(
-    {name: memberName, sticker_id: 'drop_r3__actual_paid', quantity: cents, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) { console.error('Save actual paid failed:', error); alert('保存实付金额失败：' + error.message); }
-  else { updateStatus('已更新 ' + memberName + ' 的实付金额'); }
+  try {
+    await callAdminEF('set_actual_paid', {target_name: memberName, which: 'drop', value: amount});
+    updateStatus('已更新 ' + memberName + ' 的实付金额');
+  } catch(e) { /* helper alert */ }
   if (isAdmin(myName)) renderAllAddresses();
 }
 
@@ -1020,16 +1027,22 @@ function renderAddrExisting(data) {
 }
 
 async function loadAddressFor(name) {
-  if (!sb || !name) return;
+  if (!name) return;
   const cached = allAddressesCache && allAddressesCache[name];
   if (cached) renderAddrExisting(cached);
-  const {data, error} = await sb.from('addresses').select('*').eq('name', addressStorageKey(name)).maybeSingle();
-  if (error) { console.error('Load address failed:', error); return; }
+  // 2026-06-24: cache miss 走 EF (自己 my-data, admin 走 admin overview)
+  let data = cached || null;
+  if (!cached && efHasToken()) {
+    try {
+      if (name === myName) { const res = await callEF('my-data', {action: 'get_bootstrap'}); (res.my_addresses || []).forEach(r => cacheRound3Address(r)); }
+      else if (isAdmin(myName)) { const res = await callEF('admin', {action: 'overview'}); (res.addresses || []).forEach(r => cacheRound3Address(r)); }
+      data = allAddressesCache[name] || null;
+    } catch(e) { console.error('loadAddressFor EF failed:', e); }
+  }
   const r = document.getElementById('addrRecipient');
   const p = document.getElementById('addrPhone');
   const a = document.getElementById('addrAddress');
   if (data) {
-    cacheRound3Address(data);
     const fresh = allAddressesCache[name] || data;
     if (r) r.value = data.recipient || '';
     if (p) p.value = data.phone || '';
@@ -1061,12 +1074,10 @@ async function saveAddress() {
     return;
   }
   if (status) { status.textContent = '保存中...'; status.style.color = '#999'; }
-  const {error} = await sb.from('addresses').upsert({
-    name: addressStorageKey(myName), team: myTeam, recipient, phone, address,
-    updated_at: new Date().toISOString()
-  }, {onConflict: 'name'}).select();
-  if (error) {
-    if (status) { status.textContent = '⚠️ 保存失败：' + (error.message || '未知错误'); status.style.color = '#E74C3C'; }
+  // 2026-06-24 走 my-data EF (token 验, anon 无 addresses 写权)
+  try { await callEF('my-data', {action: 'save_address', recipient, phone, address, team: myTeam}); }
+  catch(e) {
+    if (status) { status.textContent = '⚠️ 保存失败：' + e.message; status.style.color = '#E74C3C'; }
     return;
   }
   if (status) { status.textContent = '✓ 已保存'; status.style.color = '#2D8B5E'; }
@@ -1097,8 +1108,9 @@ function updateTrackingBtn() {
 async function showMyTracking() {
   if (!myName) { alert('请先选择昵称'); return; }
   let addr = allAddressesCache[myName];
-  if (!addr && typeof sb !== 'undefined' && sb) {
-    const {data} = await sb.from('addresses').select('*').eq('name', addressStorageKey(myName)).maybeSingle();
+  if (!addr && efHasToken()) {
+    try { const res = await callEF('my-data', {action: 'get_bootstrap'}); (res.my_addresses || []).forEach(r => cacheRound3Address(r)); addr = allAddressesCache[myName]; } catch(e) {}
+    const data = null;
     if (data) addr = data;
   }
   if (!addr) { alert('你还没填收货地址。请先点「📦 填写收货地址」填好后再来查。'); return; }
@@ -1120,20 +1132,16 @@ function dropOnlyAddrCandidates() {
   return out;
 }
 
+// 2026-06-24 走 admin save_tracking EF
 async function saveDropTracking(targetName, value) {
-  if (!sb) { alert('未连接到数据库'); return; }
   if (!isAdmin(myName)) { alert('仅管理员可填快递单号'); return; }
   const v = (value || '').trim();
   const existing = allAddressesCache[targetName];
   if (!existing) { alert('该用户还没填地址，无法填单号'); return; }
   try {
-    const {error} = await sb.from('addresses').upsert(
-      {name: addressStorageKey(targetName), team: existing.team || allTeams[targetName] || null, recipient: existing.recipient, phone: existing.phone, address: existing.address, tracking_number: v || null, updated_at: new Date().toISOString()},
-      {onConflict: 'name'}
-    );
-    if (error) throw error;
+    await callAdminEF('save_tracking', {target_name: targetName, value: v});
     allAddressesCache[targetName] = {...existing, tracking_number: v || null};
-  } catch(e) { console.error('saveDropTracking failed:', e); alert('保存失败：' + e.message); }
+  } catch(e) { /* helper alert */ }
 }
 
 function renderAllAddresses() {
@@ -1256,37 +1264,29 @@ function renderAllAddresses() {
   body.appendChild(wrap);
 }
 
+// 2026-06-24 走 admin overview EF (token 验 admin role, 根治整表脱库)
 async function loadAllAddresses() {
   if (!isAdmin(myName)) return;
   const body = document.getElementById('allAddressesBody');
   if (body) body.textContent = '加载中...';
   try {
-    const {data, error} = await sb.from('addresses').select('*');
-    if (error) throw error;
+    const res = await callEF('admin', {action: 'overview'});
     allAddressesCache = {};
-    (data || []).forEach(r => { cacheRound3Address(r); });
+    (res.addresses || []).forEach(r => { cacheRound3Address(r); });
     recalculate();
-  } catch(e) { console.error('Load addresses failed:', e); }
+  } catch(e) { console.error('admin overview failed:', e); }
   renderAllAddresses();
 }
 
 // ============ ADMIN CLEAR USER ============
+// 2026-06-24 走 admin clear_drop_user EF (anon 已无 DELETE 权)
 async function adminClearUser(targetName) {
-  if (!sb || !isAdmin(myName)) { alert('只有管理员可以操作'); return; }
+  if (!isAdmin(myName)) { alert('只有管理员可以操作'); return; }
   if (!confirm('确认清空 ' + targetName + ' 的所有掉落订单？')) return;
-  const ords = allOrders[targetName] || {};
-  const deletes = Object.keys(ords).filter(did => did.startsWith('drop_r3_') && ords[did] > 0).map(did =>
-    sb.from('orders').delete().match({name: targetName, sticker_id: did})
-  );
-  // Also clear payment records
-  deletes.push(sb.from('orders').delete().match({name: targetName, sticker_id: 'drop_r3__payment_self'}));
-  deletes.push(sb.from('orders').delete().match({name: targetName, sticker_id: 'drop_r3__payment_leader'}));
-  deletes.push(sb.from('orders').delete().match({name: targetName, sticker_id: 'drop_r3__actual_paid'}));
-  deletes.push(sb.from('orders').delete().match({name: targetName, sticker_id: 'drop_r3__locked'}));
-  const results = await Promise.all(deletes);
-  const errs = results.filter(r => r.error);
-  if (errs.length) { alert('部分删除失败：' + errs.map(r => r.error.message).join(', ')); }
-  else { alert(targetName + ' 的订单已清空'); }
+  try {
+    await callAdminEF('clear_drop_user', {target_name: targetName});
+    alert(targetName + ' 的订单已清空');
+  } catch(e) { /* helper alert */ return; }
   delete allOrders[targetName]; delete allPaySelf[targetName]; delete allPayLeader[targetName]; delete allActualPaid[targetName]; delete allLocked[targetName];
   renderTable(); recalculate(); saveOffline();
   if (isAdmin(myName)) renderAllAddresses();
@@ -1428,9 +1428,8 @@ async function showPaymentQR() {
   // cache miss 时 fallback 单条查 DB (DB 是 source of truth,防 init race / 改昵称误判)。
   if (isDropOnly && COLLECT_SHIPPING && myUSD > 0 && !hasAddr(myName)) {
     let myAddr = allAddressesCache[myName];
-    if (!myAddr && sb) {
-      const {data} = await sb.from('addresses').select('*').eq('name', addressStorageKey(myName)).maybeSingle();
-      if (data) { cacheRound3Address(data); myAddr = allAddressesCache[myName]; }
+    if (!myAddr && efHasToken()) {
+      try { const res = await callEF('my-data', {action: 'get_bootstrap'}); (res.my_addresses || []).forEach(r => cacheRound3Address(r)); myAddr = allAddressesCache[myName]; } catch(e) {}
     }
     if (!myAddr || !myAddr.address) {
       const wrap0 = document.getElementById('payQrImgWrap');
