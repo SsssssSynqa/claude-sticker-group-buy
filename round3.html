@@ -827,6 +827,7 @@ function handleOrderEvent(payload) {
   const row = payload.new || payload.old;
   if (!row) return;
   if (row.sticker_id === 'r3__pin') return; // skip PIN records
+  if (!row.sticker_id.startsWith('r3_')) return; // 2026-06-24 防 drop_r3_*/r2_*/_* 行污染 R3 内存(Sephy P1)
 
   // Track join order for new arrivals
   if (payload.new && payload.new.id) {
