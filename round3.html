@@ -1916,9 +1916,12 @@ async function showPaymentQR() {
   // cache miss 时 fallback 单条查 DB (照搬 showMyTracking 的 Pluto 5/7 修复): DB 是 source of truth, 防 init race / 改昵称误判"没填"。
   if (isDropship && COLLECT_SHIPPING && myUSD > 0) {
     let myAddr = allAddressesCache[myName];
-    if (!myAddr && sb) {
-      const {data} = await sb.from('addresses').select('*').eq('name', addressStorageKey(myName)).maybeSingle();
-      if (data) { cacheRound3Address(data); myAddr = allAddressesCache[myName]; }
+    if (!myAddr && efHasToken()) {
+      try {
+        const res = await callEF('my-data', {action: 'get_bootstrap'});
+        (res.my_addresses || []).forEach(r => cacheRound3Address(r));
+        myAddr = allAddressesCache[myName];
+      } catch(e) { console.error('get_bootstrap fallback failed:', e); }
     }
     if (!myAddr || !myAddr.address) {
       // 没填地址 → 不显示金额和付款码, 只提示先填地址 (DOM 构造, 不用 innerHTML)
@@ -2134,12 +2137,23 @@ function renderAddrExisting(data) {
 }
 
 async function loadAddressFor(name) {
-  if (!sb || !name) return;
-  // 先尝试用本地 cache 立刻渲染预览（避免空窗），再异步从数据库刷新
+  if (!name) return;
   const cached = allAddressesCache && allAddressesCache[name];
   if (cached) renderAddrExisting(cached);
-  const {data, error} = await sb.from('addresses').select('*').eq('name', addressStorageKey(name)).maybeSingle();
-  if (error) { console.error('Load address failed:', error); return; }
+  // 2026-06-24: cache miss 时按角色走 EF (admin -> admin overview, 普通 -> my-data)
+  let data = null;
+  if (!cached && efHasToken()) {
+    try {
+      if (name === myName) {
+        const res = await callEF('my-data', {action: 'get_bootstrap'});
+        (res.my_addresses || []).forEach(r => cacheRound3Address(r));
+      } else if (canViewAllAddresses(myName)) {
+        const res = await callEF('admin', {action: 'overview'});
+        (res.addresses || []).forEach(r => cacheRound3Address(r));
+      }
+      data = allAddressesCache[name] || null;
+    } catch(e) { console.error('loadAddressFor EF failed:', e); }
+  } else if (cached) { data = cached; }
   const r = document.getElementById('addrRecipient');
   const p = document.getElementById('addrPhone');
   const a = document.getElementById('addrAddress');
@@ -2213,12 +2227,12 @@ async function showMyTracking() {
   // init 时机 race / 用户改昵称没同步 cache 等情况误报"没填". 数据库永远是
   // source of truth, cache 只是加速.
   let addr = allAddressesCache[myName];
-  if (!addr && sb) {
-    const {data} = await sb.from('addresses').select('*').eq('name', addressStorageKey(myName)).maybeSingle();
-    if (data) {
-      cacheRound3Address(data);
+  if (!addr && efHasToken()) {
+    try {
+      const res = await callEF('my-data', {action: 'get_bootstrap'});
+      (res.my_addresses || []).forEach(r => cacheRound3Address(r));
       addr = allAddressesCache[myName];
-    }
+    } catch(e) { console.error('showMyTracking EF fallback failed:', e); }
   }
   if (!addr) { alert('你还没填收货地址。请先点「📦 填写收货地址」填好后再来查。'); return; }
   const tn = (addr.tracking_number || '').trim();
