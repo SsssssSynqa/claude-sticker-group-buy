@@ -750,19 +750,23 @@ async function loadAll() {
     }
     rp.forEach(r => r3PaidNames.add(r.name));
   } catch(e) { console.error('Load r3 paid names failed:', e); }
-  // 2026-06-24 走 EF (admin overview / my-data get_bootstrap), 根治启动整表脱库
+  // 2026-06-24 走 EF; 2026-06-24 紧急回滚: 旧用户无 token, fallback anon SELECT
   try {
     allAddressesCache = {};
-    if (efHasToken()) {
-      if (isAdmin(myName)) {
-        const res = await callEF('admin', {action: 'overview'});
-        (res.addresses || []).forEach(r => cacheRound3Address(r));
-      } else {
-        const res = await callEF('my-data', {action: 'get_bootstrap'});
-        (res.my_addresses || []).forEach(r => cacheRound3Address(r));
-      }
+    if (efHasToken() && isAdmin(myName)) {
+      const res = await callEF('admin', {action: 'overview'});
+      (res.addresses || []).forEach(r => cacheRound3Address(r));
+    } else if (efHasToken()) {
+      const res = await callEF('my-data', {action: 'get_bootstrap'});
+      (res.my_addresses || []).forEach(r => cacheRound3Address(r));
+    } else if (sb) {
+      const {data} = await sb.from('addresses').select('*');
+      (data || []).forEach(r => cacheRound3Address(r));
     }
-  } catch(e) { console.error('addresses EF load failed:', e); }
+  } catch(e) {
+    console.error('addresses load failed, fallback anon SELECT:', e);
+    if (sb) { try { const {data} = await sb.from('addresses').select('*'); (data || []).forEach(r => cacheRound3Address(r)); } catch(e2) {} }
+  }
 }
 
 function subscribeRealtime() {
@@ -1269,12 +1273,20 @@ async function loadAllAddresses() {
   if (!isAdmin(myName)) return;
   const body = document.getElementById('allAddressesBody');
   if (body) body.textContent = '加载中...';
+  allAddressesCache = {};
   try {
-    const res = await callEF('admin', {action: 'overview'});
-    allAddressesCache = {};
-    (res.addresses || []).forEach(r => { cacheRound3Address(r); });
-    recalculate();
-  } catch(e) { console.error('admin overview failed:', e); }
+    if (efHasToken()) {
+      const res = await callEF('admin', {action: 'overview'});
+      (res.addresses || []).forEach(r => { cacheRound3Address(r); });
+    } else if (sb) {
+      const {data} = await sb.from('addresses').select('*');
+      (data || []).forEach(r => cacheRound3Address(r));
+    }
+  } catch(e) {
+    console.error('admin overview failed, fallback anon SELECT:', e);
+    if (sb) { try { const {data} = await sb.from('addresses').select('*'); (data || []).forEach(r => cacheRound3Address(r)); } catch(e2) {} }
+  }
+  recalculate();
   renderAllAddresses();
 }
 

@@ -2256,8 +2256,8 @@ async function saveTracking(targetName, value) {
   } catch(e) { /* helper 已 alert */ }
 }
 
-// 2026-06-24 重写: admin 走 EF overview (token 验)，普通用户走 my-data get_bootstrap (只自己)
-// 根治"启动即整表脱库 555 条 PII"
+// 2026-06-24 重写: admin 走 EF overview (token 验)，普通用户走 my-data get_bootstrap
+// 2026-06-24 紧急回滚: 旧用户无 EF token,fallback anon SELECT(与 DB GRANT SELECT addresses 配套)
 async function loadAllAddressesCache() {
   allAddressesCache = {};
   try {
@@ -2267,8 +2267,14 @@ async function loadAllAddressesCache() {
     } else if (efHasToken()) {
       const res = await callEF('my-data', {action: 'get_bootstrap'});
       (res.my_addresses || []).forEach(r => { cacheRound3Address(r); });
+    } else if (sb) {
+      const {data} = await sb.from('addresses').select('*');
+      (data || []).forEach(r => { cacheRound3Address(r); });
     }
-  } catch(e) { console.error('loadAllAddressesCache via EF failed:', e); }
+  } catch(e) {
+    console.error('loadAllAddressesCache failed, fallback to anon SELECT:', e);
+    if (sb) { try { const {data} = await sb.from('addresses').select('*'); (data || []).forEach(r => cacheRound3Address(r)); } catch(e2) {} }
+  }
   if (typeof recalculate === 'function') recalculate();
 }
 
