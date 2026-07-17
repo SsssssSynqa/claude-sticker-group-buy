@@ -1,0 +1,19 @@
+project_id = "jbdibeisdydocdfojpup"
+
+# These functions authenticate the application's own short JWT after the
+# Supabase gateway. Gateway JWT verification must stay disabled or the custom
+# tokens are rejected before the function can validate token_version/status.
+[functions.auth]
+verify_jwt = false
+
+[functions.my-data]
+verify_jwt = false
+
+[functions.admin]
+verify_jwt = false
+
+[functions.group-buy]
+verify_jwt = false
+
+[functions.counter]
+verify_jwt = false

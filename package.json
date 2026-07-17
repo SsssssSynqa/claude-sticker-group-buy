@@ -1,0 +1,9 @@
+{
+  "name": "clawd-sticker-group-buy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:sql": "bash test/run-postgres-smoke.sh"
+  }
+}
