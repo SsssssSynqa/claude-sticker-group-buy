@@ -222,16 +222,30 @@ footer{text-align:center;padding:0 24px 28px;font-size:12px;color:var(--text2)}
 
 <footer>Clawd Badge Counter · 与贴纸团 / 毛绒页数据隔离，使用独立 `badge__*` 命名空间</footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
-const BADGE_PIN = 'badge__pin';
-const BADGE_PAY_SELF = 'badge__payment_self';
+const COUNTER_NAMESPACE = 'badge';
+const COUNTER_TOKEN_KEY = 'badge_counter_token';
+const EF_BASE = SUPA_URL + '/functions/v1';
+async function callCounter(body, keepalive = false) {
+  const token = localStorage.getItem(COUNTER_TOKEN_KEY);
+  const headers = {'Content-Type':'application/json','apikey':SUPA_KEY};
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const response = await fetch(EF_BASE + '/counter', {
+    method:'POST', headers, body:JSON.stringify({namespace:COUNTER_NAMESPACE,...body}), keepalive
+  });
+  let data; try { data = await response.json(); } catch { data = {error:'HTTP ' + response.status}; }
+  if (!response.ok) {
+    if (response.status === 401) localStorage.removeItem(COUNTER_TOKEN_KEY);
+    throw new Error(data.error || ('HTTP ' + response.status));
+  }
+  return data;
+}
+function saveCounterToken(token){ if(token) localStorage.setItem(COUNTER_TOKEN_KEY,token); }
 const MEMBER_KEY = 'badge_member_name';
 const DISPLAY_KEY = 'badge_display_nick';
 const DRAFT_KEY = 'badge_pending_draft';
-const NEXT_SEQ_KEY = 'badge_next_seq';
 const UNIT_PRICE = 5.5;
 const GROUP_TARGET = 200;
 const BADGES = [
@@ -261,7 +275,6 @@ const BADGES = [
   { id:'badge_clawd_lightbulb', name:'Clawd Lightbulb', img:'https://storage.googleapis.com/sm-artworks/966c86c2-9273-4064-9951-ab56fecd27bb/large.png' },
   { id:'badge_clawd_magnifier', name:'Clawd Magnifier', img:'https://storage.googleapis.com/sm-artworks/b604152e-1a17-444d-846e-c0fe257bda95/large.png' }
 ];
-let sb = null;
 let myName = localStorage.getItem(MEMBER_KEY) || '';
 let myDisplayNick = localStorage.getItem(DISPLAY_KEY) || '';
 let draftNick = myDisplayNick || '';
@@ -271,12 +284,11 @@ let authMode = 'register';
 let currentQty = Object.fromEntries(BADGES.map(b => [b.id, 0]));
 
 function setConnected(on){const dot=document.getElementById('connDot');dot.classList.toggle('on',!!on);dot.classList.toggle('off',!on)}
-function initSupabase(){if(!window.supabase) return false; sb=window.supabase.createClient(SUPA_URL,SUPA_KEY); return true;}
 function esc(str){const d=document.createElement('div');d.textContent=str||'';return d.innerHTML;}
 function parseSeq(name){const m=String(name||'').match(/^(\d+)-/);return m?parseInt(m[1],10):0;}
 function parseNick(name){return String(name||'').replace(/^\d+-/,'');}
 function formatName(seq,nick){return String(seq).padStart(3,'0')+'-'+nick.trim();}
-function getOrder(name){return allOrders[name] || { qtyByBadge:{}, pin:null, paymentSelf:false, updatedAt:'' }; }
+function getOrder(name){return allOrders[name] || { qtyByBadge:{}, paymentSelf:false, updatedAt:'' }; }
 function getMemberTotal(order){return BADGES.reduce((sum,b)=>sum + (order.qtyByBadge?.[b.id] || 0),0);}
 function getBadgeTotal(id){return Object.values(allOrders).reduce((sum,order)=>sum + (order.qtyByBadge?.[id] || 0),0);}
 function estimateMine(){return BADGES.reduce((sum,b)=>sum + (currentQty[b.id]||0)*UNIT_PRICE,0);}
@@ -285,30 +297,17 @@ function saveDraft(){if(!myName) return; localStorage.setItem(DRAFT_KEY,JSON.str
 function clearDraft(){localStorage.removeItem(DRAFT_KEY);}
 function markDirty(){pending={qtyByBadge:{...currentQty}}; saveDraft(); updateSubmitBar();}
 function clearDirty(){pending={}; clearDraft(); updateSubmitBar();}
+function captureOrderSnapshot(){return {qtyByBadge:{...currentQty}};}
+function syncDirtyState(){
+  const saved=getOrder(myName);
+  const hasChanges=BADGES.some(b=>(currentQty[b.id]||0)!==(saved.qtyByBadge?.[b.id]||0));
+  if(hasChanges) markDirty(); else clearDirty();
+  return hasChanges;
+}
 function updateSubmitBar(){const count=Object.keys(pending).length; document.getElementById('submitCount').textContent=count; document.getElementById('submitBar').classList.toggle('show', count>0);}
 function setIdentity(fullName){myName=fullName; myDisplayNick=parseNick(fullName); draftNick=myDisplayNick; localStorage.setItem(MEMBER_KEY,myName); localStorage.setItem(DISPLAY_KEY,myDisplayNick); document.getElementById('nickTag').textContent=myName;}
 function readDraftOrSaved(){const saved=getOrder(myName); const draft=loadDraft(); draftNick=myDisplayNick||parseNick(myName)||''; currentQty=Object.fromEntries(BADGES.map(b=>[b.id, saved.qtyByBadge?.[b.id] || 0])); if(draft?.qtyByBadge){for(const b of BADGES) currentQty[b.id]=draft.qtyByBadge[b.id] || 0;}}
-async function reserveNextSeq(){
-  const maxUsed = Object.keys(allOrders).reduce((max, name) => Math.max(max, parseSeq(name)), 0);
-  const fallbackBase = maxUsed + 1;
-  for(let i=0;i<8;i+=1){
-    const {data:row,error:readError}=await sb.from('settings').select('key,value').eq('key',NEXT_SEQ_KEY).maybeSingle();
-    if(readError) throw readError;
-    const rawCurrent=row?parseInt(row.value,10):NaN;
-    const current=Number.isFinite(rawCurrent)&&rawCurrent>0?rawCurrent:fallbackBase;
-    const candidate=Math.max(current,fallbackBase);
-    const nextValue=String(candidate+1);
-    if(row){
-      const {data:updated,error:updateError}=await sb.from('settings').update({value:nextValue,updated_at:new Date().toISOString()}).eq('key',NEXT_SEQ_KEY).eq('value',row.value).select('key');
-      if(updateError) throw updateError;
-      if(updated&&updated.length) return candidate;
-    } else {
-      const {error:insertError}=await sb.from('settings').upsert({key:NEXT_SEQ_KEY,value:nextValue,updated_at:new Date().toISOString()},{onConflict:'key'});
-      if(!insertError) return candidate;
-    }
-  }
-  let seq=fallbackBase; const used=new Set(Object.keys(allOrders).map(parseSeq)); while(used.has(seq)) seq+=1; return seq;
-}
+
 function renderProducts(){
   const grid=document.getElementById('productsGrid');
   grid.innerHTML = BADGES.map(b=>{
@@ -392,34 +391,24 @@ function renderStats(){
 }
 function render(){ renderProducts(); renderSummary(); renderStats(); }
 async function loadAll(){
-  const stickerIds = BADGES.map(b=>b.id).concat([BADGE_PIN, BADGE_PAY_SELF]);
-  const {data,error} = await sb.from('orders').select('name,sticker_id,quantity,updated_at').in('sticker_id', stickerIds).order('updated_at', {ascending:false});
-  if(error) throw error;
-  allOrders={};
-  (data||[]).forEach(row=>{
-    if(!row.name.startsWith('0') && !/^\d+-/.test(row.name)) return;
-    if(!allOrders[row.name]) allOrders[row.name] = { qtyByBadge:{}, pin:null, paymentSelf:false, updatedAt:row.updated_at||'' };
-    if(row.sticker_id===BADGE_PIN) allOrders[row.name].pin = Number(row.quantity) || null;
-    else if(row.sticker_id===BADGE_PAY_SELF) allOrders[row.name].paymentSelf = Number(row.quantity) === 1;
-    else allOrders[row.name].qtyByBadge[row.sticker_id] = Number(row.quantity) || 0;
-    if(row.updated_at && row.updated_at > allOrders[row.name].updatedAt) allOrders[row.name].updatedAt = row.updated_at;
-  });
+  const snapshot = await callCounter({action:'snapshot'});
+  allOrders = {};
+  for(const member of snapshot.members || []){
+    const order = {qtyByBadge:{},paymentSelf:!!member.payment?.member_confirmed_at,updatedAt:member.updated_at||''};
+    for(const item of member.items || []) order.qtyByBadge[item.product_id] = Number(item.quantity)||0;
+    allOrders[member.full_name] = order;
+  }
 }
+let snapshotPollTimer = null;
 function subscribeRealtime(){
-  sb.channel('badge-orders')
-    .on('postgres_changes',{event:'*',schema:'public',table:'orders'}, payload=>{
-      const row = payload.new || payload.old;
-      if(!row || !BADGES.map(b=>b.id).concat([BADGE_PIN, BADGE_PAY_SELF]).includes(row.sticker_id)) return;
-      if(!allOrders[row.name]) allOrders[row.name] = { qtyByBadge:{}, pin:null, paymentSelf:false, updatedAt:row.updated_at||'' };
-      if(payload.eventType !== 'DELETE'){
-        if(row.sticker_id===BADGE_PIN) allOrders[row.name].pin = Number(row.quantity) || null;
-        else if(row.sticker_id===BADGE_PAY_SELF) allOrders[row.name].paymentSelf = Number(row.quantity) === 1;
-        else allOrders[row.name].qtyByBadge[row.sticker_id] = Number(row.quantity) || 0;
-        allOrders[row.name].updatedAt = row.updated_at || new Date().toISOString();
-      }
-      render();
-    }).subscribe(status=>setConnected(status==='SUBSCRIBED'));
+  if(snapshotPollTimer) clearInterval(snapshotPollTimer);
+  snapshotPollTimer = setInterval(async()=>{
+    if(document.hidden || Object.keys(pending).length) return;
+    try{ await loadAll(); setConnected(true); render(); }
+    catch(error){ console.error('badge refresh failed:',error); setConnected(false); }
+  },15000);
 }
+
 function switchAuthTab(mode){
   authMode=mode;
   document.getElementById('tabRegister').classList.toggle('active', mode==='register');
@@ -446,67 +435,85 @@ async function doRegister(){
   const nick=document.getElementById('nickInput').value.trim();
   const pin=document.getElementById('pinInput').value.trim();
   if(!nick || pin.length!==6) return;
-  const seq=await reserveNextSeq();
-  const fullName=formatName(seq,nick);
-  const {error}=await sb.from('orders').upsert({name:fullName, sticker_id:BADGE_PIN, quantity:parseInt(pin,10), updated_at:new Date().toISOString()},{onConflict:'name,sticker_id'}).select();
-  if(error) throw error;
-  setIdentity(fullName);
-  if(!allOrders[fullName]) allOrders[fullName] = { qtyByBadge:{}, pin:parseInt(pin,10), updatedAt:new Date().toISOString() };
+  const result=await callCounter({action:'register',display_name:nick,pin});
+  saveCounterToken(result.token);
+  setIdentity(result.account.full_name);
   document.getElementById('authOverlay').style.display='none';
 }
 async function doLogin(){
-  const no=document.getElementById('authNoInput').value.trim();
-  const nick=document.getElementById('nickInput').value.trim();
-  const pin=parseInt(document.getElementById('pinInput').value.trim(),10);
-  const fullName=formatName(parseInt(no,10),nick);
-  const {data,error}=await sb.from('orders').select('quantity').eq('name',fullName).eq('sticker_id',BADGE_PIN).limit(1);
-  if(error) throw error;
-  if(!data || !data.length || Number(data[0].quantity)!==pin) throw new Error('编号、昵称或密码不对');
-  setIdentity(fullName);
+  const sequence=parseInt(document.getElementById('authNoInput').value.trim(),10);
+  const displayName=document.getElementById('nickInput').value.trim();
+  const pin=document.getElementById('pinInput').value.trim();
+  const result=await callCounter({action:'login',sequence,display_name:displayName,pin});
+  saveCounterToken(result.token);
+  setIdentity(result.account.full_name);
   document.getElementById('authOverlay').style.display='none';
 }
-async function submitAuth(){clearAuthError(); try{if(!sb) throw new Error('还没连上服务器，请稍后再试'); if(authMode==='register') await doRegister(); else await doLogin(); readDraftOrSaved(); render();} catch(e){showAuthError(e.message || '操作失败，请重试');}}
+async function submitAuth(){
+  clearAuthError();
+  try{
+    if(authMode==='register') await doRegister(); else await doLogin();
+    await loadAll(); readDraftOrSaved(); render(); setConnected(true);
+  }catch(error){ showAuthError(error.message || '操作失败，请重试'); }
+}
 async function submitOrder(){
-  if(!sb) return;
-  if(!myName){document.getElementById('authOverlay').style.display='flex'; return;}
+  if(!myName){ document.getElementById('authOverlay').style.display='flex'; return false; }
+  const requestSnapshot=captureOrderSnapshot();
   const submitBtn=document.getElementById('submitBtn');
   submitBtn.disabled=true; submitBtn.textContent='保存中...';
   try{
-    const rows = BADGES.map(b=>({name:myName, sticker_id:b.id, quantity:currentQty[b.id]||0, updated_at:new Date().toISOString()}));
-    const {error}=await sb.from('orders').upsert(rows,{onConflict:'name,sticker_id'}).select();
-    if(error) throw error;
-    if(!allOrders[myName]) allOrders[myName]={qtyByBadge:{}, pin:null, paymentSelf:false, updatedAt:''};
-    for(const b of BADGES) allOrders[myName].qtyByBadge[b.id] = currentQty[b.id] || 0;
-    allOrders[myName].updatedAt = new Date().toISOString();
-    clearDirty(); render();
-    submitBtn.textContent='已保存 ✓';
-    setTimeout(()=>{submitBtn.disabled=false; submitBtn.textContent='保存';},1200);
-  }catch(e){console.error('badge submit failed:', e); submitBtn.disabled=false; submitBtn.textContent='保存失败，重试';}
+    const result=await callCounter({
+      action:'save_order', display_name:myDisplayNick,
+      items:BADGES.map(b=>({product_id:b.id,quantity:requestSnapshot.qtyByBadge[b.id]||0}))
+    });
+    setIdentity(result.account.full_name);
+    if(!allOrders[myName]) allOrders[myName]={qtyByBadge:{},paymentSelf:false,updatedAt:''};
+    for(const badge of BADGES) allOrders[myName].qtyByBadge[badge.id]=requestSnapshot.qtyByBadge[badge.id]||0;
+    allOrders[myName].updatedAt=new Date().toISOString();
+    const remainsDirty=syncDirtyState();
+    render();
+    if(remainsDirty){
+      submitBtn.disabled=false; submitBtn.textContent='保存新修改';
+    }else{
+      submitBtn.textContent='已保存 ✓';
+      setTimeout(()=>{submitBtn.disabled=false;submitBtn.textContent='保存';},1200);
+    }
+    return true;
+  }catch(error){
+    console.error('badge submit failed:',error);
+    submitBtn.disabled=false; submitBtn.textContent='保存失败，重试';
+    return false;
+  }
 }
 async function clearMyOrder(){
-  if(!myName || !sb) return;
-  currentQty = Object.fromEntries(BADGES.map(b=>[b.id,0]));
-  markDirty(); render();
-  try{
-    const rows = BADGES.map(b=>({name:myName, sticker_id:b.id, quantity:0, updated_at:new Date().toISOString()}));
-    const {error}=await sb.from('orders').upsert(rows,{onConflict:'name,sticker_id'}).select();
-    if(error) throw error;
-    if(!allOrders[myName]) allOrders[myName]={qtyByBadge:{}, pin:null, paymentSelf:false, updatedAt:''};
-    for(const b of BADGES) allOrders[myName].qtyByBadge[b.id]=0;
-    clearDirty(); render();
-  }catch(e){console.error('badge clear failed:', e);}
+  if(!myName) return;
+  if(!confirm('确定清空你的徽章订单吗？清空后需要重新填写。')) return;
+  const previous={...currentQty};
+  currentQty=Object.fromEntries(BADGES.map(b=>[b.id,0])); markDirty(); render();
+  const clearSnapshot=captureOrderSnapshot();
+  const saved=await submitOrder();
+  if(saved) return;
+  for(const badge of BADGES){
+    if((currentQty[badge.id]||0)===(clearSnapshot.qtyByBadge[badge.id]||0)){
+      currentQty[badge.id]=previous[badge.id]||0;
+    }
+  }
+  syncDirtyState(); render();
+  alert('清空失败，已恢复你清空前的数量。');
 }
 async function markPaid(){
-  if(!myName || !sb) return;
-  const nextValue = getOrder(myName).paymentSelf ? 0 : 1;
+  if(!myName) return;
+  const next=!getOrder(myName).paymentSelf;
   try{
-    const {error} = await sb.from('orders').upsert({name:myName, sticker_id:BADGE_PAY_SELF, quantity:nextValue, updated_at:new Date().toISOString()},{onConflict:'name,sticker_id'}).select();
-    if(error) throw error;
-    if(!allOrders[myName]) allOrders[myName]={qtyByBadge:{}, pin:null, paymentSelf:false, updatedAt:''};
-    allOrders[myName].paymentSelf = nextValue === 1;
-    render();
-  }catch(e){console.error('badge payment mark failed:', e);}
+    await callCounter({action:'set_payment',set:next});
+    if(!allOrders[myName]) allOrders[myName]={qtyByBadge:{},paymentSelf:false,updatedAt:''};
+    allOrders[myName].paymentSelf=next; render();
+  }catch(error){
+    console.error('badge payment mark failed:',error);
+    alert('付款状态更新失败：'+(error.message||'请稍后重试'));
+  }
 }
+
 function bindEvents(){
   document.getElementById('tabRegister').addEventListener('click',()=>switchAuthTab('register'));
   document.getElementById('tabLogin').addEventListener('click',()=>switchAuthTab('login'));
@@ -535,12 +542,25 @@ function bindEvents(){
   document.getElementById('discardBtn').addEventListener('click',()=>{readDraftOrSaved(); clearDirty(); render();});
 }
 async function boot(){
-  bindEvents();
-  render();
-  if(!initSupabase()){ setConnected(false); document.getElementById('authOverlay').style.display='flex'; return; }
-  try{ await loadAll(); subscribeRealtime(); setConnected(true); } catch(e){ console.error('badge init failed:',e); setConnected(false); }
-  if(myName){ setIdentity(myName); readDraftOrSaved(); render(); } else { document.getElementById('authOverlay').style.display='flex'; switchAuthTab('register'); }
+  bindEvents(); render();
+  try{ await loadAll(); subscribeRealtime(); setConnected(true); }
+  catch(error){ console.error('badge init failed:',error); setConnected(false); }
+  const token=localStorage.getItem(COUNTER_TOKEN_KEY);
+  if(myName && token){
+    try{
+      const session=await callCounter({action:'session'});
+      saveCounterToken(session.token); setIdentity(session.account.full_name);
+      readDraftOrSaved(); render(); return;
+    }catch(error){ console.error('badge session expired:',error); }
+  }
+  document.getElementById('authOverlay').style.display='flex';
+  if(myName){
+    switchAuthTab('login');
+    document.getElementById('authNoInput').value=String(parseSeq(myName)).padStart(3,'0');
+    document.getElementById('nickInput').value=myDisplayNick;
+  }else switchAuthTab('register');
 }
+
 boot();
 </script>
 </body>

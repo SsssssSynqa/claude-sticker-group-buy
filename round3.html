@@ -165,8 +165,8 @@ section{padding:14px}
 
 .th-type{font-size:9px;font-weight:400;display:block;margin-top:2px}
 
-.nick-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center}
-.nick-popup{background:#fff;border-radius:16px;padding:28px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+.nick-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box}
+.nick-popup{background:#fff;border-radius:16px;padding:28px;max-width:360px;width:90%;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center;box-sizing:border-box}
 .nick-popup h3{color:var(--primary);font-size:18px;margin-bottom:8px}
 .nick-popup p{font-size:13px;color:var(--text2);margin-bottom:16px}
 .nick-popup input{width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;text-align:center;margin-bottom:14px}
@@ -277,9 +277,9 @@ section{padding:14px}
 .pay-stats{font-size:11px;font-weight:500;margin-left:8px}
 .pay-stats-ok{color:#2D8B5E}
 .pay-stats-pending{color:var(--danger)}
-.pay-qr-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:none;align-items:center;justify-content:center}
+.pay-qr-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:none;align-items:center;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box}
 .pay-qr-overlay.on{display:flex}
-.pay-qr-popup{background:#fff;border-radius:16px;padding:28px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+.pay-qr-popup{background:#fff;border-radius:16px;padding:28px;max-width:380px;width:90%;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center;box-sizing:border-box}
 .pay-qr-popup h3{color:var(--primary);font-size:18px;margin-bottom:4px}
 .pay-qr-popup .pay-qr-leader{font-size:13px;color:var(--text2);margin-bottom:16px}
 .pay-qr-popup img{width:240px;height:240px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.1);margin-bottom:16px;object-fit:contain;background:#f9f9f9}
@@ -314,6 +314,8 @@ section{padding:14px}
 .submit-bar-btn:active{transform:translateY(0)}
 .submit-bar-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
 .submit-bar-btn.success{background:var(--green)}
+#reminderOverlay{overflow-y:auto;padding:16px;box-sizing:border-box}
+#reminderOverlay>div{max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -521,7 +523,6 @@ section{padding:14px}
 
 <footer>Claude Code Sticker Group Buy Tool · Made with love by Sylux</footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 // ============ CONFIG ============
 const SUPA_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
@@ -537,12 +538,33 @@ function efAuthHeaders() {
 async function callEF(fn, body) {
   const r = await fetch(EF_BASE + '/' + fn, { method: 'POST', headers: efAuthHeaders(), body: JSON.stringify(body) });
   let data; try { data = await r.json(); } catch { data = { error: 'HTTP ' + r.status }; }
-  if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+  if (!r.ok) {
+    const credentialFailure = fn === 'auth' && ['login', 'change_pin'].includes(body && body.action);
+    if (r.status === 401 && !credentialFailure) efClearToken();
+    const error = new Error(data.error || ('HTTP ' + r.status));
+    error.status = r.status;
+    throw error;
+  }
   return data;
 }
 function efSaveToken(t) { if (t) localStorage.setItem('gb2_ef_token', t); }
 function efClearToken() { localStorage.removeItem('gb2_ef_token'); }
 function efHasToken() { return !!localStorage.getItem('gb2_ef_token'); }
+async function restoreAccountSession() {
+  if (!efHasToken()) return false;
+  try {
+    const session = await callEF('auth', {action: 'session'});
+    efSaveToken(session.token);
+    myName = session.name;
+    myTeam = session.team || myTeam;
+    localStorage.setItem('gb2_nickname', myName);
+    localStorage.setItem('gb2_team', myTeam);
+    return true;
+  } catch (error) {
+    efClearToken();
+    return false;
+  }
+}
 const ADMIN_NAMES = ['鹅鹅', '鹅'];
 const ADDRESS_VIEWERS = ['鹅鹅', '鹅']; // 能查看所有代发地址的白名单（2026-06-24 移除「代发」账号、收紧 admin 攻击面）
 const TEAM_LEADERS = {1: '鹅鹅', 2: '鹅鹅', 3: '鹅鹅', 4: '鹅鹅', 5: '鹅鹅', 6: '鹅鹅'}; // 2026-05-31 锁单: 1234团人少, 全团统一鹅鹅一人收款+管理
@@ -639,6 +661,22 @@ const S = [
 const TYPE_LABEL = {dc:'模切', holo:'全息', glt:'闪粉'};
 const TYPE_CLS = {dc:'badge-dc', holo:'badge-holo', glt:'badge-glt'};
 
+// Drop2 的折扣单价口径与 Round3 主单独立；Round3 导出掉落订单时必须使用这套价格。
+const DROP_EXPORT_R3_TOTALS = {"r3_clawd": 580, "r3_ultrathink": 360, "r3_clawd-happy": 620, "r3_vibing-dc": 210, "r3_clawd-shiny": 490, "r3_claudecode": 280, "r3_vibing-holo": 420, "r3_reticulating": 110, "r3_shipping": 110, "r3_manifesting-holo": 390, "r3_baking": 140, "r3_clawd-wave": 120, "r3_manifesting-glt": 150, "r3_clawd-heart": 870, "r3_clawd-headphones": 570, "r3_clawd-wand": 470, "r3_clawd-bubble": 460, "r3_clawd-coffee": 480, "r3_clawd-skateboard": 360, "r3_clawd-book": 430, "r3_clawd-cape": 290, "r3_clawd-dizzy": 460, "r3_clawd-kite": 350, "r3_clawd-lightbulb": 420, "r3_clawd-magnifier": 420};
+const DROP_EXPORT_ACTUAL_USD = 2004.5;
+let dropExportGrandUSD = 0;
+S.forEach(s => {
+  const qty = DROP_EXPORT_R3_TOTALS[s.id] || 0;
+  dropExportGrandUSD += r2(unitPrice(s, qty) * qty);
+});
+const DROP_EXPORT_DISCOUNT_RATIO = (DROP_EXPORT_ACTUAL_USD > 0 && dropExportGrandUSD > 0)
+  ? DROP_EXPORT_ACTUAL_USD / dropExportGrandUSD
+  : 1;
+const DROP_EXPORT_UNIT_PRICES = {};
+S.forEach(s => {
+  DROP_EXPORT_UNIT_PRICES[s.id] = unitPrice(s, DROP_EXPORT_R3_TOTALS[s.id] || 0) * DROP_EXPORT_DISCOUNT_RATIO;
+});
+
 // ============ STATE ============
 let myName = localStorage.getItem('gb2_nickname') || '';
 let myTeam = parseInt(localStorage.getItem('gb2_team')) || 4;
@@ -647,6 +685,7 @@ let allTeams = {}; // {name: teamNumber (1 or 2)}
 let allJoinOrder = {}; // {name: minRecordId} — for global join sequence
 let globalSeqMap = {}; // {name: globalSequenceNumber}
 let rate = 7.10;
+let dropRate = 7.10;
 let actualUSD = 0; // actual SM cart total in USD (set by admin after checkout)
 let packingFeeT1 = 0, packingFeeT2 = 0, packingFeeT3 = 0; // 1/2/3团包材费总额(¥),按订单金额比例摊给团内成员
 let cachedGrandUSD = 0;
@@ -654,7 +693,6 @@ let cachedGrandUSDActive = 0; // 非跑单人员的 USD 之和（关税分摊分
 let cachedDiscountRatio = 0;
 let cachedStickerData = {}; // {stickerId: {totalQty, unitPrice}}
 let taxCNY = 0; // customs tax total in CNY (set by admin after customs clearance)
-let sb = null;
 let connected = false;
 let isLocked = false;
 let allPaySelf = {}; // {name: true} — self-confirmed payment
@@ -665,7 +703,10 @@ let allShipFeeSelf = {}; // {name: true} — self-confirmed shipping fee paid
 let allShipFeeLeader = {}; // {name: true} — leader-confirmed shipping fee paid
 let allShipped = {}; // {name: true} — leader-confirmed shipped
 let allAddressesCache = {}; // {displayName: {team, recipient, phone, address}} — Round3-only address cache
+let allShippingSummary = {}; // {displayName: {has_address, shipping_cents}} — 无 PII 的全员运费摘要
 let currentAddressTarget = null; // 地址 modal 当前操作对象（null 表示自己填；其他值表示为别人代填，仅 admin）
+let addressLoadRevision = 0;
+let addressInputRevision = 0;
 // Drop 掉落订单数据（只给代发总览面板用，不参与 round3 主统计）
 let allDropOrders = {};      // {name: {sticker_id: qty}} 以 drop_r3_ 开头的贴纸订单
 let allDropActualPaid = {};  // {name: 元} drop_r3__actual_paid
@@ -693,303 +734,126 @@ function cacheRound3Address(row) {
   return displayName;
 }
 
-// ============ SUPABASE ============
-function initSupabaseClient() {
-  if (typeof window.supabase === 'undefined') return false;
-  try {
-    sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
-    return true;
-  } catch(e) {
-    console.error('Supabase client init failed:', e);
-    return false;
-  }
+function cacheShippingSummary(row) {
+  const displayName = row && String(row.name || '').trim();
+  if (!displayName) return;
+  allShippingSummary[displayName] = {
+    has_address: row.has_address === true,
+    shipping_cents: Number.isInteger(row.shipping_cents) ? row.shipping_cents : null
+  };
 }
 
+// ============ SUPABASE ============
 async function initSupabase() {
-  if (!sb && !initSupabaseClient()) {
-    setConnected(false);
-    updateStatus('SDK加载失败，离线模式');
-    loadOffline();
-    return;
-  }
   try {
     await loadAll();
-    saveOffline(); // 用数据库真实数据覆盖本地缓存
+    saveOffline();
     subscribeRealtime();
     setConnected(true);
     updateStatus('已连接');
-  } catch(e) {
-    console.error('Supabase init failed:', e);
+  } catch (error) {
+    console.error('Backend init failed:', error);
     setConnected(false);
     updateStatus('连接失败，离线模式');
     loadOffline();
   }
 }
 
+let snapshotRevision = null;
 async function loadAll() {
-  // Paginate to get ALL rows (Supabase default limit is 1000)
-  let orders = [];
-  let from = 0;
-  const PAGE = 1000;
-  while (true) {
-    const {data, error} = await sb.from('orders').select('*').like('sticker_id', 'r3_%').order('id').range(from, from + PAGE - 1);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-    orders = orders.concat(data);
-    if (data.length < PAGE) break;
-    from += PAGE;
-  }
+  if (!efHasToken()) throw new Error('登录已过期，请重新登录');
+  const snapshot = await callEF('my-data', {action: 'get_legacy_snapshot', known_revision: snapshotRevision});
+  if (snapshot.not_modified) return false;
+  snapshotRevision = Number.isSafeInteger(snapshot.revision) ? snapshot.revision : null;
+  const orders = snapshot.orders || [];
+
   allOrders = {};
   allTeams = {};
   allPaySelf = {};
   allPayLeader = {};
   allActualPaid = {};
+  allRefunded = {};
+  allShipFeeSelf = {};
+  allShipFeeLeader = {};
+  allShipped = {};
+  allDropOrders = {};
+  allDropActualPaid = {};
+  allDropTeams = {};
   const joinOrd = {};
+
   for (const row of orders) {
     if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
-    if (row.sticker_id === 'r3__team') {
-      allTeams[row.name] = row.quantity;
-    } else if (row.sticker_id === 'r3__pin') {
-      // Skip PIN records
-    } else if (row.sticker_id === 'r3__payment_self') {
-      if (row.quantity > 0) allPaySelf[row.name] = true;
-    } else if (row.sticker_id === 'r3__payment_leader') {
-      if (row.quantity > 0) allPayLeader[row.name] = true;
-    } else if (row.sticker_id === 'r3__actual_paid') {
-      if (row.quantity > 0) allActualPaid[row.name] = row.quantity / 100;
-    } else if (row.sticker_id === 'r3__refunded') {
-      if (row.quantity > 0) allRefunded[row.name] = row.quantity / 100;
-    } else if (row.sticker_id === 'r3__shipfee_self') {
-      if (row.quantity > 0) allShipFeeSelf[row.name] = true;
-    } else if (row.sticker_id === 'r3__shipfee_leader') {
-      if (row.quantity > 0) allShipFeeLeader[row.name] = true;
-    } else if (row.sticker_id === 'r3__shipped') {
-      if (row.quantity > 0) allShipped[row.name] = true;
-    } else if (row.quantity > 0) {
+    if (row.sticker_id.startsWith('drop_r3_')) {
+      if (row.sticker_id === 'drop_r3__team') allDropTeams[row.name] = row.quantity;
+      else if (row.sticker_id === 'drop_r3__actual_paid' && row.quantity > 0) allDropActualPaid[row.name] = row.quantity / 100;
+      else if (!row.sticker_id.startsWith('drop_r3__') && row.quantity > 0) {
+        if (!allDropOrders[row.name]) allDropOrders[row.name] = {};
+        allDropOrders[row.name][row.sticker_id] = row.quantity;
+      }
+      continue;
+    }
+    if (!row.sticker_id.startsWith('r3_')) continue;
+    if (row.sticker_id === 'r3__team') allTeams[row.name] = row.quantity;
+    else if (row.sticker_id === 'r3__payment_self' && row.quantity > 0) allPaySelf[row.name] = true;
+    else if (row.sticker_id === 'r3__payment_leader' && row.quantity > 0) allPayLeader[row.name] = true;
+    else if (row.sticker_id === 'r3__actual_paid' && row.quantity > 0) allActualPaid[row.name] = row.quantity / 100;
+    else if (row.sticker_id === 'r3__refunded' && row.quantity > 0) allRefunded[row.name] = row.quantity / 100;
+    else if (row.sticker_id === 'r3__shipfee_self' && row.quantity > 0) allShipFeeSelf[row.name] = true;
+    else if (row.sticker_id === 'r3__shipfee_leader' && row.quantity > 0) allShipFeeLeader[row.name] = true;
+    else if (row.sticker_id === 'r3__shipped' && row.quantity > 0) allShipped[row.name] = true;
+    else if (!row.sticker_id.startsWith('r3__') && row.quantity > 0) {
       if (!allOrders[row.name]) allOrders[row.name] = {};
       allOrders[row.name][row.sticker_id] = row.quantity;
     }
   }
   allJoinOrder = joinOrd;
 
-  // 加载 drop_r3_ 前缀订单（仅供代发总览面板订单详情展示，不参与 round3 主表统计）
-  allDropOrders = {}; allDropActualPaid = {}; allDropTeams = {};
-  let dfrom = 0;
-  while (true) {
-    const {data: dd, error: de} = await sb.from('orders').select('*').like('sticker_id', 'drop_r3_%').order('id').range(dfrom, dfrom + PAGE - 1);
-    if (de) { console.error('Load drop data failed:', de); break; }
-    if (!dd || dd.length === 0) break;
-    for (const row of dd) {
-      if (row.sticker_id === 'drop_r3__team') {
-        allDropTeams[row.name] = row.quantity;
-      } else if (row.sticker_id === 'drop_r3__actual_paid') {
-        if (row.quantity > 0) allDropActualPaid[row.name] = row.quantity / 100;
-      } else if (row.sticker_id.startsWith('drop_r3__')) {
-        // 跳过其他 pseudo-column（pin / payment_* / refunded 等，面板不用）
-      } else if (row.quantity > 0) {
-        if (!allDropOrders[row.name]) allDropOrders[row.name] = {};
-        allDropOrders[row.name][row.sticker_id] = row.quantity;
-      }
-    }
-    if (dd.length < PAGE) break;
-    dfrom += PAGE;
+  for (const setting of snapshot.settings || []) {
+    if (setting.key === 'r3_rate') rate = parseFloat(setting.value) || 6.90;
+    if (setting.key === 'drop_r3_rate') dropRate = parseFloat(setting.value) || 7.10;
+    if (setting.key === 'r3_locked') isLocked = setting.value === '1';
+    if (setting.key === 'r3_actual_usd') actualUSD = parseFloat(setting.value) || 0;
+    if (setting.key === 'r3_tax_cny') taxCNY = parseFloat(setting.value) || 0;
+    if (setting.key === 'r3_packing_fee_t1') packingFeeT1 = parseFloat(setting.value) || 0;
+    if (setting.key === 'r3_packing_fee_t2') packingFeeT2 = parseFloat(setting.value) || 0;
+    if (setting.key === 'r3_packing_fee_t3') packingFeeT3 = parseFloat(setting.value) || 0;
   }
 
-  const {data: settings, error: e2} = await sb.from('settings').select('*');
-  if (e2) throw e2;
-  if (settings) {
-    for (const s of settings) {
-      if (s.key === 'r3_rate') rate = parseFloat(s.value) || 6.90;
-      if (s.key === 'r3_locked') isLocked = s.value === '1';
-      if (s.key === 'r3_actual_usd') actualUSD = parseFloat(s.value) || 0;
-      if (s.key === 'r3_tax_cny') taxCNY = parseFloat(s.value) || 0;
-      if (s.key === 'r3_packing_fee_t1') packingFeeT1 = parseFloat(s.value) || 0;
-      if (s.key === 'r3_packing_fee_t2') packingFeeT2 = parseFloat(s.value) || 0;
-      if (s.key === 'r3_packing_fee_t3') packingFeeT3 = parseFloat(s.value) || 0;
+  allAddressesCache = {};
+  allShippingSummary = {};
+  (snapshot.my_addresses || []).forEach(cacheRound3Address);
+  (snapshot.shipping_summaries || []).forEach(cacheShippingSummary);
+
+  // Polling must never erase an unsaved optimistic edit.
+  if (myName && Object.keys(pendingChanges).length) {
+    if (!allOrders[myName]) allOrders[myName] = {};
+    for (const [stickerId, quantity] of Object.entries(pendingChanges)) {
+      if (quantity > 0) allOrders[myName][stickerId] = quantity;
+      else delete allOrders[myName][stickerId];
     }
   }
+  return true;
 }
 
+let snapshotPollTimer = null;
 function subscribeRealtime() {
-  sb.channel('gb-sync')
-    .on('postgres_changes', {event: '*', schema: 'public', table: 'orders'}, payload => {
-      handleOrderEvent(payload);
-    })
-    .on('postgres_changes', {event: '*', schema: 'public', table: 'settings'}, payload => {
-      handleSettingsEvent(payload);
-    })
-    .on('postgres_changes', {event: '*', schema: 'public', table: 'addresses'}, payload => {
-      handleAddressEvent(payload);
-    })
-    .subscribe(status => {
-      setConnected(status === 'SUBSCRIBED');
-    });
-}
-
-function handleAddressEvent(payload) {
-  const row = payload.new || payload.old;
-  if (!row) return;
-  const displayName = addressDisplayName(row.name);
-  if (!displayName) return;
-  if (payload.eventType === 'DELETE') {
-    delete allAddressesCache[displayName];
-  } else if (payload.new) {
-    cacheRound3Address(payload.new);
-  }
-  scheduleRenderAllAddresses();
-  recalculate(); // 地址变化可能影响 4/5/6 团代发运费的偏远附加
-}
-
-function handleOrderEvent(payload) {
-  const row = payload.new || payload.old;
-  if (!row) return;
-  if (row.sticker_id === 'r3__pin') return; // skip PIN records
-  if (!row.sticker_id.startsWith('r3_')) return; // 2026-06-24 防 drop_r3_*/r2_*/_* 行污染 R3 内存(Sephy P1)
-
-  // Track join order for new arrivals
-  if (payload.new && payload.new.id) {
-    const n = payload.new.name;
-    if (!allJoinOrder[n] || payload.new.id < allJoinOrder[n]) allJoinOrder[n] = payload.new.id;
-  }
-
-  // Handle team assignment changes
-  if (row.sticker_id === 'r3__team') {
-    if (payload.eventType === 'DELETE') {
-      delete allTeams[row.name];
-    } else {
-      allTeams[payload.new.name] = payload.new.quantity;
+  if (snapshotPollTimer) clearInterval(snapshotPollTimer);
+  setConnected(true);
+  snapshotPollTimer = setInterval(async () => {
+    if (document.hidden || Object.keys(pendingChanges).length > 0 || !efHasToken()) return;
+    try {
+      const changed = await loadAll();
+      if (!changed) { setConnected(true); return; }
+      renderTable();
+      recalculate();
+      applyLockState();
+      saveOffline();
+      setConnected(true);
+    } catch (error) {
+      console.error('snapshot refresh failed:', error);
+      setConnected(false);
     }
-    scheduleRender();
-    saveOffline();
-    return;
-  }
-
-  // Handle payment status changes
-  if (row.sticker_id === 'r3__payment_self') {
-    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
-      delete allPaySelf[row.name];
-    } else if (payload.new && payload.new.quantity > 0) {
-      allPaySelf[payload.new.name] = true;
-    }
-    scheduleRender();
-    saveOffline();
-    return;
-  }
-  if (row.sticker_id === 'r3__payment_leader') {
-    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
-      delete allPayLeader[row.name];
-    } else if (payload.new && payload.new.quantity > 0) {
-      allPayLeader[payload.new.name] = true;
-    }
-    scheduleRender();
-    saveOffline();
-    return;
-  }
-  if (row.sticker_id === 'r3__actual_paid') {
-    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity <= 0)) {
-      delete allActualPaid[row.name];
-    } else if (payload.new && payload.new.quantity > 0) {
-      allActualPaid[payload.new.name] = payload.new.quantity / 100;
-    }
-    scheduleRender();
-    scheduleRenderAllAddresses();
-    saveOffline();
-    return;
-  }
-  if (row.sticker_id === 'r3__refunded') {
-    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity <= 0)) {
-      delete allRefunded[row.name];
-    } else if (payload.new && payload.new.quantity > 0) {
-      allRefunded[payload.new.name] = payload.new.quantity / 100;
-    }
-    scheduleRender();
-    saveOffline();
-    return;
-  }
-  if (row.sticker_id === 'r3__shipfee_self') {
-    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
-      delete allShipFeeSelf[row.name];
-    } else if (payload.new && payload.new.quantity > 0) {
-      allShipFeeSelf[payload.new.name] = true;
-    }
-    scheduleRender(); scheduleRenderAllAddresses(); saveOffline(); return;
-  }
-  if (row.sticker_id === 'r3__shipfee_leader') {
-    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
-      delete allShipFeeLeader[row.name];
-    } else if (payload.new && payload.new.quantity > 0) {
-      allShipFeeLeader[payload.new.name] = true;
-    }
-    scheduleRender(); scheduleRenderAllAddresses(); saveOffline(); return;
-  }
-  if (row.sticker_id === 'r3__shipped') {
-    if (payload.eventType === 'DELETE' || (payload.new && payload.new.quantity === 0)) {
-      delete allShipped[row.name];
-    } else if (payload.new && payload.new.quantity > 0) {
-      allShipped[payload.new.name] = true;
-    }
-    scheduleRender(); scheduleRenderAllAddresses(); saveOffline(); return;
-  }
-
-  if (payload.eventType === 'DELETE') {
-    if (allOrders[row.name]) {
-      delete allOrders[row.name][row.sticker_id];
-      if (Object.keys(allOrders[row.name]).length === 0) delete allOrders[row.name];
-    }
-  } else {
-    const {name, sticker_id, quantity} = payload.new;
-    if (!allOrders[name]) allOrders[name] = {};
-    if (quantity > 0) {
-      allOrders[name][sticker_id] = quantity;
-    } else {
-      delete allOrders[name][sticker_id];
-      if (Object.keys(allOrders[name]).length === 0) delete allOrders[name];
-    }
-  }
-  scheduleRender();
-  saveOffline();
-}
-
-function handleSettingsEvent(payload) {
-  if (!payload.new) return;
-  if (payload.new.key === 'r3_rate') {
-    rate = parseFloat(payload.new.value) || 6.90;
-    document.getElementById('rateInput').value = rate;
-    recalculate();
-    saveOffline();
-  }
-  if (payload.new.key === 'r3_locked') {
-    isLocked = payload.new.value === '1';
-    applyLockState();
-    saveOffline();
-  }
-  if (payload.new.key === 'r3_actual_usd') {
-    actualUSD = parseFloat(payload.new.value) || 0;
-    document.getElementById('actualUsdInput').value = actualUSD || '';
-    recalculate();
-    saveOffline();
-  }
-  if (payload.new.key === 'r3_tax_cny') {
-    taxCNY = parseFloat(payload.new.value) || 0;
-    document.getElementById('taxCnyInput').value = taxCNY || '';
-    recalculate();
-    saveOffline();
-  }
-  if (payload.new.key === 'r3_packing_fee_t1') {
-    packingFeeT1 = parseFloat(payload.new.value) || 0;
-    const inp = document.getElementById('packingFeeT1Input'); if (inp) inp.value = packingFeeT1 || '';
-    recalculate(); saveOffline();
-  }
-  if (payload.new.key === 'r3_packing_fee_t2') {
-    packingFeeT2 = parseFloat(payload.new.value) || 0;
-    const inp = document.getElementById('packingFeeT2Input'); if (inp) inp.value = packingFeeT2 || '';
-    recalculate(); saveOffline();
-  }
-  if (payload.new.key === 'r3_packing_fee_t3') {
-    packingFeeT3 = parseFloat(payload.new.value) || 0;
-    const inp = document.getElementById('packingFeeT3Input'); if (inp) inp.value = packingFeeT3 || '';
-    recalculate(); saveOffline();
-  }
+  }, 15000);
 }
 
 function scheduleRender() {
@@ -1001,6 +865,14 @@ function scheduleRender() {
 }
 
 let pendingChanges = {}; // {sid: qty} — local changes not yet submitted to Supabase
+let orderMutationQueue = Promise.resolve();
+let clearMutationPending = false;
+
+function enqueueOrderMutation(operation) {
+  const run = orderMutationQueue.then(operation);
+  orderMutationQueue = run.catch(() => {});
+  return run;
+}
 
 function trackChange(sid, qty) {
   pendingChanges[sid] = qty;
@@ -1025,50 +897,62 @@ function updateSubmitBar() {
   }
 }
 
-async function submitCart() {
-  if (isLocked) { alert('已锁单，无法修改'); return; }
-  if (!sb || !myName) return;
+function submitCart() {
+  return enqueueOrderMutation(submitCartNow);
+}
+
+async function submitCartNow() {
+  if (isLocked) { alert('已锁单，无法修改'); return false; }
+  if (!myName || !efHasToken()) { alert('登录已过期，请重新登录后保存'); return false; }
   const entries = Object.entries(pendingChanges);
-  if (entries.length === 0) return;
+  if (entries.length === 0) return true;
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.textContent = '保存中...';
 
   try {
-    const rows = entries.map(([sid, qty]) => ({
-      name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()
-    }));
-    const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'}).select();
-    if (error) throw error;
+    await callEF('my-data', {
+      action: 'submit_orders',
+      items: entries.map(([sticker_id, quantity]) => ({sticker_id, quantity}))
+    });
 
-    pendingChanges = {};
-    clearPendingDraft();
-    btn.textContent = '已保存 ✓';
-    btn.className = 'submit-bar-btn success';
-    updateStatus('已保存');
-    setTimeout(() => updateSubmitBar(), 1500);
+    // 只清除本次实际发出的快照。请求期间产生的新编辑必须继续留在待保存区。
+    entries.forEach(([sid, qty]) => {
+      if (pendingChanges[sid] === qty) delete pendingChanges[sid];
+    });
+    if (Object.keys(pendingChanges).length === 0) {
+      clearPendingDraft();
+      btn.textContent = '已保存 ✓';
+      btn.className = 'submit-bar-btn success';
+      updateStatus('已保存');
+      setTimeout(() => updateSubmitBar(), 1500);
+    } else {
+      savePendingDraft();
+      updateSubmitBar();
+      updateStatus('本批已保存，还有新修改待保存');
+    }
+    return true;
   } catch(e) {
     console.error('Submit failed:', e);
     btn.disabled = false;
     btn.textContent = '保存失败，点击重试';
     updateStatus('保存失败');
+    return false;
   }
 }
 
 // Safety net: auto-save on page close/hide
 function flushPendingOnExit() {
-  if (!sb || !myName || Object.keys(pendingChanges).length === 0) return;
+  if (!myName || !efHasToken() || Object.keys(pendingChanges).length === 0) { savePendingDraft(); return; }
+  if (clearMutationPending) { savePendingDraft(); return; }
   if (isLocked) { savePendingDraft(); return; } // 锁单后不自动提交，只保存草稿
   savePendingDraft();
-  const rows = Object.entries(pendingChanges).map(([sid, qty]) => ({
-    name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()
-  }));
-  const url = SUPA_URL + '/rest/v1/orders?on_conflict=name,sticker_id';
-  fetch(url, {
+  const items = Object.entries(pendingChanges).map(([sticker_id, quantity]) => ({sticker_id, quantity}));
+  fetch(EF_BASE + '/my-data', {
     method: 'POST',
-    headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'resolution=merge-duplicates'},
-    body: JSON.stringify(rows),
+    headers: efAuthHeaders(),
+    body: JSON.stringify({action: 'submit_orders', items}),
     keepalive: true
   }).catch(() => {});
 }
@@ -1086,7 +970,7 @@ window.addEventListener('beforeunload', (e) => {
 window.addEventListener('pagehide', flushPendingOnExit);
 
 async function saveRate() {
-  if (!sb || !isAdmin(myName)) {
+  if (!efHasToken() || !isAdmin(myName)) {
     alert('只有管理员可以修改汇率');
     return;
   }
@@ -1112,7 +996,7 @@ async function saveRate() {
 }
 
 async function saveActualUSD() {
-  if (!sb || !isAdmin(myName)) {
+  if (!efHasToken() || !isAdmin(myName)) {
     alert('只有管理员可以设置实际美元总价');
     return;
   }
@@ -1134,7 +1018,7 @@ async function saveActualUSD() {
 }
 
 async function saveTaxCNY() {
-  if (!sb || !isAdmin(myName)) {
+  if (!efHasToken() || !isAdmin(myName)) {
     alert('只有管理员可以设置关税总额');
     return;
   }
@@ -1184,6 +1068,8 @@ function packingFeeFor(name) {
 // 4/5/6 团代发运费的偏远地区附加（按地址字符串判定）
 function dropshipExtraFor(name) {
   if (!DROPSHIP_TEAMS.includes(allTeams[name])) return 0;
+  const summary = allShippingSummary[name];
+  if (summary && Number.isInteger(summary.shipping_cents)) return Math.max(0, summary.shipping_cents / 100 - DROPSHIP_FEE);
   const addr = (allAddressesCache[name] && allAddressesCache[name].address) || '';
   if (!addr) return 0;
   if (addr.includes('新疆') || addr.includes('西藏')) return 13;
@@ -1194,12 +1080,12 @@ function dropshipExtraFor(name) {
 // 2026-06-15: 是否已填收货地址——开收运费后, 没填地址算不出按地区的运费, 显示"待填"而非默认 ¥8.5
 function hasAddr(name) {
   const a = allAddressesCache[name];
-  return !!(a && a.address);
+  return !!(a && a.address) || allShippingSummary[name]?.has_address === true;
 }
 
 // ============ LOCK ============
 async function toggleLock() {
-  if (!sb || !ADMIN_NAMES.includes(myName)) return;
+  if (!efHasToken() || !ADMIN_NAMES.includes(myName)) return;
   const newVal = isLocked ? '0' : '1';
   const lockBtn = document.getElementById('lockBtn');
   if (lockBtn) { lockBtn.disabled = true; lockBtn.textContent = '处理中...'; }
@@ -1417,6 +1303,7 @@ async function changeNick() {
   if (!newName || !newName.trim() || newName.trim() === myName) return;
   try {
     const res = await callEF('auth', {action: 'rename', new_name: newName.trim()});
+    if (res.token) efSaveToken(res.token);
     alert('显示名已更新为「' + res.display_name + '」\n（登录账号 ' + myName + ' 不变）');
     document.getElementById('nickTag').textContent = res.display_name + ' ✓';
   } catch(e) {
@@ -1430,22 +1317,29 @@ async function callAdminEF(action, params) {
   catch(e) { console.error('admin EF '+action+' failed:', e); alert(action + ' 失败：' + e.message); throw e; }
 }
 
-function changeTeam() {
-  const options = ROUND2_TEAMS.filter(t => t !== myTeam);
+async function changeTeam() {
+  const options = ROUND2_TEAMS.filter(team => team !== myTeam);
   const choice = prompt('当前：团' + myTeam + '\n输入要切换到的团号（' + options.join(' 或 ') + '）：');
   if (!choice) return;
   const newTeam = parseInt(choice);
-  if (!ROUND2_TEAMS.includes(newTeam) || newTeam === myTeam) { alert('请输入有效的团号'); return; }
-  myTeam = newTeam;
-  localStorage.setItem('gb2_team', myTeam);
-  allTeams[myName] = myTeam;
-  updateNickDisplay();
-  // 2026-06-24 走 auth change_team EF (服务端验 token, 同步 accounts.team + orders r3__team)
-  callEF('auth', {action: 'change_team', team: myTeam}).then(res => {
-    if (res.token) efSaveToken(res.token);
-  }).catch(e => console.error('change_team failed:', e));
-  renderTable();
-  recalculate();
+  if (!ROUND2_TEAMS.includes(newTeam) || newTeam === myTeam) {
+    alert('请输入有效的团号');
+    return;
+  }
+  const previousTeam = myTeam;
+  try {
+    const result = await callEF('auth', {action: 'change_team', team: newTeam});
+    if (result.token) efSaveToken(result.token);
+    myTeam = result.team;
+    localStorage.setItem('gb2_team', myTeam);
+    allTeams[myName] = myTeam;
+    updateNickDisplay();
+    renderTable();
+    recalculate();
+  } catch (error) {
+    myTeam = previousTeam;
+    alert('切换分团失败：' + error.message);
+  }
 }
 
 function updateNickDisplay() {
@@ -1498,7 +1392,8 @@ async function changePin() {
   const cleaned = newPin.replace(/\D/g, '');
   if (cleaned.length < 4 || cleaned.length > 6) { alert('新密码需要4~6位数字'); return; }
   try {
-    await callEF('auth', {action: 'change_pin', old_pin: oldPin, new_pin: cleaned});
+    const result = await callEF('auth', {action: 'change_pin', old_pin: oldPin, new_pin: cleaned});
+    if (result.token) efSaveToken(result.token);
     alert('密码已修改！');
   } catch(e) {
     alert('密码修改失败：' + e.message);
@@ -1552,56 +1447,41 @@ function paymentCellHTML(name, team) {
   }
   // Leader confirm button (for leader/admin, when member self-confirmed but not yet leader-confirmed)
   if (iAmLeader && st === 'self') {
-    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmPayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmPayment(' + jsArg(name) + ')">✓ 核实</button>';
   }
   // Leader revoke (for leader/admin, when already leader-confirmed)
   if (iAmLeader && st === 'confirmed') {
-    html += ' <button class="pay-btn" onclick="leaderRevokePayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
+    html += ' <button class="pay-btn" onclick="leaderRevokePayment(' + jsArg(name) + ')">撤销</button>';
   }
   // Leader/admin can also confirm directly even if member hasn't self-confirmed
   if (iAmLeader && st === 'unpaid' && !isMe) {
-    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmPayment(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmPayment(' + jsArg(name) + ')">✓ 确认</button>';
   }
 
   return html;
 }
 
 async function confirmMyPayment() {
-  if (!sb || !myName) return;
-  if (!isLocked) { alert('请等待团长锁单后再确认付款'); return; }
-  if (!confirm('确认你已完成付款？')) return;
+  if (!myName || !isLocked || !confirm('确认你已完成付款？')) return;
   allPaySelf[myName] = true;
-  renderTable();
-  recalculate();
-  saveOffline();
-  const {error} = await sb.from('orders').upsert(
-    {name: myName, sticker_id: 'r3__payment_self', quantity: 1, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    console.error('Payment confirm failed:', error);
+  renderTable(); recalculate(); saveOffline();
+  try {
+    await callEF('my-data', {action: 'confirm_my_payment', which: 'r3', set: true});
+    updateStatus('已标记付款');
+  } catch (error) {
     delete allPaySelf[myName];
     renderTable(); recalculate();
     alert('付款确认失败：' + error.message);
-  } else {
-    updateStatus('已标记付款');
   }
 }
 
 async function cancelMyPayment() {
-  if (!sb || !myName) return;
-  if (!isLocked) { alert('请等待团长锁单后再操作'); return; }
-  if (!confirm('确定要撤销付款确认吗？')) return;
+  if (!myName || !isLocked || !confirm('确定要撤销付款确认吗？')) return;
   delete allPaySelf[myName];
-  renderTable();
-  recalculate();
-  saveOffline();
-  const {error} = await sb.from('orders').upsert(
-    {name: myName, sticker_id: 'r3__payment_self', quantity: 0, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    console.error('Payment cancel failed:', error);
+  renderTable(); recalculate(); saveOffline();
+  try {
+    await callEF('my-data', {action: 'confirm_my_payment', which: 'r3', set: false});
+  } catch (error) {
     allPaySelf[myName] = true;
     renderTable(); recalculate();
     alert('撤销失败：' + error.message);
@@ -1609,51 +1489,41 @@ async function cancelMyPayment() {
 }
 
 async function leaderConfirmPayment(memberName) {
-  if (!sb) return;
   if (!isLocked) { alert('请等待锁单后再操作'); return; }
   const memberTeam = allTeams[memberName] || 4;
   if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  const previousLeader = !!allPayLeader[memberName];
+  const previousSelf = !!allPaySelf[memberName];
   allPayLeader[memberName] = true;
-  if (!allPaySelf[memberName]) allPaySelf[memberName] = true; // auto-mark self too
-  renderTable();
-  recalculate();
-  saveOffline();
-  const rows = [
-    {name: memberName, sticker_id: 'r3__payment_leader', quantity: 1, updated_at: new Date().toISOString()},
-    {name: memberName, sticker_id: 'r3__payment_self', quantity: 1, updated_at: new Date().toISOString()}
-  ];
-  const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'}).select();
-  if (error) {
-    console.error('Leader confirm failed:', error);
-    delete allPayLeader[memberName];
-    renderTable(); recalculate();
-    alert('确认失败：' + error.message);
-  } else {
+  allPaySelf[memberName] = true;
+  renderTable(); recalculate(); saveOffline();
+  try {
+    await callAdminEF('set_payment_leader', {target_name: memberName, which: 'r3', set: true});
     updateStatus('已确认 ' + memberName + ' 的付款');
+  } catch (error) {
+    if (previousLeader) allPayLeader[memberName] = true;
+    else delete allPayLeader[memberName];
+    if (previousSelf) allPaySelf[memberName] = true;
+    else delete allPaySelf[memberName];
+    renderTable(); recalculate(); saveOffline();
   }
 }
 
 async function leaderRevokePayment(memberName) {
-  if (!sb) return;
   if (!isLocked) { alert('请等待锁单后再操作'); return; }
   const memberTeam = allTeams[memberName] || 4;
   if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
   if (!confirm('确定要撤销对 ' + memberName + ' 的付款确认吗？')) return;
   delete allPayLeader[memberName];
-  renderTable();
-  recalculate();
-  saveOffline();
-  const {error} = await sb.from('orders').upsert(
-    {name: memberName, sticker_id: 'r3__payment_leader', quantity: 0, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    console.error('Leader revoke failed:', error);
+  renderTable(); recalculate(); saveOffline();
+  try {
+    await callAdminEF('set_payment_leader', {target_name: memberName, which: 'r3', set: false});
+  } catch (error) {
     allPayLeader[memberName] = true;
     renderTable(); recalculate();
-    alert('撤销失败：' + error.message);
   }
 }
+
 
 // ============ SHIPPING FEE STATUS ============
 function shipFeeStatusOf(name) {
@@ -1683,46 +1553,38 @@ function shipFeeCellHTML(name, team) {
     html += ' <button class="pay-btn active" onclick="cancelMyShipFee()">撤销</button>';
   }
   if (iAmLeader && st === 'self') {
-    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmShipFee(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmShipFee(' + jsArg(name) + ')">✓ 核实</button>';
   }
   if (iAmLeader && st === 'confirmed') {
-    html += ' <button class="pay-btn" onclick="leaderRevokeShipFee(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
+    html += ' <button class="pay-btn" onclick="leaderRevokeShipFee(' + jsArg(name) + ')">撤销</button>';
   }
   if (iAmLeader && st === 'unpaid' && !isMe) {
-    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmShipFee(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
+    html += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirmShipFee(' + jsArg(name) + ')">✓ 确认</button>';
   }
   return html;
 }
 
 async function confirmMyShipFee() {
-  if (!sb || !myName) return;
-  if (!isLocked) { alert('请等待团长锁单后再操作'); return; }
-  if (!confirm('确认你已付运费？')) return;
+  if (!myName || !isLocked || !confirm('确认你已付运费？')) return;
   allShipFeeSelf[myName] = true;
   renderTable(); recalculate(); saveOffline();
-  const {error} = await sb.from('orders').upsert(
-    {name: myName, sticker_id: 'r3__shipfee_self', quantity: 1, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    console.error('ShipFee confirm failed:', error);
+  try {
+    await callEF('my-data', {action: 'confirm_my_shipfee', set: true});
+    updateStatus('已标记付运费');
+  } catch (error) {
     delete allShipFeeSelf[myName];
     renderTable(); recalculate();
     alert('确认失败：' + error.message);
-  } else { updateStatus('已标记付运费'); }
+  }
 }
 
 async function cancelMyShipFee() {
-  if (!sb || !myName) return;
-  if (!confirm('确定要撤销运费确认吗？')) return;
+  if (!myName || !confirm('确定要撤销运费确认吗？')) return;
   delete allShipFeeSelf[myName];
   renderTable(); recalculate(); saveOffline();
-  const {error} = await sb.from('orders').upsert(
-    {name: myName, sticker_id: 'r3__shipfee_self', quantity: 0, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    console.error('ShipFee cancel failed:', error);
+  try {
+    await callEF('my-data', {action: 'confirm_my_shipfee', set: false});
+  } catch (error) {
     allShipFeeSelf[myName] = true;
     renderTable(); recalculate();
     alert('撤销失败：' + error.message);
@@ -1730,43 +1592,39 @@ async function cancelMyShipFee() {
 }
 
 async function leaderConfirmShipFee(memberName) {
-  if (!sb) return;
   const memberTeam = allTeams[memberName] || 4;
   if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  const previousLeader = !!allShipFeeLeader[memberName];
+  const previousSelf = !!allShipFeeSelf[memberName];
   allShipFeeLeader[memberName] = true;
-  if (!allShipFeeSelf[memberName]) allShipFeeSelf[memberName] = true;
+  allShipFeeSelf[memberName] = true;
   renderTable(); recalculate(); saveOffline();
-  const rows = [
-    {name: memberName, sticker_id: 'r3__shipfee_leader', quantity: 1, updated_at: new Date().toISOString()},
-    {name: memberName, sticker_id: 'r3__shipfee_self', quantity: 1, updated_at: new Date().toISOString()}
-  ];
-  const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'}).select();
-  if (error) {
-    console.error('Leader shipfee confirm failed:', error);
-    delete allShipFeeLeader[memberName];
-    renderTable(); recalculate();
-    alert('确认失败：' + error.message);
-  } else { updateStatus('已确认 ' + memberName + ' 的运费'); }
+  try {
+    await callAdminEF('set_shipfee_leader', {target_name: memberName, set: true});
+    updateStatus('已确认 ' + memberName + ' 的运费');
+  } catch (error) {
+    if (previousLeader) allShipFeeLeader[memberName] = true;
+    else delete allShipFeeLeader[memberName];
+    if (previousSelf) allShipFeeSelf[memberName] = true;
+    else delete allShipFeeSelf[memberName];
+    renderTable(); recalculate(); saveOffline();
+  }
 }
 
 async function leaderRevokeShipFee(memberName) {
-  if (!sb) return;
   const memberTeam = allTeams[memberName] || 4;
   if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
   if (!confirm('确定要撤销对 ' + memberName + ' 的运费确认吗？')) return;
   delete allShipFeeLeader[memberName];
   renderTable(); recalculate(); saveOffline();
-  const {error} = await sb.from('orders').upsert(
-    {name: memberName, sticker_id: 'r3__shipfee_leader', quantity: 0, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    console.error('Leader shipfee revoke failed:', error);
+  try {
+    await callAdminEF('set_shipfee_leader', {target_name: memberName, set: false});
+  } catch (error) {
     allShipFeeLeader[memberName] = true;
     renderTable(); recalculate();
-    alert('撤销失败：' + error.message);
   }
 }
+
 
 // ============ SHIPPED STATUS ============
 function shippedCellHTML(name, team) {
@@ -1775,122 +1633,112 @@ function shippedCellHTML(name, team) {
   if (shipped) {
     let html = '<span class="pay-badge" style="background:#E8F5E9;color:#2E7D32">已发货</span>';
     if (iAmLeader) {
-      html += ' <button class="pay-btn" onclick="leaderUnmarkShipped(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
+      html += ' <button class="pay-btn" onclick="leaderUnmarkShipped(' + jsArg(name) + ')">撤销</button>';
     }
     return html;
   } else {
     let html = '<span class="pay-badge pay-unpaid">未发</span>';
     if (iAmLeader) {
-      html += ' <button class="pay-btn" style="background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7" onclick="leaderMarkShipped(\'' + esc(name).replace(/'/g, "\\'") + '\')">📦 发货</button>';
+      html += ' <button class="pay-btn" style="background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7" onclick="leaderMarkShipped(' + jsArg(name) + ')">📦 发货</button>';
     }
     return html;
   }
 }
 
 async function leaderMarkShipped(memberName) {
-  if (!sb) return;
   const memberTeam = allTeams[memberName] || 4;
   if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
   allShipped[memberName] = true;
   renderTable(); saveOffline();
-  const {error} = await sb.from('orders').upsert(
-    {name: memberName, sticker_id: 'r3__shipped', quantity: 1, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    console.error('Mark shipped failed:', error);
+  try {
+    await callAdminEF('mark_shipped', {target_name: memberName});
+    updateStatus('已标记 ' + memberName + ' 发货');
+  } catch (error) {
     delete allShipped[memberName];
     renderTable();
-    alert('标记发货失败：' + error.message);
-  } else { updateStatus('已标记 ' + memberName + ' 发货'); }
+  }
 }
 
 async function leaderUnmarkShipped(memberName) {
-  if (!sb) return;
   const memberTeam = allTeams[memberName] || 4;
   if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
   if (!confirm('确定要撤销 ' + memberName + ' 的发货标记吗？')) return;
   delete allShipped[memberName];
   renderTable(); saveOffline();
-  const {error} = await sb.from('orders').upsert(
-    {name: memberName, sticker_id: 'r3__shipped', quantity: 0, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    console.error('Unmark shipped failed:', error);
+  try {
+    await callAdminEF('unmark_shipped', {target_name: memberName});
+  } catch (error) {
     allShipped[memberName] = true;
     renderTable();
-    alert('撤销失败：' + error.message);
   }
 }
+
 
 // 代发方专用发货操作（admin 在地址面板里能点；代发方不是团长但应该能标发货）
 async function dropshipMarkShipped(memberName) {
-  if (!sb) return;
   if (!canViewAllAddresses(myName)) { alert('无权操作'); return; }
-  const memberTeam = allTeams[memberName];
-  if (!DROPSHIP_TEAMS.includes(memberTeam)) { alert('仅 4/5/6 团可用'); return; }
   allShipped[memberName] = true;
-  renderTable(); saveOffline();
-  renderAllAddresses();
-  const {error} = await sb.from('orders').upsert(
-    {name: memberName, sticker_id: 'r3__shipped', quantity: 1, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    console.error('Dropship mark shipped failed:', error);
+  renderTable(); renderAllAddresses(); saveOffline();
+  try {
+    await callAdminEF('mark_shipped', {target_name: memberName});
+    updateStatus('已标记 ' + memberName + ' 发货');
+  } catch (error) {
     delete allShipped[memberName];
     renderTable(); renderAllAddresses();
-    alert('标记发货失败：' + error.message);
-  } else { updateStatus('已标记 ' + memberName + ' 发货'); }
+  }
 }
 
 async function dropshipUnmarkShipped(memberName) {
-  if (!sb) return;
   if (!canViewAllAddresses(myName)) { alert('无权操作'); return; }
   if (!confirm('确定要撤销 ' + memberName + ' 的发货标记吗？')) return;
   delete allShipped[memberName];
-  renderTable(); saveOffline();
-  renderAllAddresses();
-  const {error} = await sb.from('orders').upsert(
-    {name: memberName, sticker_id: 'r3__shipped', quantity: 0, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) {
-    console.error('Dropship unmark shipped failed:', error);
+  renderTable(); renderAllAddresses(); saveOffline();
+  try {
+    await callAdminEF('unmark_shipped', {target_name: memberName});
+  } catch (error) {
     allShipped[memberName] = true;
     renderTable(); renderAllAddresses();
-    alert('撤销失败：' + error.message);
   }
 }
+
 
 // ============ ACTUAL PAID ============
 // 2026-06-24 走 admin EF (token 验 admin role, anon 无法伪造实付)
 async function saveActualPaid(memberName, amount) {
   const memberTeam = allTeams[memberName] || 4;
   if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
+  const hadPrevious = Object.prototype.hasOwnProperty.call(allActualPaid, memberName);
+  const previous = allActualPaid[memberName];
   if (amount > 0) { allActualPaid[memberName] = amount; } else { delete allActualPaid[memberName]; }
   recalculate(); saveOffline();
   try {
     await callAdminEF('set_actual_paid', {target_name: memberName, which: 'r3', value: amount});
     updateStatus('已更新 ' + memberName + ' 的实付金额');
-  } catch(e) { /* helper 已 alert */ }
+  } catch(e) {
+    if (hadPrevious) allActualPaid[memberName] = previous;
+    else delete allActualPaid[memberName];
+    renderTable(); recalculate(); saveOffline();
+  }
 }
 
 async function saveRefunded(memberName, amount) {
-  if (!sb) return;
   const memberTeam = allTeams[memberName] || 4;
   if (!isLeaderOf(myName, memberTeam)) { alert('你不是该团的团长'); return; }
-  const cents = Math.round(amount * 100);
-  if (cents > 0) { allRefunded[memberName] = amount; } else { delete allRefunded[memberName]; }
+  const hadPrevious = Object.prototype.hasOwnProperty.call(allRefunded, memberName);
+  const previous = allRefunded[memberName];
+  if (amount > 0) allRefunded[memberName] = amount;
+  else delete allRefunded[memberName];
   recalculate(); saveOffline();
-  const {error} = await sb.from('orders').upsert(
-    {name: memberName, sticker_id: 'r3__refunded', quantity: cents, updated_at: new Date().toISOString()},
-    {onConflict: 'name,sticker_id'}
-  ).select();
-  if (error) { console.error('Save refunded failed:', error); alert('保存已退金额失败：' + error.message); }
-  else { updateStatus('已更新 ' + memberName + ' 的已退金额'); }
+  try {
+    await callAdminEF('set_refunded', {target_name: memberName, value: amount});
+    updateStatus('已更新 ' + memberName + ' 的已退金额');
+  } catch (error) {
+    if (hadPrevious) allRefunded[memberName] = previous;
+    else delete allRefunded[memberName];
+    renderTable(); recalculate(); saveOffline();
+  }
 }
+
 
 async function showPaymentQR() {
   if (!PAYMENT_FEATURES_ENABLED) { alert('付款功能暂未开放，截团锁单后会统一通知。'); return; }
@@ -2087,11 +1935,16 @@ function openAddressForm(memberName) {
     if (title) title.textContent = '📦 填写收货地址';
     if (subtitle) subtitle.textContent = '代发团专用 · 只有你自己、管理员和代发方可见';
   }
-  loadAddressFor(targetName);
+  bindAddressInputTracking();
+  addressInputRevision = 0;
+  const requestRevision = ++addressLoadRevision;
+  writeAddressForm(null);
   overlay.classList.add('on');
+  loadAddressFor(targetName, requestRevision);
 }
 
 function closeAddressForm() {
+  addressLoadRevision += 1;
   document.getElementById('addressOverlay').classList.remove('on');
   const s = document.getElementById('addrStatus');
   if (s) s.textContent = '';
@@ -2100,6 +1953,35 @@ function closeAddressForm() {
   const eb = document.getElementById('addrExistingBody');
   if (eb) eb.replaceChildren();
   currentAddressTarget = null;
+}
+
+function bindAddressInputTracking() {
+  ['addrRecipient', 'addrPhone', 'addrAddress'].forEach(id => {
+    const field = document.getElementById(id);
+    if (!field || field.dataset.loadGuardBound) return;
+    field.dataset.loadGuardBound = '1';
+    field.addEventListener('input', () => { addressInputRevision += 1; });
+  });
+}
+
+function currentAddressFormTarget() {
+  return currentAddressTarget || myName;
+}
+
+function addressLoadCanApply(name, requestRevision, inputRevisionAtStart) {
+  return requestRevision === addressLoadRevision
+    && inputRevisionAtStart === addressInputRevision
+    && name === currentAddressFormTarget();
+}
+
+function writeAddressForm(data) {
+  const recipient = document.getElementById('addrRecipient');
+  const phone = document.getElementById('addrPhone');
+  const address = document.getElementById('addrAddress');
+  if (recipient) recipient.value = data?.recipient || '';
+  if (phone) phone.value = data?.phone || '';
+  if (address) address.value = data?.address || '';
+  renderAddrExisting(data || null);
 }
 
 function renderAddrExisting(data) {
@@ -2136,10 +2018,11 @@ function renderAddrExisting(data) {
   wrap.style.display = 'block';
 }
 
-async function loadAddressFor(name) {
+async function loadAddressFor(name, requestRevision = ++addressLoadRevision) {
   if (!name) return;
+  const inputRevisionAtStart = addressInputRevision;
   const cached = allAddressesCache && allAddressesCache[name];
-  if (cached) renderAddrExisting(cached);
+  if (cached && addressLoadCanApply(name, requestRevision, inputRevisionAtStart)) writeAddressForm(cached);
   // 2026-06-24: cache miss 时按角色走 EF (admin -> admin overview, 普通 -> my-data)
   let data = null;
   if (!cached && efHasToken()) {
@@ -2154,22 +2037,8 @@ async function loadAddressFor(name) {
       data = allAddressesCache[name] || null;
     } catch(e) { console.error('loadAddressFor EF failed:', e); }
   } else if (cached) { data = cached; }
-  const r = document.getElementById('addrRecipient');
-  const p = document.getElementById('addrPhone');
-  const a = document.getElementById('addrAddress');
-  if (data) {
-    cacheRound3Address(data);
-    const fresh = allAddressesCache[name] || data;
-    if (r) r.value = data.recipient || '';
-    if (p) p.value = data.phone || '';
-    if (a) a.value = data.address || '';
-    renderAddrExisting(fresh);
-  } else {
-    if (r) r.value = '';
-    if (p) p.value = '';
-    if (a) a.value = '';
-    renderAddrExisting(null);
-  }
+  if (!addressLoadCanApply(name, requestRevision, inputRevisionAtStart)) return;
+  writeAddressForm(data ? (allAddressesCache[name] || data) : null);
 }
 async function loadMyAddress() { return loadAddressFor(myName); } // 兼容旧调用
 
@@ -2201,7 +2070,13 @@ async function saveAddress() {
   status.style.color = '#2D8B5E';
   const fresh = {name: targetName, team: targetTeam, recipient, phone, address, updated_at: new Date().toISOString()};
   allAddressesCache[targetName] = fresh;
+  const shippingExtra = (address.includes('新疆') || address.includes('西藏')) ? 13 : (address.includes('北京') || address.includes('上海')) ? 1 : 0;
+  allShippingSummary[targetName] = {
+    has_address: true,
+    shipping_cents: Math.round((DROPSHIP_FEE + shippingExtra) * 100)
+  };
   renderAddrExisting(fresh);
+  recalculate();
   setTimeout(() => closeAddressForm(), 1200);
   if (canViewAllAddresses(myName)) renderAllAddresses();
 }
@@ -2246,36 +2121,54 @@ async function showMyTracking() {
 
 // 2026-06-24 走 admin EF (token 验 admin)
 async function saveTracking(targetName, value) {
-  if (!canViewAllAddresses(myName)) { alert('仅管理员可填快递单号'); return; }
+  if (!canViewAllAddresses(myName)) { alert('仅管理员可填快递单号'); return false; }
   const v = (value || '').trim();
   const existing = allAddressesCache[targetName];
-  if (!existing) { alert('该用户还没填地址，请先代填地址再填单号'); return; }
+  if (!existing) { alert('该用户还没填地址，请先代填地址再填单号'); return false; }
   try {
     await callAdminEF('save_tracking', {target_name: targetName, value: v});
     allAddressesCache[targetName] = {...existing, tracking_number: v || null};
-  } catch(e) { /* helper 已 alert */ }
+    return true;
+  } catch(e) {
+    return false;
+  }
 }
 
-// 2026-06-24 重写: admin 走 EF overview (token 验)，普通用户走 my-data get_bootstrap
-// 2026-06-24 紧急回滚: 旧用户无 EF token,fallback anon SELECT(与 DB GRANT SELECT addresses 配套)
+// 地址 PII 只能经 EF 返回：管理员拿全量，成员只拿自己的地址；全员金额只使用无 PII 运费摘要。
 async function loadAllAddressesCache() {
-  allAddressesCache = {};
+  const nextAddresses = {};
+  const nextShippingSummary = {};
+  const stageAddress = row => {
+    const displayName = addressDisplayName(row && row.name);
+    if (displayName) nextAddresses[displayName] = {...row, name: displayName};
+  };
+  const stageShippingSummary = row => {
+    const displayName = row && String(row.name || '').trim();
+    if (!displayName) return;
+    nextShippingSummary[displayName] = {
+      has_address: row.has_address === true,
+      shipping_cents: Number.isInteger(row.shipping_cents) ? row.shipping_cents : null
+    };
+  };
   try {
-    if (efHasToken() && canViewAllAddresses(myName)) {
+    if (!efHasToken()) throw new Error('登录已过期，请重新登录后查看地址');
+    if (canViewAllAddresses(myName)) {
       const res = await callEF('admin', {action: 'overview'});
-      (res.addresses || []).forEach(r => { cacheRound3Address(r); });
-    } else if (efHasToken()) {
+      (res.addresses || []).forEach(stageAddress);
+      Object.assign(nextShippingSummary, allShippingSummary);
+    } else {
       const res = await callEF('my-data', {action: 'get_bootstrap'});
-      (res.my_addresses || []).forEach(r => { cacheRound3Address(r); });
-    } else if (sb) {
-      const {data} = await sb.from('addresses').select('*');
-      (data || []).forEach(r => { cacheRound3Address(r); });
+      (res.my_addresses || []).forEach(stageAddress);
+      (res.shipping_summaries || []).forEach(stageShippingSummary);
     }
   } catch(e) {
-    console.error('loadAllAddressesCache failed, fallback to anon SELECT:', e);
-    if (sb) { try { const {data} = await sb.from('addresses').select('*'); (data || []).forEach(r => cacheRound3Address(r)); } catch(e2) {} }
+    console.error('loadAllAddressesCache failed:', e);
+    return false;
   }
+  allAddressesCache = nextAddresses;
+  allShippingSummary = nextShippingSummary;
   if (typeof recalculate === 'function') recalculate();
+  return true;
 }
 
 let _renderAddrPanelTimer = null;
@@ -2414,7 +2307,12 @@ function renderAllAddresses() {
       trackInput.addEventListener('blur', async () => {
         const v = trackInput.value.trim();
         if (v === lastSaved) return;
-        await saveTracking(name, v);
+        const saved = await saveTracking(name, v);
+        if (!saved) {
+          trackInput.style.background = '#FFF5F5';
+          trackInput.style.borderColor = '#E74C3C';
+          return;
+        }
         lastSaved = v;
         if (v) {
           trackInput.style.background = '#F3F8E8';
@@ -2772,7 +2670,9 @@ function r2(n) { return Math.round(n * 100) / 100; }
 
 function unitPrice(sticker, qty) {
   const tiers = sticker.t;
-  if (qty <= 0) return tiers[0][1] / tiers[0][0];
+  // 低于 MOQ 时仍按首档单张价预估；tierInfo 会另外提示还差多少张。
+  // 原逻辑在首档为 10 张、qty=1~9 时让 lower===upper，产生 0/0 → NaN。
+  if (qty <= tiers[0][0]) return tiers[0][1] / tiers[0][0];
   // Find surrounding tiers and interpolate (SM uses continuous pricing)
   let lower = tiers[0], upper = null;
   for (let i = 0; i < tiers.length; i++) {
@@ -2953,8 +2853,8 @@ function renderTable() {
   if (PAYMENT_FEATURES_ENABLED) h += '<td></td><td></td><td></td>';
   h += '</tr>';
 
-  // 五团汇总 row (grand totals across all teams)
-  h += '<tr class="team-subtotal" style="background:#FFF8F0;font-weight:700"><td class="col-idx"></td><td class="col-name">五团汇总</td>';
+  // 六团汇总 row (grand totals across all teams)
+  h += '<tr class="team-subtotal" style="background:#FFF8F0;font-weight:700"><td class="col-idx"></td><td class="col-name">六团汇总</td>';
   S.forEach(s => { h += '<td id="gtsq-' + s.id + '"></td>'; });
   h += '<td id="gt-items"></td><td id="gt-usd"></td><td id="gt-cny"></td><td id="gt-fee"></td><td id="gt-tax"></td><td id="gt-shipfee"></td><td id="gt-packfee"></td><td id="gt-actual"></td><td id="gt-ap"></td><td id="gt-refunded"></td><td id="gt-owe"></td><td id="gt-refund"></td>';
   if (PAYMENT_FEATURES_ENABLED) h += '<td id="gt-pay-stats"></td><td id="gt-shipfee-stats"></td><td id="gt-ship-stats"></td>';
@@ -3013,7 +2913,7 @@ function renderTable() {
     visibleNames.forEach(name => {
       const isMe = name === myName;
       const orders = allOrders[name] || {};
-      const detailArg = JSON.stringify(name).replace(/"/g, '&quot;');
+      const detailArg = jsArg(name);
       const isInRunaway = isRunawaySection && runawayOrigTeam[name] !== undefined;
       h += '<tr class="p-row' + (isMe ? ' my-row' : '') + (isInRunaway ? ' runaway-row' : '') + '" data-name="' + esc(name) + '" data-team="' + g.team + '">';
       h += '<td class="col-idx">' + (seqMap[name] || '') + '</td>';
@@ -3118,7 +3018,16 @@ function renderTable() {
   applyCollapseState();
 }
 
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function jsArg(value) {
+  return JSON.stringify(String(value ?? ''))
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
 function hasOrders(name) { const o = allOrders[name]; return o && Object.values(o).some(q => q > 0); }
 function toggleHideEmpty() { hideEmptyOrders = !hideEmptyOrders; renderTable(); recalculate(); }
 
@@ -3346,7 +3255,8 @@ function recalculate() {
 
   const grandCNY = r2(grandUSD * rate);
   const grandFee = r2(grandCNY * 0.001);
-  const grandActualCNY = discountRatio > 0 ? r2(actualUSD * rate * 1.001 + taxCNY) : 0;
+  // 顶部实际总额必须与逐人应付之和一致，包含逐人取整后的运费和包材费。
+  const grandActualCNY = gtActual > 0 ? r2(gtActual) : 0;
   let grandTotalText = '总金额 $' + grandUSD.toFixed(2) + ' / \u00A5' + (grandCNY + grandFee).toFixed(2) + '(含手续费)';
   if (actualUSD > 0) grandTotalText += ' | 实际 $' + actualUSD.toFixed(2) + ' / \u00A5' + grandActualCNY.toFixed(2);
   if (taxCNY > 0) grandTotalText += ' | 关税 \u00A5' + taxCNY.toFixed(2);
@@ -3366,7 +3276,7 @@ function recalculate() {
   const sgPk = document.getElementById('st-grand-packfee');
   if (sgPk) { sgPk.textContent = gtPackfee > 0 ? '\u00A5' + gtPackfee.toFixed(2) : '\u2014'; if (gtPackfee > 0) sgPk.style.color = '#8B6EAE'; }
 
-  // Fill 三团汇总 row
+  // Fill 六团汇总 row
   S.forEach(s => {
     const el = document.getElementById('gtsq-' + s.id);
     if (el) el.textContent = gtStickerQty[s.id] || '';
@@ -3400,7 +3310,7 @@ function recalculate() {
   const gtrEl = document.getElementById('gt-refund');
   if (gtrEl) gtrEl.textContent = gtRefund > 0 ? '\u00A5' + gtRefund.toFixed(2) : '\u2014';
 
-  // 五团汇总：付款/运费核实/发货 全局统计
+  // 六团汇总：付款/运费核实/发货 全局统计
   let gtPayC = 0, gtPayS = 0, gtSfC = 0, gtSfS = 0, gtShp = 0, gtVisible = 0;
   teamsData.forEach(g => {
     if (g.team === -1) return; // 跑单段不参与付款/发货统计
@@ -3568,7 +3478,7 @@ function exportMyOrder() {
     const dropSid = s.id.replace(/^r3_/, 'drop_r3_');
     const q = dropOrders[dropSid] || 0;
     if (q > 0) {
-      const up = cachedStickerData[s.id]?.unitPrice || 0;
+      const up = DROP_EXPORT_UNIT_PRICES[s.id] || 0;
       const sub = r2(q * up);
       dropItemsCount += q;
       dropUSD += r2(sub);
@@ -3584,7 +3494,7 @@ function exportMyOrder() {
       lines.push('（暂无明细）');
     }
     lines.push('掉落件数：' + dropItemsCount);
-    if (dropUSD > 0) lines.push('掉落预估（¥）：¥' + r2(dropUSD * rate).toFixed(2));
+    if (dropUSD > 0) lines.push('掉落预估（¥）：¥' + r2(dropUSD * dropRate).toFixed(2));
     if (dropPaidAmt > 0) lines.push('掉落已付：¥' + dropPaidAmt.toFixed(2));
   }
 
@@ -3609,11 +3519,12 @@ function showOrderDetail(name) {
     const dropSid = s.id.replace(/^r3_/, 'drop_r3_');
     const dropQty = dropOrders[dropSid] || 0;
     if (r2Qty > 0 || dropQty > 0) {
-      const up = cachedStickerData[s.id]?.unitPrice || 0;
+      const r3UnitPrice = cachedStickerData[s.id]?.unitPrice || 0;
+      const dropUnitPrice = DROP_EXPORT_UNIT_PRICES[s.id] || 0;
       r2TotalItems += r2Qty;
-      r2TotalUSD += r2(r2Qty * up);
+      r2TotalUSD += r2(r2Qty * r3UnitPrice);
       dropTotalItems += dropQty;
-      dropTotalUSD += r2(dropQty * up);
+      dropTotalUSD += r2(dropQty * dropUnitPrice);
       rows.push({name: s.name, type: s.type, r2: r2Qty, drop: dropQty, total: r2Qty + dropQty});
     }
   });
@@ -3782,7 +3693,7 @@ function showOrderDetail(name) {
     sep.style.cssText = 'font-size:11px;font-weight:700;color:#8B6EAE;margin-top:10px;padding-top:8px;border-top:1px dashed #E8E0D8';
     sep.textContent = '📦 掉落金额';
     footer.appendChild(sep);
-    if (dropTotalUSD > 0) addRow(footer, '掉落预估（¥）', '\u00a5' + r2(dropTotalUSD * rate).toFixed(2));
+    if (dropTotalUSD > 0) addRow(footer, '掉落预估（¥）', '\u00a5' + r2(dropTotalUSD * dropRate).toFixed(2));
     addRow(footer, '掉落已付', dropPaid > 0 ? '\u00a5' + dropPaid.toFixed(2) : '\u2014');
   }
 
@@ -3793,21 +3704,48 @@ function showOrderDetail(name) {
 
 function clearMyOrders() {
   if (isLocked) { alert('已锁单，无法修改'); return; }
+  if (clearMutationPending) return orderMutationQueue;
   if (!confirm('确定要清空你的所有订单吗？')) return;
-  const sids = Object.keys(allOrders[myName] || {});
+  clearMutationPending = true;
+  return enqueueOrderMutation(clearMyOrdersNow).finally(() => { clearMutationPending = false; });
+}
+
+async function clearMyOrdersNow() {
+  if (isLocked) { alert('已锁单，无法修改'); return false; }
+  const previous = {...(allOrders[myName] || {})};
+  const pendingBeforeClear = {...pendingChanges};
+  pendingChanges = {};
+  clearPendingDraft();
+  updateSubmitBar();
   delete allOrders[myName];
-  renderTable();
-  recalculate();
-  saveOffline();
-  if (sb && sids.length > 0) {
-    const rows = sids.map(sid => ({name: myName, sticker_id: sid, quantity: 0, updated_at: new Date().toISOString()}));
-    sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'})
-      .then(({error}) => {
-        if (error) console.error('Clear failed:', error);
-        else updateStatus('已清空');
-      });
+  renderTable(); recalculate(); saveOffline();
+  try {
+    await callEF('my-data', {
+      action: 'submit_orders',
+      items: S.map(sticker => ({sticker_id: sticker.id, quantity: 0}))
+    });
+    if (Object.keys(pendingChanges).length) savePendingDraft();
+    else clearPendingDraft();
+    updateSubmitBar();
+    updateStatus(Object.keys(pendingChanges).length ? '已清空，还有新修改待保存' : '已清空');
+    return true;
+  } catch (error) {
+    if (Object.keys(previous).length) allOrders[myName] = previous;
+    pendingChanges = {...pendingBeforeClear, ...pendingChanges};
+    if (!allOrders[myName]) allOrders[myName] = {};
+    for (const [stickerId, quantity] of Object.entries(pendingChanges)) {
+      if (quantity > 0) allOrders[myName][stickerId] = quantity;
+      else delete allOrders[myName][stickerId];
+    }
+    savePendingDraft();
+    updateSubmitBar();
+    saveOffline();
+    renderTable(); recalculate();
+    alert('清空失败：' + error.message);
+    return false;
   }
 }
+
 
 document.getElementById('rateInput').addEventListener('input', function() {
   if (!isAdmin(myName)) return;
@@ -3871,36 +3809,20 @@ function showImport() {
   document.getElementById('modalOk').textContent = '导入到云端';
   document.getElementById('modalOk').onclick = async function() {
     try {
-      const d = JSON.parse(document.getElementById('modalText').value);
-      if (!d || !Array.isArray(d.people)) { alert('数据格式不正确，需包含 people 数组'); return; }
-      if (!sb) { alert('未连接到服务器，无法导入'); return; }
-
-      const rows = [];
-      for (const p of d.people) {
-        for (const [sid, qty] of Object.entries(p.orders || {})) {
-          if (qty > 0) rows.push({name: p.name, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()});
-        }
-        if (p.team) {
-          rows.push({name: p.name, sticker_id: 'r3__team', quantity: p.team, updated_at: new Date().toISOString()});
-        }
+      const data = JSON.parse(document.getElementById('modalText').value);
+      if (!data || !Array.isArray(data.people)) {
+        alert('数据格式不正确，需包含 people 数组');
+        return;
       }
-      if (rows.length > 0) {
-        const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'});
-        if (error) { alert('导入失败: ' + error.message); return; }
-      }
-      if (d.rate && isAdmin(myName)) {
-        await sb.from('settings').update({value: String(d.rate), updated_at: new Date().toISOString()}).eq('key', 'r3_rate');
-        rate = d.rate;
-        document.getElementById('rateInput').value = rate;
-      }
+      const result = await callAdminEF('import_legacy_orders', {
+        people: data.people,
+        rate: data.rate
+      });
       await loadAll();
-      renderTable();
-      recalculate();
-      saveOffline();
-      closeModal();
-      alert('导入成功！共 ' + d.people.length + ' 人，' + rows.length + ' 条订购记录');
-    } catch(e) {
-      alert('JSON解析失败: ' + e.message);
+      renderTable(); recalculate(); saveOffline(); closeModal();
+      alert('导入成功！共 ' + data.people.length + ' 人，' + result.imported + ' 条记录');
+    } catch (error) {
+      alert('导入失败：' + error.message);
     }
   };
   document.getElementById('modalBg').classList.add('on');
@@ -3947,13 +3869,18 @@ function closeModal() {
   });
 
   // Create Supabase client early so auth popup can use it
-  initSupabaseClient();
 
-  if (!myName) {
+  const hadStoredName = !!myName;
+  const sessionValid = await restoreAccountSession();
+  if (!sessionValid) {
+    if (hadStoredName) {
+      switchAuthTab('login');
+      document.getElementById('nickInput').value = myName;
+    }
     showNicknamePopup();
     await new Promise(resolve => {
       const check = setInterval(() => {
-        if (myName) { clearInterval(check); resolve(); }
+        if (myName && efHasToken()) { clearInterval(check); resolve(); }
       }, 100);
     });
   }
@@ -3969,13 +3896,8 @@ function closeModal() {
     myTeam = allTeams[myName];
     localStorage.setItem('gb2_team', myTeam);
   } else if (myName && !allTeams[myName]) {
+    // accounts.team is authoritative; auth registration/change_team keeps the marker in sync.
     allTeams[myName] = myTeam;
-    if (sb) {
-      await sb.from('orders').upsert(
-        {name: myName, sticker_id: 'r3__team', quantity: myTeam, updated_at: new Date().toISOString()},
-        {onConflict: 'name,sticker_id'}
-      ).select();
-    }
   }
   updateNickDisplay();
   if (isLocked) {

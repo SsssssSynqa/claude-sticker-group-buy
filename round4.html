@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#eee8f5">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: https:; connect-src https://jbdibeisdydocdfojpup.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<title>Round 4 · Clawd 贴纸拼团预览</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+*{box-sizing:border-box}
+:root{
+  --page:#f9f7fb;
+  --surface:#fffefe;
+  --surface-soft:#f4f0f8;
+  --surface-green:#edf7f1;
+  --ink:#302d36;
+  --muted:#756f7e;
+  --faint:#a59eab;
+  --purple:#795d93;
+  --purple-strong:#63457f;
+  --purple-soft:#e9e0f1;
+  --green:#3f8061;
+  --green-strong:#2f694e;
+  --green-soft:#dceee4;
+  --gold:#8c6e1f;
+  --gold-soft:#f5edcf;
+  --danger:#a8464f;
+  --danger-soft:#f6e3e5;
+  --border:#ddd5e3;
+  --border-strong:#c8bbd2;
+  --shadow:0 10px 30px rgba(73,55,87,.08);
+  --shadow-small:0 4px 14px rgba(73,55,87,.07);
+  --radius-sm:10px;
+  --radius:16px;
+  --radius-lg:24px;
+  --space-1:4px;
+  --space-2:8px;
+  --space-3:12px;
+  --space-4:16px;
+  --space-5:24px;
+  --space-6:32px;
+  --space-7:48px;
+}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  min-height:100vh;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at 8% 4%,rgba(194,225,207,.42),transparent 28rem),
+    radial-gradient(circle at 96% 0%,rgba(218,202,231,.48),transparent 32rem),
+    var(--page);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  line-height:1.6;
+}
+button,input,textarea,select{font:inherit}
+button{touch-action:manipulation}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible{
+  outline:3px solid rgba(121,93,147,.26);
+  outline-offset:3px;
+}
+a{color:var(--purple-strong)}
+[hidden]{display:none!important}
+.skip-link{position:fixed;left:12px;top:12px;z-index:9999;transform:translateY(-160%);background:var(--ink);color:var(--surface);padding:8px 12px;border-radius:8px}
+.skip-link:focus{transform:translateY(0)}
+.preview-ribbon{
+  padding:8px max(16px,calc((100vw - 1180px)/2));
+  color:#4c4058;
+  background:linear-gradient(90deg,#e7deef,#e3f1e9);
+  border-bottom:1px solid rgba(121,93,147,.14);
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.04em;
+  text-align:center;
+}
+.site-header{padding:clamp(24px,5vw,56px) 20px 28px}
+.header-inner{width:min(1180px,100%);margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:end}
+.eyebrow{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:var(--green-strong);font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.eyebrow::before{content:"";width:26px;height:8px;border-radius:999px;background:linear-gradient(90deg,var(--purple),var(--green))}
+h1{margin:0;color:var(--purple-strong);font-size:clamp(30px,5vw,54px);line-height:1.08;letter-spacing:-.035em}
+.subtitle{max-width:68ch;margin:14px 0 0;color:var(--muted);font-size:15px}
+.account-box{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;max-width:420px}
+.connection{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:12px}
+.connection-dot{width:9px;height:9px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 4px rgba(165,158,171,.12)}
+.connection.online .connection-dot{background:var(--green);box-shadow:0 0 0 4px rgba(63,128,97,.12)}
+.connection.offline .connection-dot{background:var(--danger);box-shadow:0 0 0 4px rgba(168,70,79,.12)}
+.account-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:rgba(255,254,254,.8);color:var(--ink);font-size:13px;font-weight:700}
+.team-dot{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:var(--purple-soft);color:var(--purple-strong);font-size:11px}
+.button{
+  min-height:42px;
+  padding:9px 15px;
+  border:1px solid transparent;
+  border-radius:12px;
+  background:var(--purple-strong);
+  color:#fffafd;
+  font-weight:750;
+  font-size:13px;
+  cursor:pointer;
+  transition:transform .16s ease,background .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+.button:hover:not(:disabled){transform:translateY(-1px);background:#55366f;box-shadow:var(--shadow-small)}
+.button:active:not(:disabled){transform:translateY(0)}
+.button:disabled{cursor:not-allowed;opacity:.5}
+.button.secondary{border-color:var(--border-strong);background:var(--surface);color:var(--purple-strong)}
+.button.secondary:hover:not(:disabled){background:var(--surface-soft);border-color:var(--purple)}
+.button.green{background:var(--green-strong)}
+.button.green:hover:not(:disabled){background:#275b42}
+.button.danger{border-color:#dfbfc3;background:var(--danger-soft);color:var(--danger)}
+.button.danger:hover:not(:disabled){background:#efd3d6}
+.button.quiet{min-height:36px;padding:6px 10px;border-color:transparent;background:transparent;color:var(--muted)}
+.button.quiet:hover:not(:disabled){background:var(--surface-soft);box-shadow:none;color:var(--purple-strong)}
+.main{width:min(1180px,calc(100% - 40px));margin:0 auto;padding-bottom:120px}
+.preview-note{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:14px;
+  align-items:start;
+  padding:18px 20px;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:linear-gradient(135deg,rgba(240,234,246,.94),rgba(235,247,240,.94));
+  box-shadow:var(--shadow-small);
+}
+.preview-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--surface);color:var(--purple-strong);font-weight:900}
+.preview-note strong{display:block;color:var(--purple-strong);font-size:14px}
+.preview-note p{margin:3px 0 0;color:var(--muted);font-size:13px}
+.round-strip{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.status-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:700}
+.status-pill.active{border-color:#afd3be;background:var(--green-soft);color:var(--green-strong)}
+.status-pill.warning{border-color:#dacd95;background:var(--gold-soft);color:var(--gold)}
+.section{margin-top:var(--space-7)}
+.section-head{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:18px}
+.section-kicker{margin:0 0 3px;color:var(--green-strong);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.section h2{margin:0;color:var(--ink);font-size:22px;line-height:1.25;letter-spacing:-.02em}
+.section-description{max-width:72ch;margin:6px 0 0;color:var(--muted);font-size:13px}
+.section-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.empty-state{
+  padding:clamp(28px,6vw,56px) 20px;
+  border:1px dashed var(--border-strong);
+  border-radius:var(--radius-lg);
+  background:rgba(255,254,254,.66);
+  text-align:center;
+}
+.empty-symbol{display:grid;place-items:center;width:54px;height:54px;margin:0 auto 14px;border-radius:18px;background:var(--purple-soft);color:var(--purple-strong);font-size:24px;font-weight:900}
+.empty-state h3{margin:0 0 6px;font-size:17px;color:var(--purple-strong)}
+.empty-state p{max-width:58ch;margin:0 auto;color:var(--muted);font-size:13px}
+.empty-state .button{margin-top:18px}
+.catalog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:16px}
+.product-card{
+  display:flex;
+  min-width:0;
+  flex-direction:column;
+  gap:12px;
+  padding:14px;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:var(--surface);
+  box-shadow:var(--shadow-small);
+  container-type:inline-size;
+}
+.product-media{display:grid;place-items:center;min-height:146px;overflow:hidden;border-radius:12px;background:linear-gradient(145deg,#f2eef6,#edf6f1)}
+.product-media img{display:block;width:100%;height:160px;object-fit:contain;padding:10px}
+.media-placeholder{display:grid;place-items:center;gap:4px;color:var(--faint);font-size:12px;text-align:center}
+.media-placeholder span{font-size:30px;color:var(--purple)}
+.product-title-row{display:flex;justify-content:space-between;align-items:start;gap:10px}
+.product-title{min-width:0}
+.product-title h3{margin:0;overflow-wrap:anywhere;font-size:16px;line-height:1.35}
+.product-title p{margin:4px 0 0;color:var(--muted);font-size:12px}
+.type-badge{flex:0 0 auto;padding:4px 8px;border-radius:999px;background:var(--purple-soft);color:var(--purple-strong);font-size:10px;font-weight:800;text-transform:uppercase}
+.type-badge.holo{background:#e5e2f5;color:#625990}
+.type-badge.glt{background:var(--gold-soft);color:var(--gold)}
+.type-badge.other{background:var(--green-soft);color:var(--green-strong)}
+.price-preview{padding:10px 12px;border-radius:12px;background:var(--surface-soft)}
+.price-preview-title{margin:0 0 5px;color:var(--purple-strong);font-size:11px;font-weight:850}
+.tier-list{display:grid;gap:3px;margin:0;padding:0;list-style:none;color:var(--muted);font-size:11px}
+.tier-list li{overflow-wrap:anywhere}
+.catalog-disclaimer{margin:7px 0 0;color:var(--faint);font-size:10px;line-height:1.45}
+.product-bottom{display:grid;gap:9px;margin-top:auto;padding-top:2px}
+.product-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--muted);font-size:11px}
+.product-link{font-weight:700;text-decoration:none}
+.quantity-control{display:grid;grid-template-columns:44px minmax(58px,1fr) 44px;overflow:hidden;border:1px solid var(--border-strong);border-radius:12px;background:var(--surface)}
+.quantity-control button{min-height:44px;border:0;background:var(--surface-soft);color:var(--purple-strong);font-size:20px;font-weight:800;cursor:pointer}
+.quantity-control button:hover:not(:disabled){background:var(--purple-soft)}
+.quantity-control button:disabled{cursor:not-allowed;color:var(--faint);opacity:.65}
+.quantity-control input{width:100%;min-width:0;border:0;border-inline:1px solid var(--border);background:var(--surface);color:var(--ink);font-weight:850;text-align:center;-moz-appearance:textfield}
+.quantity-control input::-webkit-outer-spin-button,.quantity-control input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.quantity-control input:disabled{color:var(--faint)}
+.signin-nudge{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;padding:16px 18px;border-radius:var(--radius);background:var(--surface-green);border:1px solid #c8e1d2}
+.signin-nudge strong{display:block;color:var(--green-strong);font-size:14px}
+.signin-nudge p{margin:2px 0 0;color:var(--muted);font-size:12px}
+.workspace-grid{display:grid;grid-template-columns:minmax(0,1.18fr) minmax(280px,.82fr);gap:16px}
+.panel{padding:20px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow-small)}
+.panel h3{margin:0;font-size:16px}
+.panel-sub{margin:4px 0 0;color:var(--muted);font-size:12px}
+.order-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}
+.mini-stat{padding:12px;border-radius:12px;background:var(--surface-soft)}
+.mini-stat span{display:block;color:var(--muted);font-size:10px;font-weight:700}
+.mini-stat strong{display:block;margin-top:2px;color:var(--purple-strong);font-size:15px;overflow-wrap:anywhere}
+.order-warning{margin-top:14px;padding:11px 12px;border:1px solid #e0c2c6;border-radius:12px;background:var(--danger-soft);color:var(--danger);font-size:12px;font-weight:700}
+.order-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.payment-list{display:grid;gap:12px;margin-top:16px}
+.payment-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border:1px solid var(--border);border-radius:12px}
+.payment-row h4{margin:0;font-size:13px}
+.payment-row p{margin:3px 0 0;color:var(--muted);font-size:11px}
+.payment-status{display:inline-flex;align-items:center;gap:6px;margin-top:7px;color:var(--muted);font-size:11px;font-weight:800}
+.payment-status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.payment-status.member{color:var(--gold)}
+.payment-status.member::before{background:var(--gold)}
+.payment-status.leader{color:var(--green-strong)}
+.payment-status.leader::before{background:var(--green)}
+.shipment-box{display:grid;gap:10px;margin-top:16px}
+.shipment-line{display:flex;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid #ece7ef;color:var(--muted);font-size:12px}
+.shipment-line:last-child{padding-bottom:0;border-bottom:0}
+.shipment-line strong{color:var(--ink);text-align:right;overflow-wrap:anywhere}
+.tracking-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em;user-select:all}
+.address-panel{margin-top:16px}
+.address-panel summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow-small);cursor:pointer;color:var(--purple-strong);font-size:14px;font-weight:800;list-style:none}
+.address-panel summary::-webkit-details-marker{display:none}
+.address-panel summary::after{content:"＋";font-size:18px}
+.address-panel[open] summary{border-radius:var(--radius) var(--radius) 0 0}
+.address-panel[open] summary::after{content:"－"}
+.address-content{padding:20px;border:1px solid var(--border);border-top:0;border-radius:0 0 var(--radius) var(--radius);background:var(--surface)}
+.privacy-note{margin:0 0 16px;color:var(--muted);font-size:12px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field{display:grid;gap:6px}
+.field.full{grid-column:1/-1}
+.field label,.fieldset-label{color:var(--ink);font-size:12px;font-weight:800}
+.field input,.field textarea,.field select{
+  width:100%;
+  border:1px solid var(--border-strong);
+  border-radius:10px;
+  background:#fffefe;
+  color:var(--ink);
+  padding:10px 12px;
+}
+.field textarea{min-height:92px;resize:vertical}
+.field-hint{color:var(--faint);font-size:10px}
+.form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.export-bar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-top:16px;padding:16px 18px;border:1px solid var(--border);border-radius:var(--radius);background:linear-gradient(135deg,#f0ebf5,#edf7f1)}
+.export-bar strong{display:block;color:var(--purple-strong);font-size:14px}
+.export-bar p{margin:2px 0 0;color:var(--muted);font-size:11px}
+.member-tools{display:flex;flex-wrap:wrap;gap:10px}
+.member-tools .field{min-width:160px}
+.member-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px}
+.member-card{padding:15px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow-small)}
+.member-card.me{border-color:#ad97c0;background:#fdfbff}
+.member-head{display:flex;justify-content:space-between;gap:12px;align-items:start}
+.member-name{min-width:0}
+.member-name strong{display:block;overflow-wrap:anywhere;font-size:14px}
+.member-name span{display:block;margin-top:2px;color:var(--muted);font-size:10px}
+.team-badge{flex:0 0 auto;padding:4px 8px;border-radius:999px;background:var(--purple-soft);color:var(--purple-strong);font-size:10px;font-weight:850}
+.member-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:12px}
+.member-summary span{padding:8px;border-radius:9px;background:var(--surface-soft);color:var(--muted);font-size:10px}
+.member-summary strong{display:block;margin-top:1px;color:var(--ink);font-size:11px}
+.member-card details{margin-top:10px}
+.member-card summary{cursor:pointer;color:var(--purple-strong);font-size:11px;font-weight:800}
+.item-list{display:grid;gap:5px;margin:8px 0 0;padding:8px 0 0;border-top:1px solid #ece7ef;list-style:none;color:var(--muted);font-size:11px}
+.item-list li{display:flex;justify-content:space-between;gap:10px}
+.member-empty{grid-column:1/-1}
+.save-dock{
+  position:fixed;
+  z-index:600;
+  right:max(16px,calc((100vw - 1180px)/2));
+  bottom:max(16px,env(safe-area-inset-bottom));
+  display:flex;
+  align-items:center;
+  gap:14px;
+  width:min(520px,calc(100% - 32px));
+  padding:12px 14px;
+  border:1px solid var(--border-strong);
+  border-radius:16px;
+  background:#fffefe;
+  box-shadow:0 18px 48px rgba(52,40,62,.18);
+}
+.save-dock-copy{min-width:0;flex:1}
+.save-dock strong{display:block;color:var(--purple-strong);font-size:13px}
+.save-dock span{display:block;color:var(--muted);font-size:10px}
+dialog{width:min(430px,calc(100% - 28px));max-height:calc(100vh - 32px);padding:0;border:0;border-radius:var(--radius-lg);background:var(--surface);color:var(--ink);box-shadow:0 24px 80px rgba(43,32,52,.28)}
+dialog::backdrop{background:rgba(47,42,52,.54)}
+.dialog-head{display:flex;justify-content:space-between;align-items:start;gap:16px;padding:22px 22px 14px}
+.dialog-head h2{margin:0;color:var(--purple-strong);font-size:20px}
+.dialog-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+.dialog-close{width:36px;height:36px;border:0;border-radius:50%;background:var(--surface-soft);color:var(--muted);font-size:20px;cursor:pointer}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;margin:0 22px 18px;padding:4px;border-radius:12px;background:var(--surface-soft)}
+.auth-tab{min-height:40px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:12px;font-weight:800;cursor:pointer}
+.auth-tab[aria-selected="true"]{background:var(--surface);color:var(--purple-strong);box-shadow:var(--shadow-small)}
+.auth-form{display:grid;gap:14px;padding:0 22px 22px}
+.team-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0;padding:0;border:0}
+.team-option{display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--surface);font-size:12px;cursor:pointer}
+.team-option:has(input:checked){border-color:var(--purple);background:var(--purple-soft);color:var(--purple-strong);font-weight:800}
+.team-option input{accent-color:var(--purple)}
+.auth-error{min-height:20px;margin:0;color:var(--danger);font-size:12px;font-weight:700}
+.auth-submit{width:100%}
+.toast{
+  position:fixed;
+  z-index:1000;
+  left:50%;
+  bottom:max(24px,env(safe-area-inset-bottom));
+  width:min(460px,calc(100% - 28px));
+  padding:12px 16px;
+  border:1px solid var(--border-strong);
+  border-radius:12px;
+  background:var(--ink);
+  color:#fffafd;
+  box-shadow:0 14px 36px rgba(47,42,52,.24);
+  font-size:12px;
+  font-weight:700;
+  text-align:center;
+  transform:translate(-50%,calc(100% + 48px));
+  opacity:0;
+  transition:transform .22s ease,opacity .22s ease;
+}
+.toast.show{transform:translate(-50%,0);opacity:1}
+.toast.error{background:#803a42}
+.footer{padding:20px;text-align:center;color:var(--faint);font-size:10px}
+@container(max-width:310px){.product-title-row{display:grid}.type-badge{justify-self:start}}
+@media(max-width:820px){
+  .header-inner{grid-template-columns:1fr;align-items:start}
+  .account-box{justify-content:flex-start;max-width:none}
+  .workspace-grid{grid-template-columns:1fr}
+}
+@media(max-width:620px){
+  .preview-ribbon{text-align:left}
+  .site-header{padding-inline:14px}
+  .main{width:calc(100% - 28px)}
+  .section{margin-top:36px}
+  .section-head{align-items:start;flex-direction:column}
+  .section-actions{justify-content:flex-start;width:100%}
+  .section-actions .button{flex:1}
+  .catalog-grid{grid-template-columns:1fr}
+  .product-card{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:start}
+  .product-media{min-height:112px}
+  .product-media img{height:112px;padding:6px}
+  .product-bottom,.price-preview{grid-column:1/-1}
+  .form-grid{grid-template-columns:1fr}
+  .field.full{grid-column:auto}
+  .order-overview{grid-template-columns:1fr 1fr}
+  .payment-row{grid-template-columns:1fr}
+  .member-tools{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .member-tools .field{min-width:0}
+  .save-dock{right:16px;left:16px;width:auto;bottom:max(12px,env(safe-area-inset-bottom))}
+}
+@media(max-width:410px){
+  .product-card{grid-template-columns:96px minmax(0,1fr)}
+  .product-media{min-height:96px}
+  .product-media img{height:96px}
+  .order-overview{grid-template-columns:1fr}
+  .member-tools{grid-template-columns:1fr}
+  .save-dock{align-items:stretch;flex-direction:column;gap:8px}
+  .save-dock .button{width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+<div class="preview-ribbon">未发布功能预览 · 最终商品、日期与视觉仍待 Synqa 确认</div>
+
+<header class="site-header">
+  <div class="header-inner">
+    <div>
+      <p class="eyebrow">Clawd group buy · Round 4</p>
+      <h1 id="roundTitle">Round 4 贴纸拼团</h1>
+      <p class="subtitle" id="roundSubtitle">目录、订单与金额均从服务端动态读取；页面不会用占位商品或本地估算替代最终应付。</p>
+      <div class="round-strip" id="roundMeta" aria-live="polite"></div>
+    </div>
+    <div class="account-box">
+      <span class="connection" id="connectionState" aria-live="polite"><span class="connection-dot"></span><span id="connectionText">正在连接</span></span>
+      <span class="account-chip" id="accountChip" hidden><span class="team-dot" id="accountTeam">—</span><span id="accountName"></span></span>
+      <button class="button secondary" id="authButton" type="button">注册 / 登录</button>
+      <button class="button quiet" id="logoutButton" type="button" hidden>退出账号</button>
+    </div>
+  </div>
+</header>
+
+<main class="main" id="main">
+  <section class="preview-note" aria-label="功能预览说明">
+    <div class="preview-mark" aria-hidden="true">R4</div>
+    <div>
+      <strong>这一页只展示服务端已经配置的内容</strong>
+      <p>商品卡片里的价格只标作“商品目录价格预览”。实际商品应付与运费仅采用服务端返回的 <code>expected_cents</code> / 运费字段，不在浏览器里自行推算。</p>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="catalogHeading">
+    <div class="section-head">
+      <div>
+        <p class="section-kicker">Catalog</p>
+        <h2 id="catalogHeading">Round 4 商品目录</h2>
+        <p class="section-description" id="catalogDescription">正在读取服务端目录……</p>
+      </div>
+      <div class="section-actions">
+        <button class="button secondary" id="refreshButton" type="button">刷新数据</button>
+      </div>
+    </div>
+    <div class="catalog-grid" id="catalogGrid" aria-live="polite" aria-busy="true"></div>
+    <div class="empty-state" id="catalogEmpty" hidden>
+      <div class="empty-symbol" aria-hidden="true">…</div>
+      <h3 id="catalogEmptyTitle">目录正在准备</h3>
+      <p id="catalogEmptyText">Round 4 尚未配置可展示的商品。</p>
+      <button class="button secondary" id="emptyRetryButton" type="button">重新读取</button>
+    </div>
+    <div class="signin-nudge" id="signinNudge" hidden>
+      <div>
+        <strong>登录后才能填写数量并保存订单</strong>
+        <p>账号与 Round 3 使用同一套登录方式；新用户请选择自己所在的 1～6 团。</p>
+      </div>
+      <button class="button green" id="nudgeAuthButton" type="button">注册 / 登录</button>
+    </div>
+  </section>
+
+  <section class="section" id="workspaceSection" aria-labelledby="workspaceHeading" hidden>
+    <div class="section-head">
+      <div>
+        <p class="section-kicker">My order</p>
+        <h2 id="workspaceHeading">我的 Round 4</h2>
+        <p class="section-description">保存会提交当前目录中每件商品的完整数量快照；锁单后不能自行修改。</p>
+      </div>
+    </div>
+
+    <div class="workspace-grid">
+      <article class="panel" aria-labelledby="orderPanelHeading">
+        <h3 id="orderPanelHeading">订单状态</h3>
+        <p class="panel-sub" id="orderPanelHint">还没有保存 Round 4 订单。</p>
+        <div class="order-overview">
+          <div class="mini-stat"><span>分团</span><strong id="myTeamValue">—</strong></div>
+          <div class="mini-stat"><span>已选数量</span><strong id="myItemCount">0 件</strong></div>
+          <div class="mini-stat"><span>服务端版本</span><strong id="myOrderVersion">未创建</strong></div>
+        </div>
+        <div class="order-warning" id="orphanWarning" hidden></div>
+        <div class="order-actions">
+          <button class="button" id="saveOrderButton" type="button">保存完整订单</button>
+          <button class="button danger" id="lockOrderButton" type="button">锁定订单</button>
+        </div>
+      </article>
+
+      <article class="panel" aria-labelledby="paymentPanelHeading">
+        <h3 id="paymentPanelHeading">付款确认</h3>
+        <p class="panel-sub">金额未由服务端录入时，不会显示或推算应付。</p>
+        <div class="payment-list" id="paymentList"></div>
+      </article>
+    </div>
+
+    <div class="workspace-grid" style="margin-top:16px">
+      <article class="panel" aria-labelledby="shipmentHeading">
+        <h3 id="shipmentHeading">我的发货信息</h3>
+        <p class="panel-sub">这里只显示本人的地址填写状态与快递单号。</p>
+        <div class="shipment-box" id="shipmentBox"></div>
+      </article>
+
+      <article class="panel" aria-labelledby="serverAmountHeading">
+        <h3 id="serverAmountHeading">服务端金额</h3>
+        <p class="panel-sub">目录价格预览不等于应付；以下数字完全来自服务端。</p>
+        <div class="shipment-box" id="serverAmountBox"></div>
+      </article>
+    </div>
+
+    <details class="address-panel" id="addressPanel">
+      <summary><span>填写或修改收货地址</span><span id="addressSummary">尚未填写</span></summary>
+      <div class="address-content">
+        <p class="privacy-note">收件人、手机号和详细地址只会通过 <code>group-buy</code> Edge Function 保存；成员状态区不会显示这些信息。</p>
+        <form id="addressForm">
+          <div class="form-grid">
+            <div class="field">
+              <label for="recipientInput">收件人</label>
+              <input id="recipientInput" name="recipient" type="text" maxlength="50" autocomplete="name" required>
+            </div>
+            <div class="field">
+              <label for="phoneInput">手机号</label>
+              <input id="phoneInput" name="phone" type="tel" maxlength="20" autocomplete="tel" inputmode="tel" pattern="[+0-9\s-]{7,20}" required>
+            </div>
+            <div class="field full">
+              <label for="addressInput">完整收货地址</label>
+              <textarea id="addressInput" name="address" minlength="5" maxlength="300" autocomplete="street-address" placeholder="省 / 市 / 区 / 街道 / 门牌号" required></textarea>
+              <span class="field-hint">请写到可直接交给快递发货的完整程度。</span>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="button green" id="saveAddressButton" type="submit">保存地址</button>
+          </div>
+        </form>
+      </div>
+    </details>
+
+    <div class="export-bar">
+      <div>
+        <strong>导出我的订单</strong>
+        <p>导出商品数量、服务端金额和付款/发货状态，不包含完整地址与手机号。</p>
+      </div>
+      <div class="section-actions">
+        <button class="button secondary" id="copyOrderButton" type="button">复制订单</button>
+        <button class="button" id="exportOrderButton" type="button">下载订单</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="membersSection" aria-labelledby="membersHeading" hidden>
+    <div class="section-head">
+      <div>
+        <p class="section-kicker">Group status</p>
+        <h2 id="membersHeading">全团状态</h2>
+        <p class="section-description" id="membersDescription">仅显示昵称、分团、订单内容和付款/发货状态，不显示任何成员地址或手机号。</p>
+      </div>
+      <div class="member-tools">
+        <div class="field">
+          <label for="teamFilter">筛选分团</label>
+          <select id="teamFilter"><option value="all">全部分团</option></select>
+        </div>
+        <div class="field">
+          <label for="memberSearch">查找昵称</label>
+          <input id="memberSearch" type="search" maxlength="50" placeholder="输入昵称">
+        </div>
+      </div>
+    </div>
+    <div class="member-grid" id="memberGrid" aria-live="polite"></div>
+  </section>
+</main>
+
+<div class="save-dock" id="saveDock" hidden aria-live="polite">
+  <div class="save-dock-copy">
+    <strong id="saveDockTitle">数量有未保存修改</strong>
+    <span id="saveDockText">将提交当前目录的完整订单快照</span>
+  </div>
+  <button class="button" id="dockSaveButton" type="button">保存订单</button>
+</div>
+
+<dialog id="authDialog" aria-labelledby="authTitle">
+  <div class="dialog-head">
+    <div>
+      <h2 id="authTitle">Round 4 账号</h2>
+      <p>账号会与现有拼团页面共用登录凭证。</p>
+    </div>
+    <button class="dialog-close" id="closeAuthButton" type="button" aria-label="关闭账号窗口">×</button>
+  </div>
+  <div class="auth-tabs" role="tablist" aria-label="账号操作">
+    <button class="auth-tab" id="registerTab" type="button" role="tab" aria-selected="true" aria-controls="authForm">新用户注册</button>
+    <button class="auth-tab" id="loginTab" type="button" role="tab" aria-selected="false" aria-controls="authForm">已有账号登录</button>
+  </div>
+  <form class="auth-form" id="authForm">
+    <div class="field">
+      <label for="authName">群内昵称</label>
+      <input id="authName" name="name" type="text" maxlength="50" autocomplete="username" required>
+    </div>
+    <div class="field">
+      <label for="authPin" id="authPinLabel">设置 4～6 位数字密码</label>
+      <input id="authPin" name="pin" type="password" minlength="4" maxlength="6" inputmode="numeric" pattern="[0-9]{4,6}" autocomplete="new-password" required>
+    </div>
+    <fieldset class="team-options" id="teamOptions">
+      <legend class="fieldset-label" style="grid-column:1/-1">选择所在分团</legend>
+      <label class="team-option"><input type="radio" name="team" value="1" required>1 团</label>
+      <label class="team-option"><input type="radio" name="team" value="2">2 团</label>
+      <label class="team-option"><input type="radio" name="team" value="3">3 团</label>
+      <label class="team-option"><input type="radio" name="team" value="4">4 团</label>
+      <label class="team-option"><input type="radio" name="team" value="5">5 团</label>
+      <label class="team-option"><input type="radio" name="team" value="6">6 团</label>
+    </fieldset>
+    <p class="auth-error" id="authError" role="alert"></p>
+    <button class="button auth-submit" id="authSubmitButton" type="submit">注册并进入 Round 4</button>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<footer class="footer">Clawd Sticker Group Buy · Round 4 preview</footer>
+
+<script>
+(() => {
+  'use strict';
+
+  const ROUND_ID = 'round4';
+  const SUPABASE_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
+  const PUBLIC_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
+  const EDGE_BASE = `${SUPABASE_URL}/functions/v1`;
+  const TOKEN_KEY = 'gb2_ef_token';
+  const MAX_QUANTITY = 10000;
+  const TYPE_LABELS = { dc: 'DC', holo: 'Holo', glt: 'GLT', other: 'Other' };
+  const ROUND_STATUS = {
+    draft: '草稿预览',
+    open: '可填写订单',
+    locked: '订单已截止',
+    payment: '付款与核账中',
+    shipping: '发货处理中',
+    closed: '本轮已结束'
+  };
+  const ORDER_STATUS = {
+    draft: '可编辑',
+    locked: '已锁单',
+    cancelled: '已取消',
+    fulfilled: '已完成'
+  };
+
+  const state = {
+    account: null,
+    data: null,
+    draft: new Map(),
+    dirty: false,
+    addressDirty: false,
+    authMode: 'register',
+    busyAction: '',
+    unavailable: null,
+    orphanItems: [],
+    toastTimer: null,
+    sessionExpired: false
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const elements = {
+    roundTitle: $('roundTitle'),
+    roundMeta: $('roundMeta'),
+    catalogGrid: $('catalogGrid'),
+    catalogEmpty: $('catalogEmpty'),
+    catalogEmptyTitle: $('catalogEmptyTitle'),
+    catalogEmptyText: $('catalogEmptyText'),
+    catalogDescription: $('catalogDescription'),
+    signinNudge: $('signinNudge'),
+    workspaceSection: $('workspaceSection'),
+    membersSection: $('membersSection'),
+    memberGrid: $('memberGrid'),
+    authDialog: $('authDialog'),
+    authForm: $('authForm'),
+    authError: $('authError'),
+    toast: $('toast'),
+    saveDock: $('saveDock')
+  };
+
+  class ApiError extends Error {
+    constructor(message, status = 0, code = '') {
+      super(message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.code = code;
+    }
+  }
+
+  function getToken() {
+    return localStorage.getItem(TOKEN_KEY) || '';
+  }
+
+  function saveToken(token) {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+  }
+
+  function clearToken() {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+
+  function setConnection(mode, text) {
+    const wrapper = $('connectionState');
+    wrapper.classList.remove('online', 'offline');
+    if (mode) wrapper.classList.add(mode);
+    $('connectionText').textContent = text;
+  }
+
+  function showToast(message, kind = 'info') {
+    clearTimeout(state.toastTimer);
+    elements.toast.textContent = message;
+    elements.toast.classList.toggle('error', kind === 'error');
+    elements.toast.classList.add('show');
+    state.toastTimer = setTimeout(() => elements.toast.classList.remove('show'), 3600);
+  }
+
+  function handleSessionExpired() {
+    if (state.sessionExpired) return;
+    state.sessionExpired = true;
+    clearToken();
+    state.account = null;
+    state.data = null;
+    state.draft = new Map();
+    state.dirty = false;
+    showToast('登录已过期，请重新登录。未提交的服务端操作没有生效。', 'error');
+    renderAll();
+    openAuth('login');
+  }
+
+  async function callEdge(functionName, body, options = {}) {
+    const { requiresAuth = false, timeoutMs = 20000 } = options;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const headers = {
+      apikey: PUBLIC_ANON_KEY,
+      'Content-Type': 'application/json'
+    };
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    try {
+      const response = await fetch(`${EDGE_BASE}/${functionName}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+      if (!response.ok) {
+        if (response.status === 401 && requiresAuth) handleSessionExpired();
+        throw new ApiError(data.error || `请求失败（HTTP ${response.status}）`, response.status, data.code || '');
+      }
+      setConnection('online', '服务端已连接');
+      return data;
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      setConnection('offline', navigator.onLine ? '连接失败' : '设备已离线');
+      if (error && error.name === 'AbortError') throw new ApiError('请求超时，请稍后重试');
+      throw new ApiError(navigator.onLine ? '网络连接失败，请稍后重试' : '当前设备离线，请联网后重试');
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function parseAccount(payload) {
+    return {
+      id: payload.account_id || '',
+      name: String(payload.name || ''),
+      displayName: String(payload.display_name || payload.name || ''),
+      role: String(payload.role || 'member'),
+      team: Number(payload.team) || 0
+    };
+  }
+
+  function validateCatalogPayload(payload) {
+    if (!payload || typeof payload !== 'object' || !payload.round || typeof payload.round !== 'object') {
+      throw new ApiError('服务端返回的 Round 4 数据格式不完整');
+    }
+    return {
+      ...payload,
+      products: Array.isArray(payload.products) ? payload.products : [],
+      members: Array.isArray(payload.members) ? payload.members : []
+    };
+  }
+
+  async function restoreSession() {
+    if (!getToken()) return false;
+    state.sessionExpired = false;
+    try {
+      const session = await callEdge('auth', { action: 'session' }, { requiresAuth: true });
+      saveToken(session.token);
+      state.account = parseAccount(session);
+      return true;
+    } catch (error) {
+      if (error.status !== 401) showToast(`账号恢复失败：${error.message}`, 'error');
+      return false;
+    }
+  }
+
+  async function loadPublicCatalog() {
+    state.unavailable = null;
+    try {
+      const payload = await callEdge('group-buy', { action: 'catalog', round_id: ROUND_ID });
+      state.data = validateCatalogPayload(payload);
+      syncDraftFromServer();
+    } catch (error) {
+      state.data = null;
+      if (error.status === 404) {
+        state.unavailable = {
+          kind: 'draft',
+          title: 'Round 4 仍在准备中',
+          message: '服务端目录目前仍为草稿或尚未开放。这里不会填入占位商品、日期或猜测金额；正式配置后会自动显示。'
+        };
+      } else {
+        state.unavailable = {
+          kind: 'error',
+          title: '暂时读不到 Round 4 目录',
+          message: error.message
+        };
+      }
+    }
+  }
+
+  async function loadBootstrap({ preserveDraft = false } = {}) {
+    state.unavailable = null;
+    try {
+      const payload = await callEdge('group-buy', { action: 'bootstrap', round_id: ROUND_ID }, { requiresAuth: true });
+      const data = validateCatalogPayload(payload);
+      state.data = data;
+      if (data.me && data.me.account) {
+        state.account = {
+          ...state.account,
+          displayName: String(data.me.account.display_name || state.account.displayName),
+          team: Number(data.me.account.team) || state.account.team,
+          role: String(data.me.account.role || state.account.role)
+        };
+      }
+      if (!preserveDraft || !state.dirty) syncDraftFromServer();
+      else detectOrphanItems();
+      populateAddressForm(false);
+    } catch (error) {
+      if (error.status === 401) {
+        await loadPublicCatalog();
+        return;
+      }
+      if (error.status === 404) {
+        state.data = null;
+        state.unavailable = {
+          kind: 'draft',
+          title: 'Round 4 仍在准备中',
+          message: '当前账号暂时看不到草稿目录。等服务端开放 Round 4 后，本页会直接加载正式配置。'
+        };
+        return;
+      }
+      throw error;
+    }
+  }
+
+  async function refreshData({ manual = false } = {}) {
+    if (state.busyAction) return;
+    if (manual && state.dirty) {
+      const discard = window.confirm('当前数量还没有保存。刷新会放弃这些本地修改，继续吗？');
+      if (!discard) return;
+      state.dirty = false;
+    }
+    setConnection('', '正在同步');
+    elements.catalogGrid.setAttribute('aria-busy', 'true');
+    try {
+      if (state.account && getToken()) await loadBootstrap();
+      else await loadPublicCatalog();
+      renderAll();
+      if (manual && !state.unavailable) showToast('Round 4 数据已刷新');
+    } catch (error) {
+      setConnection('offline', '同步失败');
+      showToast(`刷新失败：${error.message}`, 'error');
+      renderAll();
+    } finally {
+      elements.catalogGrid.setAttribute('aria-busy', 'false');
+    }
+  }
+
+  function products() {
+    return state.data && Array.isArray(state.data.products) ? state.data.products : [];
+  }
+
+  function ownOrder() {
+    return state.data && state.data.me ? state.data.me.order || null : null;
+  }
+
+  function ownMember() {
+    const order = ownOrder();
+    if (!order || !state.data) return null;
+    return state.data.members.find((member) => member.order_id === order.id) || null;
+  }
+
+  function paymentFor(kind) {
+    const member = ownMember();
+    if (!member || !Array.isArray(member.payment_statuses)) return null;
+    return member.payment_statuses.find((payment) => payment.kind === kind) || null;
+  }
+
+  function ownShipment() {
+    return state.data && state.data.me ? state.data.me.shipment || null : null;
+  }
+
+  function ownAddress() {
+    return state.data && state.data.me ? state.data.me.address || null : null;
+  }
+
+  function syncDraftFromServer() {
+    const next = new Map();
+    for (const product of products()) next.set(String(product.product_id), 0);
+    const order = ownOrder();
+    if (order && Array.isArray(order.items)) {
+      for (const item of order.items) {
+        if (next.has(String(item.product_id))) next.set(String(item.product_id), clampQuantity(item.quantity));
+      }
+    }
+    state.draft = next;
+    state.dirty = false;
+    detectOrphanItems();
+  }
+
+  function detectOrphanItems() {
+    const knownIds = new Set(products().map((product) => String(product.product_id)));
+    const order = ownOrder();
+    state.orphanItems = order && Array.isArray(order.items)
+      ? order.items.filter((item) => Number(item.quantity) > 0 && !knownIds.has(String(item.product_id)))
+      : [];
+  }
+
+  function clampQuantity(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(0, Math.min(MAX_QUANTITY, Math.trunc(number)));
+  }
+
+  function selectedCount() {
+    let total = 0;
+    for (const quantity of state.draft.values()) total += clampQuantity(quantity);
+    return total;
+  }
+
+  function canEditOrder() {
+    const round = state.data && state.data.round;
+    const order = ownOrder();
+    return Boolean(
+      state.account &&
+      round &&
+      round.status === 'open' &&
+      !state.busyAction &&
+      (!order || order.status === 'draft') &&
+      state.orphanItems.length === 0
+    );
+  }
+
+  function setQuantity(productId, value, { render = true } = {}) {
+    if (!canEditOrder()) return;
+    state.draft.set(productId, clampQuantity(value));
+    state.dirty = true;
+    if (render) renderCatalog();
+    renderOrderPanel();
+    renderSaveDock();
+  }
+
+  function fullOrderSnapshot() {
+    return products().map((product) => ({
+      product_id: String(product.product_id),
+      quantity: clampQuantity(state.draft.get(String(product.product_id)) || 0)
+    }));
+  }
+
+  function setBusy(action) {
+    state.busyAction = action;
+    renderCatalog();
+    renderOrderPanel();
+    renderPayments();
+    renderSaveDock();
+    $('saveAddressButton').disabled = Boolean(action);
+    $('recipientInput').disabled = Boolean(action);
+    $('phoneInput').disabled = Boolean(action);
+    $('addressInput').disabled = Boolean(action);
+    $('refreshButton').disabled = Boolean(action);
+  }
+
+  async function submitOrder(action) {
+    if (!state.account) {
+      openAuth('login');
+      return;
+    }
+    if (!canEditOrder()) {
+      showToast('当前订单或轮次不可编辑', 'error');
+      return;
+    }
+    if (action === 'lock_order') {
+      if (selectedCount() < 1) {
+        showToast('请至少选择一件商品再锁单', 'error');
+        return;
+      }
+      const confirmed = window.confirm('锁单后不能自行修改。确认锁定当前完整订单快照吗？');
+      if (!confirmed) return;
+    }
+
+    const localDraft = new Map(state.draft);
+    setBusy(action);
+    try {
+      const result = await callEdge('group-buy', {
+        action,
+        round_id: ROUND_ID,
+        team: state.account.team,
+        expected_version: ownOrder() ? Number(ownOrder().version) : 0,
+        items: fullOrderSnapshot()
+      }, { requiresAuth: true });
+      if (result.order) {
+        if (!state.data.me) state.data.me = {};
+        state.data.me.order = {
+          ...(ownOrder() || {}),
+          id: result.order.order_id,
+          team: state.account.team,
+          version: result.order.version,
+          status: result.order.status,
+          locked_at: result.order.locked_at,
+          items: Array.isArray(result.order.items) ? result.order.items : []
+        };
+      }
+      state.dirty = false;
+      await loadBootstrap();
+      renderAll();
+      showToast(action === 'lock_order' ? '订单已锁定' : '完整订单快照已保存');
+    } catch (error) {
+      if (error.status === 409) {
+        state.draft = localDraft;
+        state.dirty = true;
+        try {
+          await loadBootstrap({ preserveDraft: true });
+        } catch (refreshError) {
+          showToast(`订单版本冲突，且刷新失败：${refreshError.message}`, 'error');
+        }
+        renderAll();
+        showToast('检测到其他设备更新：已同步最新版本并保留本地数量，请核对后再次保存。', 'error');
+      } else {
+        state.draft = localDraft;
+        state.dirty = true;
+        renderAll();
+        showToast(`${action === 'lock_order' ? '锁单' : '保存'}失败：${error.message}`, 'error');
+      }
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function confirmPayment(kind) {
+    const payment = paymentFor(kind);
+    const set = !(payment && payment.member_confirmed_at);
+    setBusy(`payment-${kind}`);
+    try {
+      await callEdge('group-buy', {
+        action: 'confirm_payment',
+        round_id: ROUND_ID,
+        kind,
+        set
+      }, { requiresAuth: true });
+      await loadBootstrap();
+      renderAll();
+      showToast(set ? '付款状态已提交，等待团长核实' : '已撤销本人付款确认');
+    } catch (error) {
+      showToast(`付款状态更新失败：${error.message}`, 'error');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function saveAddress(event) {
+    event.preventDefault();
+    if (!state.account) {
+      openAuth('login');
+      return;
+    }
+    const form = $('addressForm');
+    if (!form.reportValidity()) return;
+    setBusy('address');
+    try {
+      const result = await callEdge('group-buy', {
+        action: 'save_address',
+        round_id: ROUND_ID,
+        address: {
+          label: '默认地址',
+          recipient: $('recipientInput').value.trim(),
+          phone: $('phoneInput').value.trim(),
+          address: $('addressInput').value.trim()
+        }
+      }, { requiresAuth: true });
+      if (!state.data.me) state.data.me = {};
+      state.data.me.address = result.address || null;
+      state.addressDirty = false;
+      await loadBootstrap({ preserveDraft: true });
+      renderAll();
+      showToast('收货地址已保存');
+    } catch (error) {
+      showToast(`地址保存失败：${error.message}`, 'error');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  function safeHttpUrl(value) {
+    try {
+      const url = new URL(String(value || ''), window.location.href);
+      return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function formatDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+    }).format(date);
+  }
+
+  function formatMoney(cents) {
+    if (cents === null || cents === undefined || cents === '') return '待服务端录入';
+    const value = Number(cents);
+    if (!Number.isSafeInteger(value) || value < 0) return '服务端金额无效';
+    return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value / 100);
+  }
+
+  function compactValue(value) {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '—';
+    if (typeof value === 'string') return value.slice(0, 60);
+    try {
+      return JSON.stringify(value).slice(0, 80);
+    } catch {
+      return '—';
+    }
+  }
+
+  function tierDescription(tier, index) {
+    const prefix = `档位 ${index + 1}`;
+    if (Array.isArray(tier)) {
+      if (tier.length >= 2) return `${prefix}：门槛 ${compactValue(tier[0])} · 目录价 ${compactValue(tier[1])}`;
+      return `${prefix}：${compactValue(tier)}`;
+    }
+    if (tier && typeof tier === 'object') {
+      const threshold = tier.min_quantity ?? tier.min_qty ?? tier.quantity ?? tier.qty ?? tier.threshold;
+      const priceEntries = [
+        ['price_cents', tier.price_cents],
+        ['price_cny', tier.price_cny ?? tier.cny],
+        ['price_usd', tier.price_usd ?? tier.usd],
+        ['price', tier.unit_price ?? tier.price]
+      ];
+      const entry = priceEntries.find(([, value]) => value !== undefined && value !== null);
+      let price = entry ? compactValue(entry[1]) : compactValue(tier);
+      if (entry && entry[0] === 'price_cents' && Number.isSafeInteger(Number(entry[1]))) price = formatMoney(Number(entry[1]));
+      if (entry && entry[0] === 'price_cny') price = `¥${compactValue(entry[1])}`;
+      if (entry && entry[0] === 'price_usd') price = `$${compactValue(entry[1])}`;
+      return `${prefix}${threshold !== undefined ? `：门槛 ${compactValue(threshold)} · ` : '：'}目录价 ${price}`;
+    }
+    return `${prefix}：目录价 ${compactValue(tier)}`;
+  }
+
+  function createElement(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function renderHeader() {
+    const round = state.data && state.data.round;
+    elements.roundTitle.textContent = round && round.title ? String(round.title) : 'Round 4 贴纸拼团';
+    document.title = `${elements.roundTitle.textContent} · 功能预览`;
+    elements.roundMeta.replaceChildren();
+    if (round) {
+      const status = createElement('span', `status-pill ${round.status === 'open' ? 'active' : 'warning'}`, ROUND_STATUS[round.status] || String(round.status));
+      elements.roundMeta.append(status);
+      const orderDeadline = formatDate(round.order_deadline);
+      const paymentDeadline = formatDate(round.payment_deadline);
+      if (orderDeadline) elements.roundMeta.append(createElement('span', 'status-pill', `订单截止：${orderDeadline}`));
+      if (paymentDeadline) elements.roundMeta.append(createElement('span', 'status-pill', `付款截止：${paymentDeadline}`));
+    } else {
+      elements.roundMeta.append(createElement('span', 'status-pill warning', state.unavailable && state.unavailable.kind === 'draft' ? '目录尚未开放' : '等待服务端数据'));
+    }
+
+    const loggedIn = Boolean(state.account);
+    $('accountChip').hidden = !loggedIn;
+    $('logoutButton').hidden = !loggedIn;
+    $('authButton').hidden = loggedIn;
+    if (loggedIn) {
+      $('accountName').textContent = state.account.displayName;
+      $('accountTeam').textContent = state.account.team ? `${state.account.team}团` : '—';
+    }
+  }
+
+  function renderCatalogEmpty() {
+    elements.catalogGrid.replaceChildren();
+    elements.catalogEmpty.hidden = false;
+    const unavailable = state.unavailable;
+    if (unavailable) {
+      elements.catalogEmptyTitle.textContent = unavailable.title;
+      elements.catalogEmptyText.textContent = unavailable.message;
+      $('emptyRetryButton').hidden = unavailable.kind === 'draft';
+      elements.catalogDescription.textContent = unavailable.kind === 'draft'
+        ? '草稿状态不会泄露未确认商品与金额。'
+        : '服务端读取失败，稍后可重新尝试。';
+    } else {
+      elements.catalogEmptyTitle.textContent = '目录已建立，但还没有可用商品';
+      elements.catalogEmptyText.textContent = '服务端尚未配置 active 商品。页面不会自行补入产品或业务金额。';
+      $('emptyRetryButton').hidden = false;
+      elements.catalogDescription.textContent = '等待服务端配置正式商品目录。';
+    }
+  }
+
+  function createMedia(product) {
+    const wrap = createElement('div', 'product-media');
+    const imageUrl = safeHttpUrl(product.image_url);
+    const placeholder = () => {
+      const box = createElement('div', 'media-placeholder');
+      box.append(createElement('span', '', '◇'), createElement('div', '', '图片待服务端配置'));
+      wrap.replaceChildren(box);
+    };
+    if (!imageUrl) {
+      placeholder();
+      return wrap;
+    }
+    const image = document.createElement('img');
+    image.src = imageUrl;
+    image.alt = `${String(product.name || product.product_id)} 商品图`;
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
+    image.addEventListener('error', placeholder, { once: true });
+    wrap.append(image);
+    return wrap;
+  }
+
+  function createProductCard(product) {
+    const productId = String(product.product_id || '');
+    const name = String(product.name || productId || '未命名商品');
+    const quantity = clampQuantity(state.draft.get(productId) || 0);
+    const editable = canEditOrder();
+    const card = createElement('article', 'product-card');
+    card.append(createMedia(product));
+
+    const titleRow = createElement('div', 'product-title-row');
+    const title = createElement('div', 'product-title');
+    title.append(createElement('h3', '', name));
+    const details = [product.size_label, productId ? `#${productId}` : ''].filter(Boolean).join(' · ');
+    if (details) title.append(createElement('p', '', details));
+    const type = String(product.product_type || 'other').toLowerCase();
+    titleRow.append(title, createElement('span', `type-badge ${type}`, TYPE_LABELS[type] || type));
+    card.append(titleRow);
+
+    const pricePreview = createElement('div', 'price-preview');
+    pricePreview.append(createElement('p', 'price-preview-title', '商品目录价格预览'));
+    const tiers = Array.isArray(product.price_tiers) ? product.price_tiers : [];
+    const tierList = createElement('ul', 'tier-list');
+    if (tiers.length) {
+      tiers.forEach((tier, index) => tierList.append(createElement('li', '', tierDescription(tier, index))));
+    } else {
+      tierList.append(createElement('li', '', '价格档位尚未配置'));
+    }
+    pricePreview.append(tierList, createElement('p', 'catalog-disclaimer', '仅展示服务端 price_tiers；不是最终应付，页面不进行汇率、阶梯价或运费计算。'));
+    card.append(pricePreview);
+
+    const bottom = createElement('div', 'product-bottom');
+    const meta = createElement('div', 'product-meta');
+    const totalForProduct = state.data && Array.isArray(state.data.members)
+      ? state.data.members.reduce((sum, member) => {
+        const item = Array.isArray(member.items) ? member.items.find((entry) => entry.product_id === productId) : null;
+        return sum + (item ? clampQuantity(item.quantity) : 0);
+      }, 0)
+      : 0;
+    meta.append(createElement('span', '', state.account ? `全团已保存 ${totalForProduct} 件` : '登录后填写数量'));
+    const itemUrl = safeHttpUrl(product.item_url);
+    if (itemUrl) {
+      const link = createElement('a', 'product-link', '查看商品');
+      link.href = itemUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      meta.append(link);
+    }
+    bottom.append(meta);
+
+    const control = createElement('div', 'quantity-control');
+    const minus = createElement('button', '', '−');
+    minus.type = 'button';
+    minus.disabled = !editable || quantity <= 0;
+    minus.setAttribute('aria-label', `${name} 减少一件`);
+    minus.addEventListener('click', () => setQuantity(productId, quantity - 1));
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.max = String(MAX_QUANTITY);
+    input.step = '1';
+    input.value = String(quantity);
+    input.disabled = !editable;
+    input.setAttribute('aria-label', `${name} 数量`);
+    input.addEventListener('input', () => setQuantity(productId, input.value, { render: false }));
+    input.addEventListener('change', () => renderCatalog());
+    const plus = createElement('button', '', '+');
+    plus.type = 'button';
+    plus.disabled = !editable || quantity >= MAX_QUANTITY;
+    plus.setAttribute('aria-label', `${name} 增加一件`);
+    plus.addEventListener('click', () => setQuantity(productId, quantity + 1));
+    control.append(minus, input, plus);
+    bottom.append(control);
+    card.append(bottom);
+    return card;
+  }
+
+  function renderCatalog() {
+    const list = products();
+    elements.catalogGrid.replaceChildren();
+    elements.catalogEmpty.hidden = true;
+    elements.catalogGrid.setAttribute('aria-busy', 'false');
+    if (!state.data || list.length === 0) {
+      renderCatalogEmpty();
+      elements.signinNudge.hidden = true;
+      return;
+    }
+    elements.catalogDescription.textContent = `${list.length} 件服务端商品 · 数量保存为完整订单快照`;
+    for (const product of list) elements.catalogGrid.append(createProductCard(product));
+    elements.signinNudge.hidden = Boolean(state.account);
+  }
+
+  function paymentStatusText(payment) {
+    if (payment && payment.leader_confirmed_at) return { text: '团长已核实', className: 'leader' };
+    if (payment && payment.member_confirmed_at) return { text: '本人已确认，等待核实', className: 'member' };
+    return { text: '本人尚未确认', className: '' };
+  }
+
+  function shippingServerCents() {
+    const shippingPayment = paymentFor('shipping');
+    const shipment = ownShipment();
+    if (shippingPayment && shippingPayment.expected_cents !== null && shippingPayment.expected_cents !== undefined) return shippingPayment.expected_cents;
+    return shipment ? shipment.shipping_cents : null;
+  }
+
+  function createPaymentRow(kind, label, cents) {
+    const payment = paymentFor(kind);
+    const status = paymentStatusText(payment);
+    const row = createElement('div', 'payment-row');
+    const copy = createElement('div', '');
+    copy.append(createElement('h4', '', label));
+    copy.append(createElement('p', '', cents === null || cents === undefined ? '服务端应付：待录入，请勿按目录预览自行转账' : `服务端应付：${formatMoney(cents)}`));
+    copy.append(createElement('span', `payment-status ${status.className}`, status.text));
+    const button = createElement('button', 'button secondary', '');
+    button.type = 'button';
+    const leaderConfirmed = Boolean(payment && payment.leader_confirmed_at);
+    const memberConfirmed = Boolean(payment && payment.member_confirmed_at);
+    button.textContent = leaderConfirmed ? '已核实' : memberConfirmed ? '撤销本人确认' : `我已完成${kind === 'product' ? '商品' : '运费'}付款`;
+    button.disabled = Boolean(state.busyAction) || leaderConfirmed || cents === null || cents === undefined || !ownOrder();
+    button.addEventListener('click', () => confirmPayment(kind));
+    row.append(copy, button);
+    return row;
+  }
+
+  function renderPayments() {
+    const list = $('paymentList');
+    list.replaceChildren();
+    const productPayment = paymentFor('product');
+    list.append(
+      createPaymentRow('product', '商品款', productPayment ? productPayment.expected_cents : null),
+      createPaymentRow('shipping', '运费', shippingServerCents())
+    );
+  }
+
+  function line(label, value, extraClass = '') {
+    const wrapper = createElement('div', 'shipment-line');
+    wrapper.append(createElement('span', '', label), createElement('strong', extraClass, value));
+    return wrapper;
+  }
+
+  function renderShipment() {
+    const box = $('shipmentBox');
+    box.replaceChildren();
+    const shipment = ownShipment();
+    const address = ownAddress();
+    box.append(line('地址状态', address ? '已填写' : '尚未填写'));
+    box.append(line('发货状态', shipment && shipment.shipped_at ? `已发货 · ${formatDate(shipment.shipped_at) || '时间已记录'}` : '暂未发货'));
+    box.append(line('快递单号', shipment && shipment.tracking_number ? String(shipment.tracking_number) : '暂未录入', shipment && shipment.tracking_number ? 'tracking-code' : ''));
+    $('addressSummary').textContent = address ? '已填写' : '尚未填写';
+  }
+
+  function renderServerAmounts() {
+    const box = $('serverAmountBox');
+    box.replaceChildren();
+    const productPayment = paymentFor('product');
+    box.append(line('商品应付', formatMoney(productPayment ? productPayment.expected_cents : null)));
+    box.append(line('运费', formatMoney(shippingServerCents())));
+    box.append(line('合计', '本页不自行计算'));
+  }
+
+  function populateAddressForm(force) {
+    if (state.addressDirty && !force) return;
+    const address = ownAddress();
+    $('recipientInput').value = address ? String(address.recipient || '') : '';
+    $('phoneInput').value = address ? String(address.phone || '') : '';
+    $('addressInput').value = address ? String(address.address || '') : '';
+    state.addressDirty = false;
+  }
+
+  function renderOrderPanel() {
+    if (!state.account) return;
+    const order = ownOrder();
+    const editable = canEditOrder();
+    $('myTeamValue').textContent = state.account.team ? `${state.account.team} 团` : '未分团';
+    $('myItemCount').textContent = `${selectedCount()} 件`;
+    $('myOrderVersion').textContent = order ? `v${order.version}` : '未创建';
+    $('orderPanelHint').textContent = order
+      ? `服务端状态：${ORDER_STATUS[order.status] || order.status}${state.dirty ? ' · 有本地修改未保存' : ''}`
+      : state.dirty ? '新订单尚未保存。' : '还没有保存 Round 4 订单。';
+    $('saveOrderButton').disabled = !editable || !state.dirty || Boolean(state.busyAction);
+    $('dockSaveButton').disabled = !editable || !state.dirty || Boolean(state.busyAction);
+    $('lockOrderButton').disabled = !editable || selectedCount() < 1 || Boolean(state.busyAction);
+    $('lockOrderButton').textContent = order && order.status === 'locked' ? '订单已锁定' : '锁定订单';
+    $('orphanWarning').hidden = state.orphanItems.length === 0;
+    if (state.orphanItems.length) {
+      $('orphanWarning').textContent = `服务端订单含 ${state.orphanItems.length} 项已不在当前 active 目录中的商品。为避免静默删除旧订单行，本页已暂停保存，请联系团长处理目录。`;
+    }
+  }
+
+  function renderSaveDock() {
+    const show = Boolean(state.account && state.dirty);
+    elements.saveDock.hidden = !show;
+    if (!show) return;
+    $('saveDockTitle').textContent = `${selectedCount()} 件商品 · 数量有未保存修改`;
+    $('saveDockText').textContent = state.orphanItems.length ? '目录发生变化，暂不能覆盖服务端订单' : '将提交当前目录的完整订单快照';
+  }
+
+  function memberPaymentText(member, kind) {
+    const payment = Array.isArray(member.payment_statuses)
+      ? member.payment_statuses.find((entry) => entry.kind === kind)
+      : null;
+    if (payment && payment.leader_confirmed_at) return '已核实';
+    if (payment && payment.member_confirmed_at) return '待核实';
+    return '未确认';
+  }
+
+  function productName(productId) {
+    const product = products().find((entry) => String(entry.product_id) === String(productId));
+    return product ? String(product.name || productId) : String(productId);
+  }
+
+  function renderMembers() {
+    const grid = elements.memberGrid;
+    grid.replaceChildren();
+    if (!state.data || !state.account) return;
+    const teamValue = $('teamFilter').value;
+    const query = $('memberSearch').value.trim().toLocaleLowerCase('zh-CN');
+    const members = state.data.members
+      .slice()
+      .sort((a, b) => Number(a.team) - Number(b.team) || String(a.display_name).localeCompare(String(b.display_name), 'zh-CN'))
+      .filter((member) => teamValue === 'all' || String(member.team) === teamValue)
+      .filter((member) => !query || String(member.display_name || '').toLocaleLowerCase('zh-CN').includes(query));
+
+    $('membersDescription').textContent = `共 ${state.data.members.length} 个已创建订单的成员 · 当前显示 ${members.length} 人 · 不含地址与手机号`;
+    if (!members.length) {
+      const empty = createElement('div', 'empty-state member-empty');
+      empty.append(createElement('div', 'empty-symbol', '∅'), createElement('h3', '', '没有匹配的成员'), createElement('p', '', '换一个分团或昵称关键词再试。'));
+      grid.append(empty);
+      return;
+    }
+
+    const myOrderId = ownOrder() ? ownOrder().id : '';
+    for (const member of members) {
+      const card = createElement('article', `member-card ${member.order_id === myOrderId ? 'me' : ''}`);
+      const head = createElement('div', 'member-head');
+      const name = createElement('div', 'member-name');
+      name.append(createElement('strong', '', String(member.display_name || '未命名成员')));
+      name.append(createElement('span', '', `${ORDER_STATUS[member.status] || member.status}${member.order_id === myOrderId ? ' · 我' : ''}`));
+      head.append(name, createElement('span', 'team-badge', `${member.team} 团`));
+      card.append(head);
+
+      const items = Array.isArray(member.items) ? member.items.filter((item) => Number(item.quantity) > 0) : [];
+      const itemCount = items.reduce((sum, item) => sum + clampQuantity(item.quantity), 0);
+      const summary = createElement('div', 'member-summary');
+      const values = [
+        ['商品', `${itemCount} 件`],
+        ['商品款', memberPaymentText(member, 'product')],
+        ['运费', memberPaymentText(member, 'shipping')],
+        ['发货', member.shipping && member.shipping.shipped_at ? '已发货' : member.shipping && member.shipping.shipping_cents !== null && member.shipping.shipping_cents !== undefined ? '待发货' : '运费待录入']
+      ];
+      for (const [label, value] of values) {
+        const cell = createElement('span', '', label);
+        cell.append(createElement('strong', '', value));
+        summary.append(cell);
+      }
+      card.append(summary);
+
+      const details = document.createElement('details');
+      const detailsSummary = document.createElement('summary');
+      detailsSummary.textContent = items.length ? `查看 ${items.length} 项订单明细` : '订单内暂无商品';
+      details.append(detailsSummary);
+      if (items.length) {
+        const list = createElement('ul', 'item-list');
+        for (const item of items) {
+          const row = document.createElement('li');
+          row.append(createElement('span', '', productName(item.product_id)), createElement('strong', '', `× ${clampQuantity(item.quantity)}`));
+          list.append(row);
+        }
+        details.append(list);
+      }
+      card.append(details);
+      grid.append(card);
+    }
+  }
+
+  function renderTeamFilter() {
+    const select = $('teamFilter');
+    const current = select.value || 'all';
+    select.replaceChildren();
+    const all = document.createElement('option');
+    all.value = 'all';
+    all.textContent = '全部分团';
+    select.append(all);
+    const count = state.data && state.data.round ? Math.min(20, Math.max(1, Number(state.data.round.team_count) || 6)) : 6;
+    for (let team = 1; team <= count; team += 1) {
+      const option = document.createElement('option');
+      option.value = String(team);
+      option.textContent = `${team} 团`;
+      select.append(option);
+    }
+    select.value = [...select.options].some((option) => option.value === current) ? current : 'all';
+  }
+
+  function renderWorkspace() {
+    const visible = Boolean(state.account && state.data);
+    elements.workspaceSection.hidden = !visible;
+    elements.membersSection.hidden = !visible;
+    if (!visible) return;
+    renderOrderPanel();
+    renderPayments();
+    renderShipment();
+    renderServerAmounts();
+    renderTeamFilter();
+    renderMembers();
+    populateAddressForm(false);
+    const exportDisabled = !ownOrder();
+    $('copyOrderButton').disabled = exportDisabled;
+    $('exportOrderButton').disabled = exportDisabled;
+  }
+
+  function renderAll() {
+    renderHeader();
+    renderCatalog();
+    renderWorkspace();
+    renderSaveDock();
+  }
+
+  function setAuthMode(mode) {
+    state.authMode = mode === 'login' ? 'login' : 'register';
+    const registering = state.authMode === 'register';
+    $('registerTab').setAttribute('aria-selected', String(registering));
+    $('loginTab').setAttribute('aria-selected', String(!registering));
+    $('teamOptions').hidden = !registering;
+    $('authPinLabel').textContent = registering ? '设置 4～6 位数字密码' : '4～6 位数字密码';
+    $('authPin').autocomplete = registering ? 'new-password' : 'current-password';
+    $('authSubmitButton').textContent = registering ? '注册并进入 Round 4' : '登录 Round 4';
+    elements.authError.textContent = '';
+  }
+
+  function openAuth(mode = 'register') {
+    setAuthMode(mode);
+    if (!elements.authDialog.open) elements.authDialog.showModal();
+    requestAnimationFrame(() => $('authName').focus());
+  }
+
+  function closeAuth() {
+    if (elements.authDialog.open) elements.authDialog.close();
+  }
+
+  async function submitAuth(event) {
+    event.preventDefault();
+    elements.authError.textContent = '';
+    if (!elements.authForm.reportValidity()) return;
+    const registering = state.authMode === 'register';
+    const team = registering ? Number(new FormData(elements.authForm).get('team')) : undefined;
+    if (registering && (!Number.isInteger(team) || team < 1 || team > 6)) {
+      elements.authError.textContent = '请选择自己所在的 1～6 团';
+      return;
+    }
+    $('authSubmitButton').disabled = true;
+    $('authSubmitButton').textContent = registering ? '正在注册…' : '正在登录…';
+    try {
+      const payload = {
+        action: registering ? 'register' : 'login',
+        name: $('authName').value.trim(),
+        pin: $('authPin').value
+      };
+      if (registering) payload.team = team;
+      const result = await callEdge('auth', payload);
+      saveToken(result.token);
+      state.sessionExpired = false;
+      state.account = parseAccount(result);
+      state.addressDirty = false;
+      await loadBootstrap();
+      closeAuth();
+      elements.authForm.reset();
+      setAuthMode('register');
+      renderAll();
+      showToast(registering ? '账号已注册，欢迎来到 Round 4' : '登录成功');
+    } catch (error) {
+      elements.authError.textContent = error.message;
+    } finally {
+      $('authSubmitButton').disabled = false;
+      $('authSubmitButton').textContent = state.authMode === 'register' ? '注册并进入 Round 4' : '登录 Round 4';
+    }
+  }
+
+  function logout() {
+    if (state.dirty) {
+      const confirmed = window.confirm('还有未保存的数量修改。退出账号会放弃这些修改，继续吗？');
+      if (!confirmed) return;
+    }
+    clearToken();
+    state.account = null;
+    state.data = null;
+    state.draft = new Map();
+    state.dirty = false;
+    state.addressDirty = false;
+    state.sessionExpired = false;
+    refreshData();
+    showToast('已退出当前账号');
+  }
+
+  function paymentExportLine(kind, label) {
+    const payment = paymentFor(kind);
+    const cents = kind === 'shipping' ? shippingServerCents() : payment ? payment.expected_cents : null;
+    return `${label}：${formatMoney(cents)} · ${paymentStatusText(payment).text}`;
+  }
+
+  function orderExportText() {
+    const order = ownOrder();
+    if (!order || !state.account) return '';
+    const round = state.data.round || {};
+    const lines = [
+      `${String(round.title || 'Round 4 贴纸拼团')} - 我的订单`,
+      `昵称：${state.account.displayName}`,
+      `分团：${state.account.team} 团`,
+      `订单状态：${ORDER_STATUS[order.status] || order.status}`,
+      `订单版本：v${order.version}`,
+      ''
+    ];
+    const items = Array.isArray(order.items) ? order.items.filter((item) => Number(item.quantity) > 0) : [];
+    lines.push('商品：');
+    if (!items.length) lines.push('- 暂无商品');
+    for (const item of items) lines.push(`- ${productName(item.product_id)} × ${clampQuantity(item.quantity)}`);
+    lines.push('', `总件数：${items.reduce((sum, item) => sum + clampQuantity(item.quantity), 0)}`);
+    lines.push(paymentExportLine('product', '商品应付（服务端）'));
+    lines.push(paymentExportLine('shipping', '运费（服务端）'));
+    lines.push(`地址状态：${ownAddress() ? '已填写' : '未填写'}`);
+    lines.push(`发货状态：${ownShipment() && ownShipment().shipped_at ? '已发货' : '暂未发货'}`);
+    lines.push(`快递单号：${ownShipment() && ownShipment().tracking_number ? ownShipment().tracking_number : '暂未录入'}`);
+    lines.push('', '说明：商品目录价格仅供预览；本页没有自行计算最终应付金额。');
+    return lines.join('\n');
+  }
+
+  async function copyOrder() {
+    const text = orderExportText();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('订单已复制到剪贴板');
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.append(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      showToast(copied ? '订单已复制到剪贴板' : '复制失败，请使用下载订单', copied ? 'info' : 'error');
+    }
+  }
+
+  function exportOrder() {
+    const text = orderExportText();
+    if (!text) return;
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const safeName = state.account.displayName.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40) || 'member';
+    link.href = url;
+    link.download = `Round4_${safeName}_订单.txt`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('订单文件已导出');
+  }
+
+  async function initialize() {
+    setConnection('', '正在连接');
+    const restored = await restoreSession();
+    try {
+      if (restored && state.account) await loadBootstrap();
+      else await loadPublicCatalog();
+    } catch (error) {
+      state.unavailable = { kind: 'error', title: 'Round 4 数据加载失败', message: error.message };
+      showToast(`初始化失败：${error.message}`, 'error');
+    }
+    renderAll();
+  }
+
+  $('authButton').addEventListener('click', () => openAuth('register'));
+  $('nudgeAuthButton').addEventListener('click', () => openAuth('register'));
+  $('logoutButton').addEventListener('click', logout);
+  $('closeAuthButton').addEventListener('click', closeAuth);
+  $('registerTab').addEventListener('click', () => setAuthMode('register'));
+  $('loginTab').addEventListener('click', () => setAuthMode('login'));
+  elements.authForm.addEventListener('submit', submitAuth);
+  $('refreshButton').addEventListener('click', () => refreshData({ manual: true }));
+  $('emptyRetryButton').addEventListener('click', () => refreshData({ manual: true }));
+  $('saveOrderButton').addEventListener('click', () => submitOrder('save_order'));
+  $('dockSaveButton').addEventListener('click', () => submitOrder('save_order'));
+  $('lockOrderButton').addEventListener('click', () => submitOrder('lock_order'));
+  $('addressForm').addEventListener('submit', saveAddress);
+  $('addressForm').addEventListener('input', () => { state.addressDirty = true; });
+  $('teamFilter').addEventListener('change', renderMembers);
+  $('memberSearch').addEventListener('input', renderMembers);
+  $('copyOrderButton').addEventListener('click', copyOrder);
+  $('exportOrderButton').addEventListener('click', exportOrder);
+  window.addEventListener('online', () => {
+    setConnection('', '网络已恢复，正在同步');
+    if (!state.dirty && !state.busyAction) refreshData();
+  });
+  window.addEventListener('offline', () => setConnection('offline', '设备已离线'));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !state.dirty && !state.busyAction && state.account) refreshData();
+  });
+  setInterval(() => {
+    if (document.visibilityState === 'visible' && state.account && !state.dirty && !state.busyAction) refreshData();
+  }, 45000);
+
+  initialize();
+})();
+</script>
+</body>
+</html>

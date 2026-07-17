@@ -114,8 +114,8 @@ section{padding:14px}
 
 .th-type{font-size:9px;font-weight:400;display:block;margin-top:2px}
 
-.nick-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center}
-.nick-popup{background:#fff;border-radius:16px;padding:28px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+.nick-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box}
+.nick-popup{background:#fff;border-radius:16px;padding:28px;max-width:360px;width:90%;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center;box-sizing:border-box}
 .nick-popup h3{color:var(--primary);font-size:18px;margin-bottom:8px}
 .nick-popup p{font-size:13px;color:var(--text2);margin-bottom:16px}
 .nick-popup input{width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;text-align:center;margin-bottom:14px}
@@ -238,9 +238,9 @@ section{padding:14px}
 .locked-input{opacity:.5;pointer-events:none}
 .lock-notice{font-size:12px;color:var(--danger);font-weight:500;margin-left:8px}
 
-.pay-qr-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:none;align-items:center;justify-content:center}
+.pay-qr-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;display:none;align-items:center;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box}
 .pay-qr-overlay.on{display:flex}
-.pay-qr-popup{background:#fff;border-radius:16px;padding:28px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+.pay-qr-popup{background:#fff;border-radius:16px;padding:28px;max-width:380px;width:90%;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center;box-sizing:border-box}
 .pay-qr-popup h3{color:var(--primary);font-size:18px;margin-bottom:4px}
 .pay-qr-popup .pay-qr-leader{font-size:13px;color:var(--text2);margin-bottom:16px}
 .pay-qr-popup img{width:240px;height:240px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.1);margin-bottom:16px;object-fit:contain;background:#f9f9f9}
@@ -262,6 +262,8 @@ section{padding:14px}
 .btn-pay-confirm:disabled{opacity:.7;cursor:not-allowed;transform:none}
 .btn-pay-confirm.self-confirmed{background:linear-gradient(135deg,#E8714A,#D4623E)}
 .btn-pay-confirm.confirmed{background:linear-gradient(135deg,#2D8B5E,#247A50)}
+#reminderOverlay{overflow-y:auto;padding:16px;box-sizing:border-box}
+#reminderOverlay>div{max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;box-sizing:border-box}
 
 @media(max-width:768px){
 .pay-action-bar{display:grid;grid-template-columns:1fr;gap:10px;max-width:none}
@@ -440,7 +442,6 @@ section{padding:14px}
 
 <footer>Claude Code Sticker Drop · Made with love by Sylux</footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 /* jshint esversion: 8, browser: true */
 // ============ CONFIG ============
@@ -457,11 +458,33 @@ function efAuthHeaders() {
 async function callEF(fn, body) {
   const r = await fetch(EF_BASE + '/' + fn, { method: 'POST', headers: efAuthHeaders(), body: JSON.stringify(body) });
   let data; try { data = await r.json(); } catch { data = { error: 'HTTP ' + r.status }; }
-  if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+  if (!r.ok) {
+    const credentialFailure = fn === 'auth' && ['login', 'change_pin'].includes(body && body.action);
+    if (r.status === 401 && !credentialFailure) efClearToken();
+    const error = new Error(data.error || ('HTTP ' + r.status));
+    error.status = r.status;
+    throw error;
+  }
   return data;
 }
 function efSaveToken(t) { if (t) localStorage.setItem('gb2_ef_token', t); }
+function efClearToken() { localStorage.removeItem('gb2_ef_token'); }
 function efHasToken() { return !!localStorage.getItem('gb2_ef_token'); }
+async function restoreAccountSession() {
+  if (!efHasToken()) return false;
+  try {
+    const session = await callEF('auth', {action: 'session'});
+    efSaveToken(session.token);
+    myName = session.name;
+    myTeam = session.team || myTeam;
+    localStorage.setItem('gb2_nickname', myName);
+    localStorage.setItem('gb2_team', myTeam);
+    return true;
+  } catch (error) {
+    efClearToken();
+    return false;
+  }
+}
 async function callAdminEF(action, params) {
   try { return await callEF('admin', {action, ...(params || {})}); }
   catch(e) { console.error('admin EF '+action+' failed:', e); alert(action + ' 失败：' + e.message); throw e; }
@@ -578,7 +601,8 @@ const TYPE_CLS = {dc:'badge-dc', holo:'badge-holo', glt:'badge-glt'};
 function r2(n) { return Math.round(n * 100) / 100; }
 function unitPrice(sticker, qty) {
   const tiers = sticker.t;
-  if (qty <= 0) return tiers[0][1] / tiers[0][0];
+  // 低于 MOQ 时按首档单张价预估，避免首档为 10 张时 qty=1~9 出现 0/0 → NaN。
+  if (qty <= tiers[0][0]) return tiers[0][1] / tiers[0][0];
   let lower = tiers[0], upper = null;
   for (let i = 0; i < tiers.length; i++) {
     if (qty >= tiers[i][0]) lower = tiers[i];
@@ -601,17 +625,25 @@ S.forEach(s => { DROP_UNIT_PRICES[s.id] = unitPrice(s, R3_TOTALS[s.id] || 0) * D
 let myName = localStorage.getItem('gb2_nickname') || '';
 let myTeam = parseInt(localStorage.getItem('gb2_team')) || 4;
 let allOrders = {}, allTeams = {}, allJoinOrder = {}, globalSeqMap = {};
-let rate = 7.10, sb = null, connected = false, hideEmptyOrders = true;
+let rate = 7.10, connected = false, hideEmptyOrders = true;
 let allLocked = {}; // {name:true} 个人锁单(存 orders.drop_r3__locked, 锁了不可改/不可解)
 function iAmLocked() { return !!allLocked[myName]; }
 let renderTimer = null, pendingChanges = {};
+let orderMutationQueue = Promise.resolve();
+let clearMutationPending = false;
 let collapsedTeams = {}; // {team: bool} — true=折叠；未设置时默认折叠（除自己那行 .my-row 会穿透显示）
 const PENDING_DRAFT_KEY = 'drop_r3_pending_changes';
 let allPaySelf = {}, allPayLeader = {}, allActualPaid = {};
-// R3已确认订单的人(名字在 r3__actual_paid 名单里)→ 运费随R3一起付,本页不填地址/不付运费
+// R3 有商品订单的人 → 运费与掉落合并到 R3，一律不在本页重复填地址/付运费。
+// r3PaidNames 只用于判断 R3 跑单库存；跨页发货判断必须看真实商品订单，不能看实付伪列。
 let r3PaidNames = new Set();
-function hasR3Order() { return r3PaidNames.has(myName); }
+let r3OrdersByName = {}; // {name: {r3_product_id: quantity}}
+let r3OrderNames = new Set();
+function hasR3Order(name = myName) { return r3OrderNames.has(name); }
 let allAddressesCache = {}; // {displayName: {recipient, phone, address, ...}} — Round3-only 地址
+let allShippingSummary = {}; // {displayName: {has_address, shipping_cents}} — 无 PII 的全员运费摘要
+let addressLoadRevision = 0;
+let addressInputRevision = 0;
 const ROUND3_ADDRESS_PREFIX = 'r3__';
 
 function addressStorageKey(name) {
@@ -630,8 +662,26 @@ function cacheRound3Address(row) {
   return displayName;
 }
 
+function cacheShippingSummary(row) {
+  const displayName = row && String(row.name || '').trim();
+  if (!displayName) return;
+  allShippingSummary[displayName] = {
+    has_address: row.has_address === true,
+    shipping_cents: Number.isInteger(row.shipping_cents) ? row.shipping_cents : null
+  };
+}
+
 // ============ HELPERS ============
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function jsArg(value) {
+  return JSON.stringify(String(value ?? ''))
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
 function hasOrders(name) { const o = allOrders[name]; return o && Object.values(o).some(q => q > 0); }
 function isAdmin(name) { return ADMIN_NAMES.includes(name); }
 function isLeaderOf(name, team) { return TEAM_LEADERS[team] === name || isAdmin(name); }
@@ -649,6 +699,8 @@ function getRemainingStock(stickerObj) {
 // ============ SHIPPING HELPERS (ported from round3.html) ============
 // 掉落-only 用户运费的偏远地区附加(按地址字符串判定); R3已付的人这里不收运费,extra无意义
 function dropshipExtraFor(name) {
+  const summary = allShippingSummary[name];
+  if (summary && Number.isInteger(summary.shipping_cents)) return Math.max(0, summary.shipping_cents / 100 - DROPSHIP_FEE);
   const addr = (allAddressesCache[name] && allAddressesCache[name].address) || '';
   if (!addr) return 0;
   if (addr.includes('新疆') || addr.includes('西藏')) return 13;
@@ -658,12 +710,12 @@ function dropshipExtraFor(name) {
 // 是否已填收货地址——没填地址算不出按地区的运费,付款门会拦住
 function hasAddr(name) {
   const a = allAddressesCache[name];
-  return !!(a && a.address);
+  return !!(a && a.address) || allShippingSummary[name]?.has_address === true;
 }
 
 function shippingFeeInfoFor(name, items) {
   if (!COLLECT_SHIPPING || items <= 0) return {text: '—', amount: 0, status: 'none'};
-  if (r3PaidNames.has(name)) return {text: '随R3', amount: 0, status: 'r3'};
+  if (hasR3Order(name)) return {text: '随R3', amount: 0, status: 'r3'};
   if (!hasAddr(name)) return {text: '待地址', amount: 0, status: 'missing'};
   const amount = r2(DROPSHIP_FEE + dropshipExtraFor(name));
   return {text: '¥' + amount.toFixed(2), amount, status: 'ready'};
@@ -673,141 +725,137 @@ function shippingFeeInfoFor(name, items) {
 const DROP_PAYMENT_DEADLINE = new Date('2026-06-03T14:00:00+08:00'); // 付款截止;此刻前跑单未定→库存0
 const THIRTEEN_PLUS30 = new Set(['clawd','clawd-happy','clawd-shiny','clawd-heart','clawd-headphones','clawd-wand','clawd-coffee','clawd-skateboard','clawd-book','clawd-cape','clawd-dizzy','clawd-lightbulb','clawd-magnifier']); // 13款形象款:库存=跑单数+30;其余12款=跑单数
 async function computeDropStock() {
-  // 付款截止前:跑单还没定,库存全部置0
-  if (Date.now() < DROP_PAYMENT_DEADLINE.getTime()) { S.forEach(s => { DROP_STOCK[stockKey(s)] = 0; }); return; }
-  if (!sb) return;
-  try {
-    // 一次查"真款订单+实付名单"(同一快照·不分两次读,消掉时间差);只取这两类、绕开高频写入的其它伪列
-    const ids = S.map(s => s.id).concat('r3__actual_paid');
-    let rows = [], from = 0;
-    while (true) {
-      const {data, error} = await sb.from('orders').select('name,sticker_id,quantity').in('sticker_id', ids).gt('quantity', 0).order('id').range(from, from + 999);
-      if (error) throw error;
-      if (!data || !data.length) break;
-      rows = rows.concat(data);
-      if (data.length < 1000) break;
-      from += 1000;
+  if (Date.now() < DROP_PAYMENT_DEADLINE.getTime()) {
+    S.forEach(sticker => { DROP_STOCK[stockKey(sticker)] = 0; });
+    return;
+  }
+  const runawayQuantities = {};
+  for (const [name, orders] of Object.entries(r3OrdersByName)) {
+    // 已实付的普通成员不是掉落库存；管理员的凑整单始终计入。
+    if (r3PaidNames.has(name) && !ADMIN_NAMES.includes(name)) continue;
+    for (const [stickerId, quantity] of Object.entries(orders)) {
+      const key = stickerId.slice(3);
+      runawayQuantities[key] = (runawayQuantities[key] || 0) + quantity;
     }
-    const ord = {}, paid = new Set();
-    for (const r of rows) { if (r.sticker_id === 'r3__actual_paid') { paid.add(r.name); r3PaidNames.add(r.name); } else (ord[r.name] = ord[r.name] || {})[r.sticker_id] = r.quantity; }
-    const runqty = {};
-    for (const nm in ord) { if (paid.has(nm) && !ADMIN_NAMES.includes(nm)) continue; /* admin(鹅/鹅鹅)的凑整订单无视付款状态、永远进掉落库存 */ for (const sid in ord[nm]) { const k = sid.slice(3); runqty[k] = (runqty[k] || 0) + ord[nm][sid]; } }
-    S.forEach(s => { const k = stockKey(s), rn = runqty[k] || 0; DROP_STOCK[k] = THIRTEEN_PLUS30.has(k) ? rn + 30 : rn; });
-  } catch(e) { console.error('computeDropStock failed:', e); }
+  }
+  S.forEach(sticker => {
+    const key = stockKey(sticker);
+    const runaway = runawayQuantities[key] || 0;
+    DROP_STOCK[key] = THIRTEEN_PLUS30.has(key) ? runaway + 30 : runaway;
+  });
 }
 
 // ============ SUPABASE ============
-function initSupabaseClient() {
-  if (typeof window.supabase === 'undefined') return false;
-  try { sb = window.supabase.createClient(SUPA_URL, SUPA_KEY); return true; }
-  catch(e) { console.error('Supabase init failed:', e); return false; }
-}
 async function initSupabase() {
-  if (!sb && !initSupabaseClient()) { setConnected(false); updateStatus('SDK加载失败'); loadOffline(); return; }
-  try { await loadAll(); await computeDropStock(); saveOffline(); subscribeRealtime(); setConnected(true); updateStatus('已连接'); }
-  catch(e) { console.error('Init failed:', e); setConnected(false); updateStatus('连接失败'); loadOffline(); }
+  try {
+    await loadAll();
+    await computeDropStock();
+    saveOffline();
+    subscribeRealtime();
+    setConnected(true);
+    updateStatus('已连接');
+  } catch (error) {
+    console.error('Backend init failed:', error);
+    setConnected(false);
+    updateStatus('连接失败');
+    loadOffline();
+  }
 }
 
+let snapshotRevision = null;
 async function loadAll() {
-  let orders = [], from = 0;
-  while (true) {
-    const {data, error} = await sb.from('orders').select('*').like('sticker_id', 'drop_r3_%').order('id').range(from, from + 999);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-    orders = orders.concat(data);
-    if (data.length < 1000) break;
-    from += 1000;
-  }
-  allOrders = {}; allTeams = {}; allPaySelf = {}; allPayLeader = {}; allActualPaid = {}; allLocked = {};
+  if (!efHasToken()) throw new Error('登录已过期，请重新登录');
+  const snapshot = await callEF('my-data', {action: 'get_legacy_snapshot', known_revision: snapshotRevision});
+  if (snapshot.not_modified) return false;
+  snapshotRevision = Number.isSafeInteger(snapshot.revision) ? snapshot.revision : null;
+  const rows = snapshot.orders || [];
+
+  allOrders = {};
+  allTeams = {};
+  allPaySelf = {};
+  allPayLeader = {};
+  allActualPaid = {};
+  allLocked = {};
+  r3PaidNames = new Set();
+  r3OrdersByName = {};
+  r3OrderNames = new Set();
   const joinOrd = {};
-  for (const row of orders) {
+
+  for (const row of rows) {
     if (!joinOrd[row.name] || row.id < joinOrd[row.name]) joinOrd[row.name] = row.id;
-    if (row.sticker_id === 'drop_r3__team') { allTeams[row.name] = row.quantity; }
-    else if (row.sticker_id === 'drop_r3__pin') { /* skip */ }
-    else if (row.sticker_id === 'drop_r3__payment_self') { if (row.quantity > 0) allPaySelf[row.name] = true; }
-    else if (row.sticker_id === 'drop_r3__payment_leader') { if (row.quantity > 0) allPayLeader[row.name] = true; }
-    else if (row.sticker_id === 'drop_r3__actual_paid') { if (row.quantity > 0) allActualPaid[row.name] = row.quantity / 100; }
-    else if (row.sticker_id === 'drop_r3__locked') { if (row.quantity > 0) allLocked[row.name] = true; }
-    else if (row.quantity > 0) { if (!allOrders[row.name]) allOrders[row.name] = {}; allOrders[row.name][row.sticker_id] = row.quantity; }
+    if (row.sticker_id === 'r3__team' && !allTeams[row.name]) allTeams[row.name] = row.quantity;
+    if (row.sticker_id === 'r3__actual_paid' && row.quantity > 0) r3PaidNames.add(row.name);
+    if (S.some(sticker => sticker.id === row.sticker_id) && row.quantity > 0) {
+      (r3OrdersByName[row.name] = r3OrdersByName[row.name] || {})[row.sticker_id] = row.quantity;
+      r3OrderNames.add(row.name);
+    }
+    if (!row.sticker_id.startsWith('drop_r3_')) continue;
+    if (row.sticker_id === 'drop_r3__team') allTeams[row.name] = row.quantity;
+    else if (row.sticker_id === 'drop_r3__payment_self' && row.quantity > 0) allPaySelf[row.name] = true;
+    else if (row.sticker_id === 'drop_r3__payment_leader' && row.quantity > 0) allPayLeader[row.name] = true;
+    else if (row.sticker_id === 'drop_r3__actual_paid' && row.quantity > 0) allActualPaid[row.name] = row.quantity / 100;
+    else if (row.sticker_id === 'drop_r3__locked' && row.quantity > 0) allLocked[row.name] = true;
+    else if (!row.sticker_id.startsWith('drop_r3__') && row.quantity > 0) {
+      if (!allOrders[row.name]) allOrders[row.name] = {};
+      allOrders[row.name][row.sticker_id] = row.quantity;
+    }
   }
   allJoinOrder = joinOrd;
-  const {data: settings} = await sb.from('settings').select('*');
-  if (settings) for (const s of settings) {
-    if (s.key === 'drop_r3_rate') rate = parseFloat(s.value) || 7.10;
+  for (const setting of snapshot.settings || []) {
+    if (setting.key === 'drop_r3_rate') rate = parseFloat(setting.value) || 7.10;
   }
-  // R3 已确认订单名单(r3__actual_paid)——这些人运费随R3一起付,掉落页不填地址/不收运费。
-  // 始终加载(不受掉落库存截止日影响),作为跨页判定的 source of truth。
-  try {
-    r3PaidNames = new Set();
-    let rp = [], rpFrom = 0;
-    while (true) {
-      const {data, error} = await sb.from('orders').select('name,quantity').eq('sticker_id', 'r3__actual_paid').gt('quantity', 0).order('id').range(rpFrom, rpFrom + 999);
-      if (error) throw error;
-      if (!data || !data.length) break;
-      rp = rp.concat(data);
-      if (data.length < 1000) break;
-      rpFrom += 1000;
-    }
-    rp.forEach(r => r3PaidNames.add(r.name));
-  } catch(e) { console.error('Load r3 paid names failed:', e); }
-  // 2026-06-24 走 EF; 2026-06-24 紧急回滚: 旧用户无 token, fallback anon SELECT
-  try {
-    allAddressesCache = {};
-    if (efHasToken() && isAdmin(myName)) {
-      const res = await callEF('admin', {action: 'overview'});
-      (res.addresses || []).forEach(r => cacheRound3Address(r));
-    } else if (efHasToken()) {
-      const res = await callEF('my-data', {action: 'get_bootstrap'});
-      (res.my_addresses || []).forEach(r => cacheRound3Address(r));
-    } else if (sb) {
-      const {data} = await sb.from('addresses').select('*');
-      (data || []).forEach(r => cacheRound3Address(r));
-    }
-  } catch(e) {
-    console.error('addresses load failed, fallback anon SELECT:', e);
-    if (sb) { try { const {data} = await sb.from('addresses').select('*'); (data || []).forEach(r => cacheRound3Address(r)); } catch(e2) {} }
+
+  allAddressesCache = {};
+  allShippingSummary = {};
+  (snapshot.my_addresses || []).forEach(cacheRound3Address);
+  (snapshot.shipping_summaries || []).forEach(cacheShippingSummary);
+  if (isAdmin(myName)) {
+    const overview = await callEF('admin', {action: 'overview'});
+    (overview.addresses || []).forEach(cacheRound3Address);
   }
+
+  if (myName && Object.keys(pendingChanges).length) {
+    if (!allOrders[myName]) allOrders[myName] = {};
+    for (const [stickerId, quantity] of Object.entries(pendingChanges)) {
+      if (quantity > 0) allOrders[myName][stickerId] = quantity;
+      else delete allOrders[myName][stickerId];
+    }
+  }
+  return true;
 }
 
+let snapshotPollTimer = null;
 function subscribeRealtime() {
-  sb.channel('drop-r3-sync').on('postgres_changes', {event:'*', schema:'public', table:'orders'}, p => {
-    const row = p.new || p.old;
-    if (!row || !row.sticker_id) return;
-    // R3 已确认订单名单(r3__actual_paid)变化 → 同步 r3PaidNames(跨页判定),不属于 drop_r3_ 命名空间
-    if (row.sticker_id === 'r3__actual_paid') {
-      if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) r3PaidNames.delete(row.name);
-      else if (p.new && p.new.quantity > 0) r3PaidNames.add(p.new.name);
-      scheduleRender(); return;
+  if (snapshotPollTimer) clearInterval(snapshotPollTimer);
+  setConnected(true);
+  snapshotPollTimer = setInterval(async () => {
+    if (document.hidden || Object.keys(pendingChanges).length > 0 || !efHasToken()) return;
+    try {
+      const changed = await loadAll();
+      if (!changed) { setConnected(true); return; }
+      await computeDropStock();
+      renderTable();
+      recalculate();
+      applyLockState();
+      renderAllAddresses();
+      saveOffline();
+      setConnected(true);
+    } catch (error) {
+      console.error('snapshot refresh failed:', error);
+      setConnected(false);
     }
-    if (!row.sticker_id.startsWith('drop_r3_')) return;
-    if (row.sticker_id === 'drop_r3__pin') return;
-    if (p.new && p.new.id) { const n = p.new.name; if (!allJoinOrder[n] || p.new.id < allJoinOrder[n]) allJoinOrder[n] = p.new.id; }
-    if (row.sticker_id === 'drop_r3__team') { if (p.eventType === 'DELETE') delete allTeams[row.name]; else allTeams[p.new.name] = p.new.quantity; scheduleRender(); saveOffline(); return; }
-    if (row.sticker_id === 'drop_r3__payment_self') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allPaySelf[row.name]; else if (p.new && p.new.quantity > 0) allPaySelf[p.new.name] = true; scheduleRender(); saveOffline(); return; }
-    if (row.sticker_id === 'drop_r3__payment_leader') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allPayLeader[row.name]; else if (p.new && p.new.quantity > 0) allPayLeader[p.new.name] = true; scheduleRender(); saveOffline(); return; }
-    if (row.sticker_id === 'drop_r3__actual_paid') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allActualPaid[row.name]; else if (p.new && p.new.quantity > 0) allActualPaid[p.new.name] = p.new.quantity / 100; scheduleRender(); saveOffline(); return; }
-    if (row.sticker_id === 'drop_r3__locked') { if (p.eventType === 'DELETE' || (p.new && p.new.quantity === 0)) delete allLocked[row.name]; else if (p.new && p.new.quantity > 0) allLocked[p.new.name] = true; scheduleRender(); saveOffline(); return; }
-    if (p.eventType === 'DELETE') { if (allOrders[row.name]) { delete allOrders[row.name][row.sticker_id]; if (!Object.keys(allOrders[row.name]).length) delete allOrders[row.name]; } }
-    else { const {name, sticker_id, quantity} = p.new; if (!allOrders[name]) allOrders[name] = {}; if (quantity > 0) allOrders[name][sticker_id] = quantity; else { delete allOrders[name][sticker_id]; if (!Object.keys(allOrders[name]).length) delete allOrders[name]; } }
-    scheduleRender(); saveOffline();
-  }).on('postgres_changes', {event:'*', schema:'public', table:'settings'}, p => {
-    if (!p.new) return;
-    if (p.new.key === 'drop_r3_rate') { rate = parseFloat(p.new.value) || 7.10; document.getElementById('rateInput').value = rate; recalculate(); saveOffline(); }
-  }).on('postgres_changes', {event:'*', schema:'public', table:'addresses'}, p => {
-    const row = p.new || p.old;
-    if (!row || !row.name) return;
-    const displayName = addressDisplayName(row.name);
-    if (!displayName) return;
-    if (p.eventType === 'DELETE') delete allAddressesCache[displayName];
-    else cacheRound3Address(p.new);
-    recalculate();
-    if (isAdmin(myName)) renderAllAddresses();
-  }).subscribe(st => { setConnected(st === 'SUBSCRIBED'); });
+  }, 15000);
 }
 
 function scheduleRender() { clearTimeout(renderTimer); renderTimer = setTimeout(() => { renderTable(); recalculate(); }, 100); }
 
 // ============ PENDING CHANGES ============
+function enqueueOrderMutation(operation) {
+  const run = orderMutationQueue.then(operation);
+  orderMutationQueue = run.catch(() => {});
+  return run;
+}
+
 function trackChange(sid, qty) { pendingChanges[sid] = qty; savePendingDraft(); updateSubmitBar(); }
 function updateSubmitBar() {
   const count = Object.keys(pendingChanges).length;
@@ -816,29 +864,66 @@ function updateSubmitBar() {
   if (count > 0) { bar.classList.add('show'); btn.textContent = '保存'; btn.disabled = false; btn.className = 'submit-bar-btn'; }
   else { bar.classList.remove('show'); clearPendingDraft(); }
 }
-async function submitCart() {
-  if (iAmLocked()) { alert('已锁单，无法修改'); return; }
-  if (!isDropOpen()) { alert('还没到开抢时间哦，请等待倒计时归零～'); return; }
-  if (!sb || !myName) return;
+function submitCart() {
+  return enqueueOrderMutation(submitCartNow);
+}
+
+async function submitCartNow() {
+  if (iAmLocked()) { alert('已锁单，无法修改'); return false; }
+  if (!isDropOpen()) { alert('还没到开抢时间哦，请等待倒计时归零～'); return false; }
+  if (!myName || !efHasToken()) { alert('登录已过期，请重新登录后保存'); return false; }
   const entries = Object.entries(pendingChanges);
-  if (!entries.length) return;
+  if (!entries.length) return true;
   const btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = '保存中...';
   try {
-    const rows = entries.map(([sid, qty]) => ({name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()}));
-    const {error} = await sb.from('orders').upsert(rows, {onConflict: 'name,sticker_id'}).select();
-    if (error) throw error;
-    pendingChanges = {}; clearPendingDraft();
-    btn.textContent = '已保存 ✓'; btn.className = 'submit-bar-btn success'; updateStatus('已保存');
-    setTimeout(updateSubmitBar, 1500);
-  } catch(e) { console.error('Submit failed:', e); btn.disabled = false; btn.textContent = '保存失败，点击重试'; }
+    await callEF('my-data', {
+      action: 'submit_orders',
+      items: entries.map(([sticker_id, quantity]) => ({sticker_id, quantity}))
+    });
+    // 只清除本次请求的快照，保存期间的新编辑继续保留，避免旧请求覆盖新修改。
+    entries.forEach(([sid, qty]) => {
+      if (pendingChanges[sid] === qty) delete pendingChanges[sid];
+    });
+    if (Object.keys(pendingChanges).length === 0) {
+      clearPendingDraft();
+      btn.textContent = '已保存 ✓'; btn.className = 'submit-bar-btn success'; updateStatus('已保存');
+      setTimeout(updateSubmitBar, 1500);
+    } else {
+      savePendingDraft(); updateSubmitBar(); updateStatus('本批已保存，还有新修改待保存');
+    }
+    return true;
+  } catch(e) {
+    console.error('Submit failed:', e); btn.disabled = false; btn.textContent = '保存失败，点击重试';
+    return false;
+  }
 }
 
 // ============ OFFLINE ============
 function saveOffline() { try { localStorage.setItem('drop_r3_cache', JSON.stringify({allOrders, allTeams, allJoinOrder, rate, allLocked, allPaySelf, allPayLeader, allActualPaid})); } catch(e) {} }
 function savePendingDraft() { try { if (!myName || !Object.keys(pendingChanges).length) { clearPendingDraft(); return; } localStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify({name: myName, changes: pendingChanges})); } catch(e) {} }
 function clearPendingDraft() { try { localStorage.removeItem(PENDING_DRAFT_KEY); } catch(e) {} }
-function restorePendingDraft() { try { const d = JSON.parse(localStorage.getItem(PENDING_DRAFT_KEY)); if (!d || d.name !== myName || !d.changes) return; pendingChanges = d.changes; if (!allOrders[myName]) allOrders[myName] = {}; for (const [sid, qty] of Object.entries(pendingChanges)) { const v = Math.max(0, parseInt(qty) || 0); if (v > 0) allOrders[myName][sid] = v; else delete allOrders[myName][sid]; } } catch(e) {} }
+function restorePendingDraft() {
+  if (iAmLocked()) {
+    pendingChanges = {};
+    clearPendingDraft();
+    return false;
+  }
+  try {
+    const d = JSON.parse(localStorage.getItem(PENDING_DRAFT_KEY));
+    if (!d || d.name !== myName || !d.changes) return false;
+    pendingChanges = d.changes;
+    if (!allOrders[myName]) allOrders[myName] = {};
+    for (const [sid, qty] of Object.entries(pendingChanges)) {
+      const v = Math.max(0, parseInt(qty) || 0);
+      if (v > 0) allOrders[myName][sid] = v;
+      else delete allOrders[myName][sid];
+    }
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
 function loadOffline() { try { const d = JSON.parse(localStorage.getItem('drop_r3_cache')); if (d) { allOrders = d.allOrders || {}; allTeams = d.allTeams || {}; allJoinOrder = d.allJoinOrder || {}; rate = d.rate || 7.10; allLocked = d.allLocked || {}; allPaySelf = d.allPaySelf || {}; allPayLeader = d.allPayLeader || {}; allActualPaid = d.allActualPaid || {}; } } catch(e) {} }
 
 // ============ UI ============
@@ -889,38 +974,49 @@ async function doRegister(name, pin) {
   updateNickDisplay(); renderTable(); recalculate();
 }
 async function doLogin(name, pin) {
-  const res = await callEF('auth', {action: 'login', name, pin});
-  efSaveToken(res.token);
-  myName = res.name; localStorage.setItem('gb2_nickname', myName);
-  if (res.team) myTeam = res.team;
-  else {
-    const {data: rt} = await sb.from('orders').select('quantity').eq('name', name).eq('sticker_id', 'r3__team');
-    if (rt && rt.length > 0) myTeam = rt[0].quantity;
-    await sb.from('orders').upsert({name, sticker_id: 'drop_r3__team', quantity: myTeam, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
-  }
+  const result = await callEF('auth', {action: 'login', name, pin});
+  efSaveToken(result.token);
+  myName = result.name;
+  myTeam = result.team || myTeam;
+  localStorage.setItem('gb2_nickname', myName);
   localStorage.setItem('gb2_team', myTeam);
   document.getElementById('nickOverlay').style.display = 'none';
   updateNickDisplay(); renderTable(); recalculate();
 }
+
 // 2026-06-24 重写: 只改 display_name (走 auth rename, name_key 不变防接管)
 async function changeNick() {
   const n = prompt('修改昵称（仅改显示名，登录账号不变）:', myName);
   if (!n || !n.trim() || n.trim() === myName) return;
   try {
     const res = await callEF('auth', {action: 'rename', new_name: n.trim()});
+    if (res.token) efSaveToken(res.token);
     alert('显示名已更新为「' + res.display_name + '」\n（登录账号 ' + myName + ' 不变）');
     const tag = document.getElementById('nickTag'); if (tag) tag.textContent = res.display_name + ' ✓';
   } catch(e) { alert('修改失败：' + e.message); }
 }
-function changeTeam() {
-  const c = prompt('当前：团' + myTeam + '\n输入新团号（' + ROUND2_TEAMS.filter(t => t !== myTeam).join('/') + '）：');
-  if (!c) return;
-  const t = parseInt(c);
-  if (!ROUND2_TEAMS.includes(t) || t === myTeam) { alert('请输入有效的团号'); return; }
-  myTeam = t; localStorage.setItem('gb2_team', myTeam); allTeams[myName] = myTeam; updateNickDisplay();
-  if (sb) sb.from('orders').upsert({name: myName, sticker_id: 'drop_r3__team', quantity: myTeam, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
-  renderTable(); recalculate();
+async function changeTeam() {
+  const choice = prompt('当前：团' + myTeam + '\n输入新团号（' + ROUND2_TEAMS.filter(team => team !== myTeam).join('/') + '）：');
+  if (!choice) return;
+  const newTeam = parseInt(choice);
+  if (!ROUND2_TEAMS.includes(newTeam) || newTeam === myTeam) {
+    alert('请输入有效的团号');
+    return;
+  }
+  try {
+    const result = await callEF('auth', {action: 'change_team', team: newTeam});
+    if (result.token) efSaveToken(result.token);
+    myTeam = result.team;
+    localStorage.setItem('gb2_team', myTeam);
+    allTeams[myName] = myTeam;
+    updateNickDisplay();
+    renderTable();
+    recalculate();
+  } catch (error) {
+    alert('切换分团失败：' + error.message);
+  }
 }
+
 function updateNickDisplay() {
   const el = document.getElementById('nickTag'); if (el) el.textContent = myName;
   const te = document.getElementById('teamTag'); if (te) te.textContent = '团' + myTeam;
@@ -934,63 +1030,106 @@ function paymentCellHTML(name, team) {
   if (!allLocked[name]) return h;
   if (isMe && st === 'unpaid') h += ' <button class="pay-btn" onclick="confirmMyPay()">我已付款</button>';
   if (isMe && st === 'self') h += ' <button class="pay-btn active" onclick="cancelMyPay()">撤销</button>';
-  if (admin && st === 'self') h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 核实</button>';
-  if (admin && st === 'confirmed') h += ' <button class="pay-btn" onclick="leaderRevoke(\'' + esc(name).replace(/'/g, "\\'") + '\')">撤销</button>';
-  if (admin && st === 'unpaid' && !isMe) h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(\'' + esc(name).replace(/'/g, "\\'") + '\')">✓ 确认</button>';
+  if (admin && st === 'self') h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(' + jsArg(name) + ')">✓ 核实</button>';
+  if (admin && st === 'confirmed') h += ' <button class="pay-btn" onclick="leaderRevoke(' + jsArg(name) + ')">撤销</button>';
+  if (admin && st === 'unpaid' && !isMe) h += ' <button class="pay-btn pay-btn-confirm" onclick="leaderConfirm(' + jsArg(name) + ')">✓ 确认</button>';
   return h;
 }
 async function confirmMyPay() {
-  if (!sb || !myName || !confirm('确认你已完成付款？')) return;
-  allPaySelf[myName] = true; renderTable(); recalculate(); saveOffline();
-  const {error} = await sb.from('orders').upsert({name: myName, sticker_id: 'drop_r3__payment_self', quantity: 1, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
-  if (error) { delete allPaySelf[myName]; renderTable(); recalculate(); alert('失败：' + error.message); }
-}
-async function cancelMyPay() {
-  if (!sb || !myName || !confirm('撤销付款确认？')) return;
-  delete allPaySelf[myName]; renderTable(); recalculate(); saveOffline();
-  const {error} = await sb.from('orders').upsert({name: myName, sticker_id: 'drop_r3__payment_self', quantity: 0, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
-  if (error) { allPaySelf[myName] = true; renderTable(); recalculate(); alert('失败：' + error.message); }
-}
-async function leaderConfirm(mem) {
-  if (!sb) return;
-  if (!isAdmin(myName)) return;
-  allPayLeader[mem] = true; if (!allPaySelf[mem]) allPaySelf[mem] = true;
+  if (!myName || !confirm('确认你已完成付款？')) return;
+  allPaySelf[myName] = true;
   renderTable(); recalculate(); saveOffline();
-  await sb.from('orders').upsert([{name: mem, sticker_id: 'drop_r3__payment_leader', quantity: 1, updated_at: new Date().toISOString()},{name: mem, sticker_id: 'drop_r3__payment_self', quantity: 1, updated_at: new Date().toISOString()}], {onConflict: 'name,sticker_id'}).select();
+  try {
+    await callEF('my-data', {action: 'confirm_my_payment', which: 'drop', set: true});
+  } catch (error) {
+    delete allPaySelf[myName];
+    renderTable(); recalculate();
+    alert('失败：' + error.message);
+  }
 }
+
+async function cancelMyPay() {
+  if (!myName || !confirm('撤销付款确认？')) return;
+  delete allPaySelf[myName];
+  renderTable(); recalculate(); saveOffline();
+  try {
+    await callEF('my-data', {action: 'confirm_my_payment', which: 'drop', set: false});
+  } catch (error) {
+    allPaySelf[myName] = true;
+    renderTable(); recalculate();
+    alert('失败：' + error.message);
+  }
+}
+
+async function leaderConfirm(mem) {
+  if (!isAdmin(myName)) return;
+  const previousLeader = !!allPayLeader[mem];
+  const previousSelf = !!allPaySelf[mem];
+  allPayLeader[mem] = true;
+  allPaySelf[mem] = true;
+  renderTable(); recalculate(); saveOffline();
+  try {
+    await callAdminEF('set_payment_leader', {target_name: mem, which: 'drop', set: true});
+  } catch (error) {
+    if (previousLeader) allPayLeader[mem] = true;
+    else delete allPayLeader[mem];
+    if (previousSelf) allPaySelf[mem] = true;
+    else delete allPaySelf[mem];
+    renderTable(); recalculate(); saveOffline();
+  }
+}
+
 async function leaderRevoke(mem) {
-  if (!sb || !isAdmin(myName) || !confirm('撤销 ' + mem + ' 的付款确认？')) return;
-  delete allPayLeader[mem]; renderTable(); recalculate(); saveOffline();
-  await sb.from('orders').upsert({name: mem, sticker_id: 'drop_r3__payment_leader', quantity: 0, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select();
+  if (!isAdmin(myName) || !confirm('撤销 ' + mem + ' 的付款确认？')) return;
+  delete allPayLeader[mem];
+  renderTable(); recalculate(); saveOffline();
+  try {
+    await callAdminEF('set_payment_leader', {target_name: mem, which: 'drop', set: false});
+  } catch (error) {
+    allPayLeader[mem] = true;
+    renderTable(); recalculate();
+  }
 }
+
 
 // ============ ACTUAL PAID ============
 // 2026-06-24 走 admin EF (which='drop')
 async function saveActualPaid(memberName, amount) {
   if (!isAdmin(myName)) { alert('只有管理员可以操作'); return; }
+  const hadPrevious = Object.prototype.hasOwnProperty.call(allActualPaid, memberName);
+  const previous = allActualPaid[memberName];
   if (amount > 0) { allActualPaid[memberName] = amount; } else { delete allActualPaid[memberName]; }
   recalculate(); saveOffline();
   try {
     await callAdminEF('set_actual_paid', {target_name: memberName, which: 'drop', value: amount});
     updateStatus('已更新 ' + memberName + ' 的实付金额');
-  } catch(e) { /* helper alert */ }
+  } catch(e) {
+    if (hadPrevious) allActualPaid[memberName] = previous;
+    else delete allActualPaid[memberName];
+    renderTable(); recalculate(); saveOffline();
+  }
   if (isAdmin(myName)) renderAllAddresses();
 }
 
 // ============ ADDRESS FORM (ported from round3.html, DOM-built) ============
 function openAddressForm() {
-  // 跨页拦截：R3 有已确认订单的人,运费随R3一起付,本页不填地址
+  // 跨页拦截：R3 有商品订单的人，运费随 R3 一起付，本页不重复填地址。
   if (hasR3Order()) {
-    alert('你在 Round3 有已确认订单，请去 Round3 页面填地址付运费，掉落贴纸会和 Round3 一起发货，这里不用填');
+    alert('你在 Round3 有订单，请去 Round3 页面填地址付运费，掉落贴纸会和 Round3 一起发货，这里不用重复填写或付款');
     return;
   }
   const overlay = document.getElementById('addressOverlay');
   if (!overlay) return;
-  loadAddressFor(myName);
+  bindAddressInputTracking();
+  addressInputRevision = 0;
+  const requestRevision = ++addressLoadRevision;
+  writeAddressForm(null);
   overlay.classList.add('on');
+  loadAddressFor(myName, requestRevision);
 }
 
 function closeAddressForm() {
+  addressLoadRevision += 1;
   const overlay = document.getElementById('addressOverlay');
   if (overlay) overlay.classList.remove('on');
   const s = document.getElementById('addrStatus');
@@ -999,6 +1138,31 @@ function closeAddressForm() {
   if (e) e.style.display = 'none';
   const eb = document.getElementById('addrExistingBody');
   if (eb) eb.replaceChildren();
+}
+
+function bindAddressInputTracking() {
+  ['addrRecipient', 'addrPhone', 'addrAddress'].forEach(id => {
+    const field = document.getElementById(id);
+    if (!field || field.dataset.loadGuardBound) return;
+    field.dataset.loadGuardBound = '1';
+    field.addEventListener('input', () => { addressInputRevision += 1; });
+  });
+}
+
+function addressLoadCanApply(name, requestRevision, inputRevisionAtStart) {
+  return requestRevision === addressLoadRevision
+    && inputRevisionAtStart === addressInputRevision
+    && name === myName;
+}
+
+function writeAddressForm(data) {
+  const recipient = document.getElementById('addrRecipient');
+  const phone = document.getElementById('addrPhone');
+  const address = document.getElementById('addrAddress');
+  if (recipient) recipient.value = data?.recipient || '';
+  if (phone) phone.value = data?.phone || '';
+  if (address) address.value = data?.address || '';
+  renderAddrExisting(data || null);
 }
 
 function renderAddrExisting(data) {
@@ -1030,10 +1194,11 @@ function renderAddrExisting(data) {
   wrap.style.display = 'block';
 }
 
-async function loadAddressFor(name) {
+async function loadAddressFor(name, requestRevision = ++addressLoadRevision) {
   if (!name) return;
+  const inputRevisionAtStart = addressInputRevision;
   const cached = allAddressesCache && allAddressesCache[name];
-  if (cached) renderAddrExisting(cached);
+  if (cached && addressLoadCanApply(name, requestRevision, inputRevisionAtStart)) writeAddressForm(cached);
   // 2026-06-24: cache miss 走 EF (自己 my-data, admin 走 admin overview)
   let data = cached || null;
   if (!cached && efHasToken()) {
@@ -1043,25 +1208,12 @@ async function loadAddressFor(name) {
       data = allAddressesCache[name] || null;
     } catch(e) { console.error('loadAddressFor EF failed:', e); }
   }
-  const r = document.getElementById('addrRecipient');
-  const p = document.getElementById('addrPhone');
-  const a = document.getElementById('addrAddress');
-  if (data) {
-    const fresh = allAddressesCache[name] || data;
-    if (r) r.value = data.recipient || '';
-    if (p) p.value = data.phone || '';
-    if (a) a.value = data.address || '';
-    renderAddrExisting(fresh);
-  } else {
-    if (r) r.value = '';
-    if (p) p.value = '';
-    if (a) a.value = '';
-    renderAddrExisting(null);
-  }
+  if (!addressLoadCanApply(name, requestRevision, inputRevisionAtStart)) return;
+  writeAddressForm(data ? (allAddressesCache[name] || data) : null);
 }
 
 async function saveAddress() {
-  if (!sb) return;
+  if (!efHasToken()) return;
   // 兜底：未勾选"只在掉落页下单"→ 阻止保存,提示去 R3 填
   const okCheck = document.getElementById('addrOnlyDropConfirm');
   if (okCheck && !okCheck.checked) {
@@ -1087,13 +1239,18 @@ async function saveAddress() {
   if (status) { status.textContent = '✓ 已保存'; status.style.color = '#2D8B5E'; }
   const fresh = {name: myName, team: myTeam, recipient, phone, address, updated_at: new Date().toISOString()};
   allAddressesCache[myName] = fresh;
+  const shippingExtra = (address.includes('新疆') || address.includes('西藏')) ? 13 : (address.includes('北京') || address.includes('上海')) ? 1 : 0;
+  allShippingSummary[myName] = {
+    has_address: true,
+    shipping_cents: Math.round((DROPSHIP_FEE + shippingExtra) * 100)
+  };
   renderAddrExisting(fresh);
   recalculate();
   if (isAdmin(myName)) renderAllAddresses();
   setTimeout(() => closeAddressForm(), 1200);
 }
 
-// 只对"掉落-only"用户(hasR3Order()===false)且已锁单显示;R3已付的人隐藏
+// 只对“掉落-only”用户（没有 R3 商品订单）且已锁单显示。
 function updateAddressBtn() {
   const btn = document.getElementById('btnAddress');
   if (!btn) return;
@@ -1127,25 +1284,28 @@ async function showMyTracking() {
 }
 
 // ============ ADMIN: 掉落-only 代发总览 (ported from round3.html, DOM-built) ============
-// 候选 = 掉落已付款(allActualPaid=drop_r3__actual_paid) 且不在 r3PaidNames 的人(掉落-only)
+// 候选 = 掉落已付款且没有 R3 商品订单的人（掉落-only）。
 function dropOnlyAddrCandidates() {
   const out = [];
   Object.keys(allActualPaid || {}).forEach(n => {
-    if (allActualPaid[n] > 0 && !r3PaidNames.has(n)) out.push(n);
+    if (allActualPaid[n] > 0 && !hasR3Order(n)) out.push(n);
   });
   return out;
 }
 
 // 2026-06-24 走 admin save_tracking EF
 async function saveDropTracking(targetName, value) {
-  if (!isAdmin(myName)) { alert('仅管理员可填快递单号'); return; }
+  if (!isAdmin(myName)) { alert('仅管理员可填快递单号'); return false; }
   const v = (value || '').trim();
   const existing = allAddressesCache[targetName];
-  if (!existing) { alert('该用户还没填地址，无法填单号'); return; }
+  if (!existing) { alert('该用户还没填地址，无法填单号'); return false; }
   try {
     await callAdminEF('save_tracking', {target_name: targetName, value: v});
     allAddressesCache[targetName] = {...existing, tracking_number: v || null};
-  } catch(e) { /* helper alert */ }
+    return true;
+  } catch(e) {
+    return false;
+  }
 }
 
 function renderAllAddresses() {
@@ -1252,7 +1412,12 @@ function renderAllAddresses() {
     trackInput.addEventListener('blur', async () => {
       const v = trackInput.value.trim();
       if (v === lastSaved) return;
-      await saveDropTracking(name, v);
+      const saved = await saveDropTracking(name, v);
+      if (!saved) {
+        trackInput.style.background = '#FFF5F5';
+        trackInput.style.borderColor = '#E74C3C';
+        return;
+      }
       lastSaved = v;
       if (v) { trackInput.style.background = '#F3F8E8'; trackInput.style.borderColor = '#B5CC8E'; }
       else { trackInput.style.background = '#fff'; trackInput.style.borderColor = 'var(--border)'; }
@@ -1275,16 +1440,12 @@ async function loadAllAddresses() {
   if (body) body.textContent = '加载中...';
   allAddressesCache = {};
   try {
-    if (efHasToken()) {
-      const res = await callEF('admin', {action: 'overview'});
-      (res.addresses || []).forEach(r => { cacheRound3Address(r); });
-    } else if (sb) {
-      const {data} = await sb.from('addresses').select('*');
-      (data || []).forEach(r => cacheRound3Address(r));
-    }
+    if (!efHasToken()) throw new Error('登录已过期，请重新登录');
+    const res = await callEF('admin', {action: 'overview'});
+    (res.addresses || []).forEach(r => { cacheRound3Address(r); });
   } catch(e) {
-    console.error('admin overview failed, fallback anon SELECT:', e);
-    if (sb) { try { const {data} = await sb.from('addresses').select('*'); (data || []).forEach(r => cacheRound3Address(r)); } catch(e2) {} }
+    console.error('admin overview failed:', e);
+    if (body) body.textContent = e.message || '地址加载失败';
   }
   recalculate();
   renderAllAddresses();
@@ -1306,25 +1467,25 @@ async function adminClearUser(targetName) {
 
 // ============ LOCK ============
 async function lockMyOrder() {
-  if (!sb || !myName) return;
-  if (iAmLocked()) return;
-  if (!isDropOpen()) { alert('还没到开抢时间,先选好数量,等倒计时归零再锁～'); return; }
-  if (!confirm('锁单后你的数量就不能再改了,确定吗?(锁完马上可以扫码付款)')) return;
-  if (Object.keys(pendingChanges).length) { await submitCart(); }
+  if (!myName || iAmLocked()) return;
+  if (!isDropOpen()) { alert('还没到开抢时间，先等倒计时归零～'); return; }
+  if (!confirm('锁单后你的数量就不能再改了，确定吗？')) return;
+  if (Object.keys(pendingChanges).length) {
+    const saved = await submitCart();
+    if (!saved || Object.keys(pendingChanges).length) {
+      alert('订单还没有完整保存，已取消锁单。请先保存剩余修改后再试。');
+      return;
+    }
+  }
   const lockBtn = document.getElementById('lockBtn');
   if (lockBtn) { lockBtn.disabled = true; lockBtn.textContent = '处理中...'; }
   try {
-    const {error} = await sb.from('orders').upsert(
-      {name: myName, sticker_id: 'drop_r3__locked', quantity: 1, updated_at: new Date().toISOString()},
-      {onConflict: 'name,sticker_id'}
-    );
-    if (error) throw error;
+    await callEF('my-data', {action: 'set_drop_lock'});
     allLocked[myName] = true;
     applyLockState();
     saveOffline();
-  } catch(e) {
-    console.error('Lock failed:', e);
-    alert('锁单失败：' + e.message);
+  } catch (error) {
+    alert('锁单失败：' + error.message);
     if (lockBtn) lockBtn.disabled = false;
   }
 }
@@ -1366,6 +1527,7 @@ function applyLockState() {
     const bar = document.getElementById('submitBar');
     if (bar) bar.classList.remove('show');
     pendingChanges = {};
+    clearPendingDraft();
   }
   updatePaymentBtns();
 }
@@ -1431,7 +1593,7 @@ async function showPaymentQR() {
     }
   });
 
-  const isDropOnly = !hasR3Order();  // R3无已确认订单 = 掉落-only,要填地址付运费
+  const isDropOnly = !hasR3Order();  // R3 无商品订单 = 掉落-only，需要在本页填地址付运费。
 
   document.getElementById('payQrTitle').textContent = '掉落付款码';
   document.getElementById('payQrLeader').textContent = '统一收款：鹅鹅';
@@ -1603,17 +1765,15 @@ function updatePaymentBtns() {
 
 // ============ FLUSH ON EXIT ============
 function flushPendingOnExit() {
-  if (!sb || !myName || Object.keys(pendingChanges).length === 0) return;
+  if (!myName || !efHasToken() || Object.keys(pendingChanges).length === 0) { savePendingDraft(); return; }
+  if (clearMutationPending) { savePendingDraft(); return; }
   if (iAmLocked()) { savePendingDraft(); return; }
   savePendingDraft();
-  const rows = Object.entries(pendingChanges).map(([sid, qty]) => ({
-    name: myName, sticker_id: sid, quantity: qty, updated_at: new Date().toISOString()
-  }));
-  const url = SUPA_URL + '/rest/v1/orders?on_conflict=name,sticker_id';
-  fetch(url, {
+  const items = Object.entries(pendingChanges).map(([sticker_id, quantity]) => ({sticker_id, quantity}));
+  fetch(EF_BASE + '/my-data', {
     method: 'POST',
-    headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'resolution=merge-duplicates'},
-    body: JSON.stringify(rows),
+    headers: efAuthHeaders(),
+    body: JSON.stringify({action: 'submit_orders', items}),
     keepalive: true
   }).catch(() => {});
 }
@@ -1684,8 +1844,8 @@ function renderTable() {
 
     vis.forEach(name => {
       const isMe = name === myName, o = allOrders[name] || {};
-      const adminClearBtn = (isAdmin(myName) && !isMe) ? ' <button class="order-detail-btn" style="color:#e74c3c" onclick="adminClearUser(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')" title="清空此人订单">🗑</button>' : '';
-      h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-team="' + g.team + '" data-name="' + esc(name) + '"><td class="col-idx">' + (seqMap[name]||'') + '</td><td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')">📋</button>' + adminClearBtn + '</td>';
+      const adminClearBtn = (isAdmin(myName) && !isMe) ? ' <button class="order-detail-btn" style="color:#e74c3c" onclick="adminClearUser(' + jsArg(name) + ')" title="清空此人订单">🗑</button>' : '';
+      h += '<tr class="p-row' + (isMe ? ' my-row' : '') + '" data-team="' + g.team + '" data-name="' + esc(name) + '"><td class="col-idx">' + (seqMap[name]||'') + '</td><td class="col-name">' + esc(name) + (isMe ? ' <small style="color:var(--primary)">(你)</small>' : '') + ' <button class="order-detail-btn" onclick="showOrderDetail(' + jsArg(name) + ')">📋</button>' + adminClearBtn + '</td>';
       S.forEach(s => {
         const did = dropId(s.id), v = o[did] || 0;
         h += isMe ? '<td><input type="number" min="0" value="' + (v||'') + '" data-si="' + did + '"></td>' : '<td>' + (v||'') + '</td>';
@@ -1751,9 +1911,9 @@ function applyCollapseState() {
 // ============ RECALCULATE ============
 function recalculate() {
   const td = getTeamsData();
-  let pi = 0, gItems = 0, gUSD = 0, gCNY = 0;
+  let pi = 0, gItems = 0, gUSD = 0, gCNY = 0, gShippingKnown = 0, gShippingPending = 0;
   td.forEach(g => {
-    let tItems = 0, tUSD = 0, tCNY = 0, tShippingKnown = 0, tActualPaid = 0;
+    let tItems = 0, tUSD = 0, tCNY = 0, tShippingKnown = 0, tShippingPending = 0, tActualPaid = 0;
     const tsq = {}; S.forEach(s => { tsq[s.id] = 0; });
     const vis = hideEmptyOrders ? g.names.filter(n => n === myName || hasOrders(n)) : g.names;
     if (!vis.length) return;
@@ -1774,14 +1934,16 @@ function recalculate() {
         psfe.style.color = shipInfo.status === 'ready' ? '#8B6EAE' : shipInfo.status === 'missing' ? '#E8714A' : '#999';
       }
       tShippingKnown += shipInfo.amount;
+      if (shipInfo.status === 'missing') tShippingPending++;
       // Owe/refund column
       const paid = allActualPaid[name] || 0;
       if (allActualPaid[name] !== undefined) tActualPaid += allActualPaid[name];
       const poe = document.getElementById('po-' + pi);
       if (poe) {
         if (items === 0 || allActualPaid[name] === undefined) { poe.textContent = '\u2014'; }
+        else if (shipInfo.status === 'missing') { poe.innerHTML = '<span style="color:#E8714A">待填地址</span>'; }
         else {
-          const diff = r2(tot - paid);
+          const diff = r2(tot + shipInfo.amount - paid);
           if (diff > 0.005) { poe.innerHTML = '<span style="color:#E74C3C">\u00A5' + diff.toFixed(2) + ' 补</span>'; }
           else if (diff < -0.005) { poe.innerHTML = '<span style="color:#7BC9A0">\u00A5' + Math.abs(diff).toFixed(2) + ' 退</span>'; }
           else { poe.innerHTML = '<span style="color:#999">\u2714\ufe0f 已平</span>'; }
@@ -1800,13 +1962,19 @@ function recalculate() {
     if (tsapEl) tsapEl.textContent = tActualPaid > 0 ? '\u00A5' + tActualPaid.toFixed(2) : '\u2014';
     const tsowEl = document.getElementById('tsow-' + g.team);
     if (tsowEl) {
-      const teamDiff = r2(tCNY - tActualPaid);
-      if (tActualPaid > 0 && Math.abs(teamDiff) > 0.005) { tsowEl.innerHTML = teamDiff > 0 ? '<span style="color:#E74C3C">\u00A5' + teamDiff.toFixed(2) + '</span>' : '<span style="color:#7BC9A0">-\u00A5' + Math.abs(teamDiff).toFixed(2) + '</span>'; }
+      const teamDiff = r2(tCNY + tShippingKnown - tActualPaid);
+      if (tShippingPending > 0) { tsowEl.innerHTML = '<span style="color:#E8714A">待地址 ' + tShippingPending + ' 人</span>'; }
+      else if (tActualPaid > 0 && Math.abs(teamDiff) > 0.005) { tsowEl.innerHTML = teamDiff > 0 ? '<span style="color:#E74C3C">\u00A5' + teamDiff.toFixed(2) + '</span>' : '<span style="color:#7BC9A0">-\u00A5' + Math.abs(teamDiff).toFixed(2) + '</span>'; }
       else { tsowEl.textContent = '\u2014'; }
     }
-    gItems += tItems; gUSD += tUSD; gCNY += tCNY;
+    gItems += tItems; gUSD += tUSD; gCNY += tCNY; gShippingKnown += tShippingKnown; gShippingPending += tShippingPending;
   });
-  document.getElementById('grandTotal').textContent = gItems > 0 ? '总计 ' + gItems + ' 件 · $' + gUSD.toFixed(2) + ' · \u00A5' + gCNY.toFixed(2) : '';
+  document.getElementById('grandTotal').textContent = gItems > 0
+    ? '总计 ' + gItems + ' 件 · $' + gUSD.toFixed(2) + ' · 商品\u00A5' + gCNY.toFixed(2)
+      + ' · 运费\u00A5' + gShippingKnown.toFixed(2)
+      + (gShippingPending > 0 ? '（另有' + gShippingPending + '人待地址）' : '')
+      + ' · 已知合计\u00A5' + r2(gCNY + gShippingKnown).toFixed(2)
+    : '';
   updateCards();
   updatePaymentBtns();
 }
@@ -1955,7 +2123,7 @@ function showOrderDetail(name) {
   } else if (shipInfo.status !== 'missing' && paySummary.amountDue > 0) {
     foot += '<div class="od-total main"><span>本次应付</span><span>\u00A5' + paySummary.amountDue.toFixed(2) + '</span></div>';
   }
-  foot += '<button onclick="copyOrderText(' + JSON.stringify(name).replace(/"/g,'&quot;') + ')" style="margin-top:12px;width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">📋 复制订单文本</button>';
+  foot += '<button onclick="copyOrderText(' + jsArg(name) + ')" style="margin-top:12px;width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">📋 复制订单文本</button>';
   const ov = document.createElement('div'); ov.className = 'od-overlay';
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
   ov.innerHTML = '<div class="od-card"><div class="od-header"><h3>#' + seq + ' ' + esc(name) + ' · 团' + team + '</h3><button class="od-close">\u2715</button></div><div class="od-body">' + items + '</div><div class="od-footer">' + foot + '</div></div>';
@@ -1965,11 +2133,48 @@ function showOrderDetail(name) {
 
 function clearMyOrders() {
   if (iAmLocked()) { alert('已锁单，无法修改'); return; }
+  if (clearMutationPending) return orderMutationQueue;
   if (!confirm('确定要清空你的所有订单吗？')) return;
-  const sids = Object.keys(allOrders[myName] || {});
-  delete allOrders[myName]; renderTable(); recalculate(); saveOffline();
-  if (sb && sids.length) sb.from('orders').upsert(sids.map(sid => ({name: myName, sticker_id: sid, quantity: 0, updated_at: new Date().toISOString()})), {onConflict: 'name,sticker_id'}).then(r => { if (!r.error) updateStatus('已清空'); });
+  clearMutationPending = true;
+  return enqueueOrderMutation(clearMyOrdersNow).finally(() => { clearMutationPending = false; });
 }
+
+async function clearMyOrdersNow() {
+  if (iAmLocked()) { alert('已锁单，无法修改'); return false; }
+  const previous = {...(allOrders[myName] || {})};
+  const pendingBeforeClear = {...pendingChanges};
+  pendingChanges = {};
+  clearPendingDraft();
+  updateSubmitBar();
+  delete allOrders[myName];
+  renderTable(); recalculate(); saveOffline();
+  try {
+    await callEF('my-data', {
+      action: 'submit_orders',
+      items: S.map(sticker => ({sticker_id: dropId(sticker.id), quantity: 0}))
+    });
+    if (Object.keys(pendingChanges).length) savePendingDraft();
+    else clearPendingDraft();
+    updateSubmitBar();
+    updateStatus(Object.keys(pendingChanges).length ? '已清空，还有新修改待保存' : '已清空');
+    return true;
+  } catch (error) {
+    if (Object.keys(previous).length) allOrders[myName] = previous;
+    pendingChanges = {...pendingBeforeClear, ...pendingChanges};
+    if (!allOrders[myName]) allOrders[myName] = {};
+    for (const [stickerId, quantity] of Object.entries(pendingChanges)) {
+      if (quantity > 0) allOrders[myName][stickerId] = quantity;
+      else delete allOrders[myName][stickerId];
+    }
+    savePendingDraft();
+    updateSubmitBar();
+    saveOffline();
+    renderTable(); recalculate();
+    alert('清空失败：' + error.message);
+    return false;
+  }
+}
+
 
 // ============ INIT ============
 (function() {
@@ -1997,15 +2202,26 @@ function clearMyOrders() {
     recalculate(); renderTable(); trackChange(did, next); saveOffline();
   });
 
-  initSupabaseClient();
-  if (!myName) { showNicknamePopup(); await new Promise(r => { const c = setInterval(() => { if (myName) { clearInterval(c); r(); } }, 100); }); }
+  const hadStoredName = !!myName;
+  const sessionValid = await restoreAccountSession();
+  if (!sessionValid) {
+    if (hadStoredName) { switchAuthTab('login'); document.getElementById('nickInput').value = myName; }
+    showNicknamePopup();
+    await new Promise(resolve => { const check = setInterval(() => { if (myName && efHasToken()) { clearInterval(check); resolve(); } }, 100); });
+  }
   updateNickDisplay();
   document.getElementById('rateInput').value = rate;
   document.getElementById('orderTable').innerHTML = '<tbody><tr><td style="text-align:center;padding:40px;color:#999" colspan="24">连接中...</td></tr></tbody>';
   await initSupabase();
   if (myName && allTeams[myName]) { myTeam = allTeams[myName]; localStorage.setItem('gb2_team', myTeam); }
-  else if (myName && !allTeams[myName]) { allTeams[myName] = myTeam; if (sb) await sb.from('orders').upsert({name: myName, sticker_id: 'drop_r3__team', quantity: myTeam, updated_at: new Date().toISOString()}, {onConflict: 'name,sticker_id'}).select(); }
-  updateNickDisplay(); restorePendingDraft();
+  else if (myName && !allTeams[myName]) { allTeams[myName] = myTeam; }
+  updateNickDisplay();
+  if (iAmLocked()) {
+    pendingChanges = {};
+    clearPendingDraft();
+  } else {
+    restorePendingDraft();
+  }
   document.getElementById('rateInput').value = rate;
   renderTable(); recalculate();
   applyLockState();
