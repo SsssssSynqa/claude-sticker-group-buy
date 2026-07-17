@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#eee8f5">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: https:; connect-src https://jbdibeisdydocdfojpup.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
-<title>Round 4 · Clawd 贴纸拼团预览</title>
+<title>Round 4 · Clawd 贴纸拼团</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
 *{box-sizing:border-box}
@@ -211,6 +211,10 @@ h1{margin:0;color:var(--purple-strong);font-size:clamp(30px,5vw,54px);line-heigh
 .payment-status.member::before{background:var(--gold)}
 .payment-status.leader{color:var(--green-strong)}
 .payment-status.leader::before{background:var(--green)}
+.payment-actions{display:flex;justify-content:flex-end;margin-top:14px}
+.payment-code{padding:0 22px 22px;text-align:center}
+.payment-code img{display:block;width:min(320px,100%);max-height:58vh;margin:0 auto 14px;border:1px solid var(--border);border-radius:16px;object-fit:contain;background:#fff}
+.payment-code p{margin:0;color:var(--muted);font-size:12px;line-height:1.7}
 .shipment-box{display:grid;gap:10px;margin-top:16px}
 .shipment-line{display:flex;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid #ece7ef;color:var(--muted);font-size:12px}
 .shipment-line:last-child{padding-bottom:0;border-bottom:0}
@@ -359,14 +363,14 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
 </head>
 <body>
 <a class="skip-link" href="#main">跳到主要内容</a>
-<div class="preview-ribbon">未发布功能预览 · 最终商品、日期与视觉仍待 Synqa 确认</div>
+<div class="preview-ribbon">Round 4 已确认 · 7 月 20 日开始 · 7 月 24 日截团</div>
 
 <header class="site-header">
   <div class="header-inner">
     <div>
       <p class="eyebrow">Clawd group buy · Round 4</p>
       <h1 id="roundTitle">Round 4 贴纸拼团</h1>
-      <p class="subtitle" id="roundSubtitle">目录、订单与金额均从服务端动态读取；页面不会用占位商品或本地估算替代最终应付。</p>
+      <p class="subtitle" id="roundSubtitle">沿用 Round 3 的 25 款贴纸、价格档与六团规则；订单和最终应付仍以服务端数据为准。</p>
       <div class="round-strip" id="roundMeta" aria-live="polite"></div>
     </div>
     <div class="account-box">
@@ -379,11 +383,11 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
 </header>
 
 <main class="main" id="main">
-  <section class="preview-note" aria-label="功能预览说明">
+  <section class="preview-note" aria-label="Round 4 开团说明">
     <div class="preview-mark" aria-hidden="true">R4</div>
     <div>
-      <strong>这一页只展示服务端已经配置的内容</strong>
-      <p>商品卡片里的价格只标作“商品目录价格预览”。实际商品应付与运费仅采用服务端返回的 <code>expected_cents</code> / 运费字段，不在浏览器里自行推算。</p>
+      <strong>商品和规则与 Round 3 相同</strong>
+      <p>2026 年 7 月 20 日开始登记，7 月 24 日 23:59 截团。商品卡片展示原始 USD 价格档；最终商品应付与运费采用服务端核算结果。</p>
     </div>
   </section>
 
@@ -443,6 +447,9 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
         <h3 id="paymentPanelHeading">付款确认</h3>
         <p class="panel-sub">金额未由服务端录入时，不会显示或推算应付。</p>
         <div class="payment-list" id="paymentList"></div>
+        <div class="payment-actions">
+          <button class="button green" id="paymentQrButton" type="button" disabled>查看付款码</button>
+        </div>
       </article>
     </div>
 
@@ -564,8 +571,22 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
   </form>
 </dialog>
 
+<dialog id="paymentDialog" aria-labelledby="paymentDialogTitle">
+  <div class="dialog-head">
+    <div>
+      <h2 id="paymentDialogTitle">Round 4 付款码</h2>
+      <p>1～6 团沿用 Round 3 的同一个收款码。</p>
+    </div>
+    <button class="dialog-close" id="closePaymentButton" type="button" aria-label="关闭付款码窗口">×</button>
+  </div>
+  <div class="payment-code">
+    <img src="r2-pay-5.png" alt="Round 4 一至六团付款码">
+    <p>请以页面显示的服务端应付金额为准，并在付款时备注自己的昵称。金额尚未录入时，付款码按钮不会开放。</p>
+  </div>
+</dialog>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<footer class="footer">Clawd Sticker Group Buy · Round 4 preview</footer>
+<footer class="footer">Clawd Sticker Group Buy · Round 4</footer>
 
 <script>
 (() => {
@@ -901,7 +922,7 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
     return Boolean(
       state.account &&
       round &&
-      round.status === 'open' &&
+      orderWindowState(round).editable &&
       !state.busyAction &&
       (!order || order.status === 'draft') &&
       state.orphanItems.length === 0
@@ -943,7 +964,8 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
       return;
     }
     if (!canEditOrder()) {
-      showToast('当前订单或轮次不可编辑', 'error');
+      const round = state.data && state.data.round;
+      showToast(round ? orderWindowState(round).message : '当前轮次不可编辑', 'error');
       return;
     }
     if (action === 'lock_order') {
@@ -1071,8 +1093,33 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
     return new Intl.DateTimeFormat('zh-CN', {
-      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+      timeZone: 'Asia/Shanghai'
     }).format(date);
+  }
+
+  function orderWindowState(round) {
+    if (!round || round.status !== 'open') {
+      return {
+        editable: false,
+        label: ROUND_STATUS[round && round.status] || '当前不可登记',
+        message: '当前轮次不可填写订单'
+      };
+    }
+    const now = Date.now();
+    const opensAt = round.order_opens_at ? new Date(round.order_opens_at).getTime() : null;
+    const deadline = round.order_deadline ? new Date(round.order_deadline).getTime() : null;
+    if (Number.isFinite(opensAt) && now < opensAt) {
+      return {
+        editable: false,
+        label: '尚未开始',
+        message: `Round 4 将于 ${formatDate(round.order_opens_at)} 开始登记`
+      };
+    }
+    if (Number.isFinite(deadline) && now >= deadline) {
+      return { editable: false, label: '订单已截止', message: 'Round 4 已截团，不能再修改订单' };
+    }
+    return { editable: true, label: '可填写订单', message: '当前可填写订单' };
   }
 
   function formatMoney(cents) {
@@ -1096,7 +1143,7 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
   function tierDescription(tier, index) {
     const prefix = `档位 ${index + 1}`;
     if (Array.isArray(tier)) {
-      if (tier.length >= 2) return `${prefix}：门槛 ${compactValue(tier[0])} · 目录价 ${compactValue(tier[1])}`;
+      if (tier.length >= 2) return `${prefix}：数量 ${compactValue(tier[0])} · USD 总价 $${compactValue(tier[1])}`;
       return `${prefix}：${compactValue(tier)}`;
     }
     if (tier && typeof tier === 'object') {
@@ -1127,13 +1174,16 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
   function renderHeader() {
     const round = state.data && state.data.round;
     elements.roundTitle.textContent = round && round.title ? String(round.title) : 'Round 4 贴纸拼团';
-    document.title = `${elements.roundTitle.textContent} · 功能预览`;
+    document.title = elements.roundTitle.textContent;
     elements.roundMeta.replaceChildren();
     if (round) {
-      const status = createElement('span', `status-pill ${round.status === 'open' ? 'active' : 'warning'}`, ROUND_STATUS[round.status] || String(round.status));
+      const windowState = orderWindowState(round);
+      const status = createElement('span', `status-pill ${windowState.editable ? 'active' : 'warning'}`, windowState.label);
       elements.roundMeta.append(status);
+      const orderOpensAt = formatDate(round.order_opens_at);
       const orderDeadline = formatDate(round.order_deadline);
       const paymentDeadline = formatDate(round.payment_deadline);
+      if (orderOpensAt) elements.roundMeta.append(createElement('span', 'status-pill', `开始登记：${orderOpensAt}`));
       if (orderDeadline) elements.roundMeta.append(createElement('span', 'status-pill', `订单截止：${orderDeadline}`));
       if (paymentDeadline) elements.roundMeta.append(createElement('span', 'status-pill', `付款截止：${paymentDeadline}`));
     } else {
@@ -1210,7 +1260,7 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
     card.append(titleRow);
 
     const pricePreview = createElement('div', 'price-preview');
-    pricePreview.append(createElement('p', 'price-preview-title', '商品目录价格预览'));
+    pricePreview.append(createElement('p', 'price-preview-title', 'Sticker Mule USD 价格档'));
     const tiers = Array.isArray(product.price_tiers) ? product.price_tiers : [];
     const tierList = createElement('ul', 'tier-list');
     if (tiers.length) {
@@ -1218,7 +1268,7 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
     } else {
       tierList.append(createElement('li', '', '价格档位尚未配置'));
     }
-    pricePreview.append(tierList, createElement('p', 'catalog-disclaimer', '仅展示服务端 price_tiers；不是最终应付，页面不进行汇率、阶梯价或运费计算。'));
+    pricePreview.append(tierList, createElement('p', 'catalog-disclaimer', '以上是每个数量档的原始 USD 总价；最终会按全团总量统一核算，不是现在需要付款的金额。'));
     card.append(pricePreview);
 
     const bottom = createElement('div', 'product-bottom');
@@ -1277,7 +1327,8 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
       elements.signinNudge.hidden = true;
       return;
     }
-    elements.catalogDescription.textContent = `${list.length} 件服务端商品 · 数量保存为完整订单快照`;
+    const windowState = orderWindowState(state.data.round);
+    elements.catalogDescription.textContent = `${list.length} 款 Round 3 同款商品 · ${windowState.message}`;
     for (const product of list) elements.catalogGrid.append(createProductCard(product));
     elements.signinNudge.hidden = Boolean(state.account);
   }
@@ -1318,10 +1369,24 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
     const list = $('paymentList');
     list.replaceChildren();
     const productPayment = paymentFor('product');
+    const productCents = productPayment ? productPayment.expected_cents : null;
+    const shippingCents = shippingServerCents();
     list.append(
-      createPaymentRow('product', '商品款', productPayment ? productPayment.expected_cents : null),
-      createPaymentRow('shipping', '运费', shippingServerCents())
+      createPaymentRow('product', '商品款', productCents),
+      createPaymentRow('shipping', '运费', shippingCents)
     );
+    $('paymentQrButton').disabled = Boolean(state.busyAction) || ![productCents, shippingCents]
+      .some((cents) => Number.isSafeInteger(Number(cents)) && Number(cents) > 0);
+  }
+
+  function openPaymentDialog() {
+    const dialog = $('paymentDialog');
+    if (!$('paymentQrButton').disabled && !dialog.open) dialog.showModal();
+  }
+
+  function closePaymentDialog() {
+    const dialog = $('paymentDialog');
+    if (dialog.open) dialog.close();
   }
 
   function line(label, value, extraClass = '') {
@@ -1363,12 +1428,13 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
     if (!state.account) return;
     const order = ownOrder();
     const editable = canEditOrder();
+    const windowState = orderWindowState(state.data.round);
     $('myTeamValue').textContent = state.account.team ? `${state.account.team} 团` : '未分团';
     $('myItemCount').textContent = `${selectedCount()} 件`;
     $('myOrderVersion').textContent = order ? `v${order.version}` : '未创建';
     $('orderPanelHint').textContent = order
       ? `服务端状态：${ORDER_STATUS[order.status] || order.status}${state.dirty ? ' · 有本地修改未保存' : ''}`
-      : state.dirty ? '新订单尚未保存。' : '还没有保存 Round 4 订单。';
+      : state.dirty ? '新订单尚未保存。' : windowState.editable ? '还没有保存 Round 4 订单。' : windowState.message;
     $('saveOrderButton').disabled = !editable || !state.dirty || Boolean(state.busyAction);
     $('dockSaveButton').disabled = !editable || !state.dirty || Boolean(state.busyAction);
     $('lockOrderButton').disabled = !editable || selectedCount() < 1 || Boolean(state.busyAction);
@@ -1682,6 +1748,8 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
   $('memberSearch').addEventListener('input', renderMembers);
   $('copyOrderButton').addEventListener('click', copyOrder);
   $('exportOrderButton').addEventListener('click', exportOrder);
+  $('paymentQrButton').addEventListener('click', openPaymentDialog);
+  $('closePaymentButton').addEventListener('click', closePaymentDialog);
   window.addEventListener('online', () => {
     setConnection('', '网络已恢复，正在同步');
     if (!state.dirty && !state.busyAction) refreshData();

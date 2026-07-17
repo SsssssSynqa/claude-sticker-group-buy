@@ -58,7 +58,7 @@ async function loadCatalog(client: SupabaseClient, roundId: string) {
   const { data: round, error: roundError } = await client
     .from("group_buy_rounds")
     .select(
-      "id,title,shipping_group_id,status,team_count,exchange_rate,processing_fee_rate,shipping_config,order_deadline,payment_deadline,updated_at",
+      "id,title,shipping_group_id,status,team_count,exchange_rate,processing_fee_rate,shipping_config,order_opens_at,order_deadline,payment_deadline,updated_at",
     )
     .eq("id", roundId)
     .maybeSingle();

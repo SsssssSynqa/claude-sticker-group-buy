@@ -170,21 +170,57 @@ BEGIN
     RAISE EXCEPTION 'counter sequence allocation failed: %', result;
   END IF;
 
+  IF (
+    SELECT count(*) FROM public.group_buy_products
+    WHERE round_id = 'round4' AND active
+  ) <> 25 THEN
+    RAISE EXCEPTION 'Round4 launch catalog does not contain the 25 Round3 products';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.group_buy_rounds
+    WHERE id = 'round4'
+      AND title = 'Round 4 贴纸拼团'
+      AND shipping_group_id = 'round4_drop4'
+      AND status = 'open'
+      AND team_count = 6
+      AND exchange_rate = 6.8
+      AND order_opens_at = '2026-07-20 00:00:00+08'::timestamptz
+      AND order_deadline = '2026-07-24 23:59:59+08'::timestamptz
+  ) THEN
+    RAISE EXCEPTION 'Round4 launch dates or inherited rules are incorrect';
+  END IF;
+
   INSERT INTO public.group_buy_rounds(
-    id, title, shipping_group_id, status, team_count, exchange_rate
+    id, title, shipping_group_id, status, team_count, exchange_rate, order_opens_at
   ) VALUES
-    ('round4', 'Round 4', 'round4drop4', 'open', 6, 6.8),
-    ('drop4', 'Drop 4', 'round4drop4', 'open', 6, 6.8),
-    ('round5', 'Round 5', 'round5only', 'open', 6, 6.8);
+    ('test_round4', 'Test Round 4', 'test_round4_drop4', 'open', 6, 6.8, now() - interval '1 day'),
+    ('test_drop4', 'Test Drop 4', 'test_round4_drop4', 'open', 6, 6.8, now() - interval '1 day'),
+    ('test_round5', 'Test Round 5', 'test_round5_only', 'open', 6, 6.8, now() - interval '1 day'),
+    ('test_future', 'Test Future', 'test_future_only', 'open', 6, 6.8, now() + interval '1 day');
   INSERT INTO public.group_buy_products(
     round_id, product_id, name, product_type, price_tiers
   ) VALUES
-    ('round4', 'clawd', 'Clawd', 'dc', '[[1,5],[10,17]]'::jsonb),
-    ('drop4', 'clawd', 'Clawd', 'dc', '[[1,5],[10,17]]'::jsonb);
+    ('test_round4', 'clawd', 'Clawd', 'dc', '[[1,5],[10,17]]'::jsonb),
+    ('test_drop4', 'clawd', 'Clawd', 'dc', '[[1,5],[10,17]]'::jsonb),
+    ('test_future', 'clawd', 'Clawd', 'dc', '[[1,5],[10,17]]'::jsonb);
+
+  BEGIN
+    PERFORM public.save_group_buy_order(
+      account_id,
+      'test_future',
+      6,
+      0,
+      '[{"product_id":"clawd","quantity":1}]'::jsonb,
+      false
+    );
+    RAISE EXCEPTION 'future Round4 registration window accepted an early order';
+  EXCEPTION WHEN object_not_in_prerequisite_state THEN
+    NULL;
+  END;
 
   order_result := public.save_group_buy_order(
     account_id,
-    'round4',
+    'test_round4',
     6,
     0,
     '[{"product_id":"clawd","quantity":2}]'::jsonb,
@@ -194,7 +230,7 @@ BEGIN
     RAISE EXCEPTION 'normalized order save failed: %', order_result;
   END IF;
   result := public.set_group_buy_member_payment(
-    account_id, 'round4', 'shipping', true
+    account_id, 'test_round4', 'shipping', true
   );
   IF result->>'member_confirmed_at' IS NULL THEN
     RAISE EXCEPTION 'normalized member payment confirmation failed: %', result;
@@ -204,7 +240,7 @@ BEGIN
   WHERE order_id = (order_result->>'order_id')::uuid AND kind = 'shipping';
   BEGIN
     PERFORM public.set_group_buy_member_payment(
-      account_id, 'round4', 'shipping', false
+      account_id, 'test_round4', 'shipping', false
     );
     RAISE EXCEPTION 'member revoked a leader-confirmed normalized payment';
   EXCEPTION WHEN object_not_in_prerequisite_state THEN
@@ -212,7 +248,7 @@ BEGIN
   END;
   order_result := public.save_group_buy_order(
     account_id,
-    'round4',
+    'test_round4',
     6,
     1,
     '[]'::jsonb,
@@ -224,7 +260,7 @@ BEGIN
   END IF;
   order_result := public.save_group_buy_order(
     account_id,
-    'drop4',
+    'test_drop4',
     6,
     0,
     '[{"product_id":"clawd","quantity":1}]'::jsonb,
@@ -235,16 +271,16 @@ BEGIN
   END IF;
 
   PERFORM public.save_group_buy_address(
-    account_id, 'round4', '默认地址', 'Bob', '13800138000', '北京市朝阳区测试路 1 号'
+    account_id, 'test_round4', '默认地址', 'Bob', '13800138000', '北京市朝阳区测试路 1 号'
   );
   UPDATE public.group_buy_shipments shipment
   SET shipped_at = now()
   FROM public.group_buy_orders grouped_order
   WHERE grouped_order.id = shipment.order_id
     AND grouped_order.account_id = migration_smoke.account_id
-    AND grouped_order.round_id = 'round4';
+    AND grouped_order.round_id = 'test_round4';
   PERFORM public.save_group_buy_address(
-    account_id, 'drop4', '默认地址', 'Bob', '13800138000', '北京市朝阳区测试路 2 号'
+    account_id, 'test_drop4', '默认地址', 'Bob', '13800138000', '北京市朝阳区测试路 2 号'
   );
   IF (
     SELECT count(*)
@@ -258,7 +294,7 @@ BEGIN
     FROM public.group_buy_shipments shipment
     JOIN public.group_buy_orders grouped_order ON grouped_order.id = shipment.order_id
     WHERE grouped_order.account_id = migration_smoke.account_id
-      AND grouped_order.round_id = 'drop4'
+      AND grouped_order.round_id = 'test_drop4'
       AND shipment.address_snapshot->>'address' = '北京市朝阳区测试路 2 号'
   ) <> 1 THEN
     RAISE EXCEPTION 'shared shipping group did not refresh the unshipped order snapshot';
@@ -268,14 +304,14 @@ BEGIN
     FROM public.group_buy_shipments shipment
     JOIN public.group_buy_orders grouped_order ON grouped_order.id = shipment.order_id
     WHERE grouped_order.account_id = migration_smoke.account_id
-      AND grouped_order.round_id = 'round4'
+      AND grouped_order.round_id = 'test_round4'
       AND shipment.shipped_at IS NOT NULL
       AND shipment.address_snapshot->>'address' = '北京市朝阳区测试路 1 号'
   ) THEN
     RAISE EXCEPTION 'editing a shared address rewrote an already-shipped snapshot';
   END IF;
   PERFORM public.save_group_buy_address(
-    account_id, 'round5', '默认地址', 'Bob', '13800138000', '上海市徐汇区测试路 3 号'
+    account_id, 'test_round5', '默认地址', 'Bob', '13800138000', '上海市徐汇区测试路 3 号'
   );
   IF (
     SELECT count(*)
@@ -287,11 +323,11 @@ BEGIN
   INSERT INTO public.group_buy_products(
     round_id, product_id, name, product_type, price_tiers
   ) VALUES (
-    'round5', 'clawd', 'Clawd', 'dc', '[[1,5],[10,17]]'::jsonb
+    'test_round5', 'clawd', 'Clawd', 'dc', '[[1,5],[10,17]]'::jsonb
   );
   order_result := public.save_group_buy_order(
     account_id,
-    'round5',
+    'test_round5',
     6,
     0,
     '[{"product_id":"clawd","quantity":1}]'::jsonb,
@@ -302,7 +338,7 @@ BEGIN
     FROM public.group_buy_shipments shipment
     JOIN public.group_buy_orders grouped_order ON grouped_order.id = shipment.order_id
     WHERE grouped_order.account_id = migration_smoke.account_id
-      AND grouped_order.round_id = 'round5'
+      AND grouped_order.round_id = 'test_round5'
       AND shipment.address_snapshot->>'address' = '上海市徐汇区测试路 3 号'
   ) THEN
     RAISE EXCEPTION 'address saved before an order was not attached on order creation';
