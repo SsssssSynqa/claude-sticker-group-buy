@@ -4,7 +4,8 @@
 ALTER TABLE public.accounts
   ADD COLUMN IF NOT EXISTS token_version integer NOT NULL DEFAULT 1,
   ADD COLUMN IF NOT EXISTS failed_login_attempts integer NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS locked_until timestamptz;
+  ADD COLUMN IF NOT EXISTS locked_until timestamptz,
+  ADD COLUMN IF NOT EXISTS normalized_name_conflict boolean NOT NULL DEFAULT false;
 
 ALTER TABLE public.accounts
   DROP CONSTRAINT IF EXISTS accounts_token_version_positive,
@@ -16,27 +17,22 @@ ALTER TABLE public.accounts
   ADD COLUMN IF NOT EXISTS normalized_name_key text
   GENERATED ALWAYS AS (public.normalize_name_key(name_key)) STORED;
 
-DO $$
-DECLARE
-  duplicate_names text;
-BEGIN
-  SELECT string_agg(normalized_name_key, ', ' ORDER BY normalized_name_key)
-  INTO duplicate_names
-  FROM (
-    SELECT normalized_name_key
-    FROM public.accounts
-    GROUP BY normalized_name_key
-    HAVING count(*) > 1
-    LIMIT 20
-  ) duplicates;
-
-  IF duplicate_names IS NOT NULL THEN
-    RAISE EXCEPTION 'normalized account names collide: %', duplicate_names;
-  END IF;
-END;
-$$;
+-- Production already contains a small number of legacy names that differ only
+-- by case or repeated whitespace. Preserve those exact login names instead of
+-- renaming or merging accounts. New registrations remain protected by the
+-- partial unique index and the serialized similarity check below.
+UPDATE public.accounts account
+SET normalized_name_conflict = EXISTS (
+  SELECT 1
+  FROM public.accounts other
+  WHERE other.id <> account.id
+    AND other.normalized_name_key = account.normalized_name_key
+);
 
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_normalized_name_key_uidx
+  ON public.accounts(normalized_name_key)
+  WHERE NOT normalized_name_conflict;
+CREATE INDEX IF NOT EXISTS accounts_normalized_name_key_lookup_idx
   ON public.accounts(normalized_name_key);
 
 CREATE OR REPLACE FUNCTION public.register_group_buy_account(
@@ -120,7 +116,13 @@ DECLARE
 BEGIN
   SELECT * INTO v_account
   FROM public.accounts account
-  WHERE account.normalized_name_key = public.normalize_name_key(p_name)
+  WHERE account.name_key = btrim(p_name)
+     OR (
+       NOT account.normalized_name_conflict
+       AND account.normalized_name_key = public.normalize_name_key(p_name)
+     )
+  ORDER BY (account.name_key = btrim(p_name)) DESC
+  LIMIT 1
   FOR UPDATE;
 
   IF NOT FOUND THEN

@@ -2,36 +2,27 @@
 -- Existing plaintext PIN marker rows are intentionally left untouched here; the
 -- final permission migration makes the entire legacy table private first.
 
--- Abort before creating target objects when the legacy source cannot be mapped
--- one-to-one.  In particular, leading-zero sequence aliases such as 001/1 must
--- not be collapsed by an ON CONFLICT clause.
+-- Build one normalized source map that supports both historical layouts:
+-- fresh legacy databases still have counter PIN marker rows, while production
+-- has already moved those hashes into accounts/user_pins and removed markers.
 DO $$
 DECLARE
-  invalid_rows text;
+  invalid_count bigint;
 BEGIN
-  SELECT string_agg(
-    format('%s/%s(quantity=%s)', invalid.name, invalid.sticker_id, invalid.quantity),
-    ', ' ORDER BY invalid.name, invalid.sticker_id
-  )
-  INTO invalid_rows
-  FROM (
-    SELECT marker.name, marker.sticker_id, marker.quantity
-    FROM public.orders marker
-    WHERE marker.sticker_id IN ('badge__pin', 'plush__pin')
-      AND NOT CASE
-        WHEN marker.name ~ '^[0-9]{1,6}-.+$' THEN
-          split_part(marker.name, '-', 1)::integer BETWEEN 1 AND 999999
-          AND length(btrim(substring(marker.name FROM position('-' IN marker.name) + 1))) BETWEEN 1 AND 50
-          AND marker.quantity IS NOT NULL
-          AND marker.quantity BETWEEN 0 AND 999999
-        ELSE false
-      END
-    ORDER BY marker.name, marker.sticker_id
-    LIMIT 20
-  ) invalid;
+  SELECT count(*) INTO invalid_count
+  FROM public.orders marker
+  WHERE marker.sticker_id IN ('badge__pin', 'plush__pin')
+    AND NOT CASE
+      WHEN marker.name ~ '^[0-9]{1,6}-.+$' THEN
+        split_part(marker.name, '-', 1)::integer BETWEEN 1 AND 999999
+        AND length(btrim(substring(marker.name FROM position('-' IN marker.name) + 1))) BETWEEN 1 AND 50
+        AND marker.quantity IS NOT NULL
+        AND marker.quantity BETWEEN 0 AND 999999
+      ELSE false
+    END;
 
-  IF invalid_rows IS NOT NULL THEN
-    RAISE EXCEPTION 'counter migration invalid PIN marker(s): %', invalid_rows
+  IF invalid_count > 0 THEN
+    RAISE EXCEPTION 'counter migration invalid PIN marker(s): % row(s)', invalid_count
       USING ERRCODE = '22023';
   END IF;
 END;
@@ -39,118 +30,170 @@ $$;
 
 DO $$
 DECLARE
-  invalid_rows text;
+  invalid_count bigint;
 BEGIN
-  SELECT string_agg(
-    format('%s/%s(quantity=%s)', invalid.name, invalid.sticker_id, invalid.quantity),
-    ', ' ORDER BY invalid.name, invalid.sticker_id
+  SELECT count(*) INTO invalid_count
+  FROM public.orders legacy
+  WHERE (
+    legacy.sticker_id LIKE 'badge\_%' ESCAPE '\'
+    OR legacy.sticker_id LIKE 'plush\_%' ESCAPE '\'
   )
-  INTO invalid_rows
-  FROM (
-    SELECT legacy.name, legacy.sticker_id, legacy.quantity
-    FROM public.orders legacy
-    WHERE (
-      legacy.sticker_id LIKE 'badge\_%' ESCAPE '\'
-      OR legacy.sticker_id LIKE 'plush\_%' ESCAPE '\'
-    )
-      AND legacy.sticker_id NOT IN ('badge__pin', 'plush__pin')
-      AND (
-        legacy.quantity IS NULL
-        OR NOT (
-          (legacy.sticker_id = 'badge__payment_self' AND legacy.quantity BETWEEN 0 AND 1)
-          OR (
-            legacy.sticker_id ~ '^badge_[a-z0-9_]+$'
-            AND position('__' IN legacy.sticker_id) = 0
-            AND legacy.quantity BETWEEN 0 AND 10000
-          )
-          OR (
-            legacy.sticker_id IN ('plush__sound_qty', 'plush__silent_qty')
-            AND legacy.quantity BETWEEN 0 AND 10000
-          )
+    AND legacy.sticker_id NOT IN ('badge__pin', 'plush__pin')
+    AND (
+      legacy.quantity IS NULL
+      OR NOT (
+        (legacy.sticker_id = 'badge__payment_self' AND legacy.quantity BETWEEN 0 AND 1)
+        OR (
+          legacy.sticker_id ~ '^badge_[a-z0-9_]+$'
+          AND position('__' IN legacy.sticker_id) = 0
+          AND legacy.quantity BETWEEN 0 AND 10000
+        )
+        OR (
+          legacy.sticker_id IN ('plush__sound_qty', 'plush__silent_qty')
+          AND legacy.quantity BETWEEN 0 AND 10000
         )
       )
-    ORDER BY legacy.name, legacy.sticker_id
-    LIMIT 20
-  ) invalid;
+    );
 
-  IF invalid_rows IS NOT NULL THEN
-    RAISE EXCEPTION 'counter migration invalid legacy item/payment row(s): %', invalid_rows
+  IF invalid_count > 0 THEN
+    RAISE EXCEPTION 'counter migration invalid legacy item/payment row(s): % row(s)', invalid_count
       USING ERRCODE = '22023';
   END IF;
 END;
 $$;
 
+CREATE TEMP TABLE counter_source_accounts (
+  namespace text NOT NULL,
+  sequence integer NOT NULL,
+  display_name text NOT NULL,
+  legacy_name text NOT NULL,
+  pin_hash text NOT NULL,
+  status text NOT NULL,
+  source_kind text NOT NULL,
+  PRIMARY KEY (namespace, legacy_name)
+);
+
+-- Preferred source for untouched legacy installations. Padding restores the
+-- six-digit PIN that was historically stored as an integer quantity.
+INSERT INTO counter_source_accounts(
+  namespace, sequence, display_name, legacy_name, pin_hash, status, source_kind
+)
+SELECT
+  CASE marker.sticker_id WHEN 'badge__pin' THEN 'badge' ELSE 'plush' END,
+  split_part(marker.name, '-', 1)::integer,
+  btrim(substring(marker.name FROM position('-' IN marker.name) + 1)),
+  marker.name,
+  public.hash_pin(lpad(marker.quantity::text, 6, '0')),
+  'active',
+  'pin_marker'
+FROM public.orders marker
+WHERE marker.sticker_id IN ('badge__pin', 'plush__pin');
+
+-- Production-safe fallback after the June credential migration. Every counter
+-- row is already tied to accounts.id; copy its bcrypt hash without exposing a
+-- PIN. Rows that never had a PIN are preserved as disabled accounts with an
+-- unguessable placeholder hash, so their orders remain visible to the leader.
 DO $$
 DECLARE
-  orphan_rows text;
+  invalid_count bigint;
 BEGIN
-  SELECT string_agg(
-    format('%s/%s', orphan.name, orphan.sticker_id),
-    ', ' ORDER BY orphan.name, orphan.sticker_id
-  )
-  INTO orphan_rows
-  FROM (
-    SELECT legacy.name, legacy.sticker_id
+  WITH counter_rows AS (
+    SELECT
+      CASE
+        WHEN legacy.sticker_id LIKE 'badge\_%' ESCAPE '\' THEN 'badge'
+        WHEN legacy.sticker_id LIKE 'plush\_%' ESCAPE '\' THEN 'plush'
+      END AS namespace,
+      legacy.name,
+      legacy.account_id
     FROM public.orders legacy
-    WHERE (
-      legacy.sticker_id = 'badge__payment_self'
-      OR (
-        legacy.sticker_id ~ '^badge_[a-z0-9_]+$'
-        AND position('__' IN legacy.sticker_id) = 0
-      )
-      OR legacy.sticker_id IN ('plush__sound_qty', 'plush__silent_qty')
-    )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM public.orders marker
-        WHERE marker.name = legacy.name
-          AND marker.sticker_id = CASE
-            WHEN legacy.sticker_id LIKE 'badge\_%' ESCAPE '\' THEN 'badge__pin'
-            ELSE 'plush__pin'
-          END
-      )
-    ORDER BY legacy.name, legacy.sticker_id
-    LIMIT 20
-  ) orphan;
+    WHERE legacy.sticker_id LIKE 'badge\_%' ESCAPE '\'
+       OR legacy.sticker_id LIKE 'plush\_%' ESCAPE '\'
+  ), grouped AS (
+    SELECT
+      namespace,
+      name,
+      count(DISTINCT account_id) FILTER (WHERE account_id IS NOT NULL) AS account_count
+    FROM counter_rows
+    WHERE namespace IS NOT NULL
+    GROUP BY namespace, name
+  )
+  SELECT count(*) INTO invalid_count
+  FROM grouped
+  WHERE grouped.name !~ '^[0-9]{1,6}-.+$'
+     OR split_part(grouped.name, '-', 1)::integer NOT BETWEEN 1 AND 999999
+     OR length(btrim(substring(grouped.name FROM position('-' IN grouped.name) + 1))) NOT BETWEEN 1 AND 50
+     OR grouped.account_count > 1
+     OR (
+       grouped.account_count = 0
+       AND NOT EXISTS (
+         SELECT 1
+         FROM counter_source_accounts source
+         WHERE source.namespace = grouped.namespace
+           AND source.legacy_name = grouped.name
+       )
+     );
 
-  IF orphan_rows IS NOT NULL THEN
-    RAISE EXCEPTION 'counter migration orphan legacy row(s) without matching PIN marker: %', orphan_rows
+  IF invalid_count > 0 THEN
+    RAISE EXCEPTION 'counter migration has % unmappable legacy account group(s)', invalid_count
       USING ERRCODE = '23503';
   END IF;
 END;
 $$;
 
+WITH counter_rows AS (
+  SELECT
+    CASE
+      WHEN legacy.sticker_id LIKE 'badge\_%' ESCAPE '\' THEN 'badge'
+      WHEN legacy.sticker_id LIKE 'plush\_%' ESCAPE '\' THEN 'plush'
+    END AS namespace,
+    legacy.name,
+    legacy.account_id
+  FROM public.orders legacy
+  WHERE legacy.sticker_id LIKE 'badge\_%' ESCAPE '\'
+     OR legacy.sticker_id LIKE 'plush\_%' ESCAPE '\'
+), grouped AS (
+  SELECT
+    namespace,
+    name,
+    min(account_id::text)::uuid AS account_id
+  FROM counter_rows
+  WHERE namespace IS NOT NULL
+  GROUP BY namespace, name
+  HAVING count(DISTINCT account_id) FILTER (WHERE account_id IS NOT NULL) = 1
+)
+INSERT INTO counter_source_accounts(
+  namespace, sequence, display_name, legacy_name, pin_hash, status, source_kind
+)
+SELECT
+  grouped.namespace,
+  split_part(grouped.name, '-', 1)::integer,
+  btrim(substring(grouped.name FROM position('-' IN grouped.name) + 1)),
+  grouped.name,
+  COALESCE(
+    pins.pin_hash,
+    public.hash_pin(gen_random_uuid()::text || gen_random_uuid()::text)
+  ),
+  CASE WHEN pins.pin_hash IS NULL THEN 'disabled' ELSE 'active' END,
+  'account_hash'
+FROM grouped
+LEFT JOIN public.user_pins pins ON pins.account_id = grouped.account_id
+WHERE grouped.name ~ '^[0-9]{1,6}-.+$'
+ON CONFLICT (namespace, legacy_name) DO NOTHING;
+
 DO $$
 DECLARE
-  collisions text;
+  collision_count bigint;
 BEGIN
-  WITH source_accounts AS (
-    SELECT
-      CASE marker.sticker_id WHEN 'badge__pin' THEN 'badge' ELSE 'plush' END AS namespace,
-      split_part(marker.name, '-', 1)::integer AS sequence,
-      marker.name AS legacy_name
-    FROM public.orders marker
-    WHERE marker.sticker_id IN ('badge__pin', 'plush__pin')
-  ), duplicate_sequences AS (
-    SELECT namespace, sequence, string_agg(legacy_name, ' | ' ORDER BY legacy_name) AS legacy_names
-    FROM source_accounts
+  SELECT count(*) INTO collision_count
+  FROM (
+    SELECT namespace, sequence
+    FROM counter_source_accounts
     GROUP BY namespace, sequence
     HAVING count(*) > 1
-  )
-  SELECT string_agg(
-    format('%s/%s => %s', duplicate.namespace, duplicate.sequence, duplicate.legacy_names),
-    ', ' ORDER BY duplicate.namespace, duplicate.sequence
-  )
-  INTO collisions
-  FROM (
-    SELECT namespace, sequence, legacy_names
-    FROM duplicate_sequences
-    ORDER BY namespace, sequence
-    LIMIT 20
-  ) duplicate;
+  ) collisions;
 
-  IF collisions IS NOT NULL THEN
-    RAISE EXCEPTION 'counter source sequence collision(s): %', collisions
+  IF collision_count > 0 THEN
+    RAISE EXCEPTION 'counter source sequence collision(s): % group(s)', collision_count
       USING ERRCODE = '23505';
   END IF;
 END;
@@ -200,66 +243,29 @@ REVOKE ALL ON public.counter_payments FROM anon, authenticated;
 
 DO $$
 DECLARE
-  conflicts text;
+  conflict_count bigint;
 BEGIN
-  WITH source_accounts AS (
-    SELECT
-      CASE marker.sticker_id WHEN 'badge__pin' THEN 'badge' ELSE 'plush' END AS namespace,
-      split_part(marker.name, '-', 1)::integer AS sequence,
-      marker.name AS legacy_name
-    FROM public.orders marker
-    WHERE marker.sticker_id IN ('badge__pin', 'plush__pin')
-  ), target_conflicts AS (
-    SELECT
-      source.namespace,
-      source.sequence,
-      source.legacy_name,
-      target.sequence AS existing_sequence,
-      target.legacy_name AS existing_legacy_name
-    FROM source_accounts source
-    JOIN public.counter_accounts target
-      ON target.namespace = source.namespace
-     AND (
-       target.sequence = source.sequence
-       OR target.legacy_name = source.legacy_name
-     )
-  )
-  SELECT string_agg(
-    format(
-      '%s/%s/%s conflicts with %s/%s',
-      conflict.namespace,
-      conflict.sequence,
-      conflict.legacy_name,
-      conflict.existing_sequence,
-      coalesce(conflict.existing_legacy_name, '<null>')
-    ),
-    ', ' ORDER BY conflict.namespace, conflict.sequence, conflict.legacy_name
-  )
-  INTO conflicts
-  FROM (
-    SELECT *
-    FROM target_conflicts
-    ORDER BY namespace, sequence, legacy_name
-    LIMIT 20
-  ) conflict;
+  SELECT count(*) INTO conflict_count
+  FROM counter_source_accounts source
+  JOIN public.counter_accounts target
+    ON target.namespace = source.namespace
+   AND (
+     target.sequence = source.sequence
+     OR target.legacy_name = source.legacy_name
+   );
 
-  IF conflicts IS NOT NULL THEN
-    RAISE EXCEPTION 'counter target account conflict(s): %', conflicts
+  IF conflict_count > 0 THEN
+    RAISE EXCEPTION 'counter target account conflict(s): % row(s)', conflict_count
       USING ERRCODE = '23505';
   END IF;
 END;
 $$;
 
-INSERT INTO public.counter_accounts(namespace, sequence, display_name, legacy_name, pin_hash)
-SELECT
-  CASE marker.sticker_id WHEN 'badge__pin' THEN 'badge' ELSE 'plush' END,
-  split_part(marker.name, '-', 1)::integer,
-  btrim(substring(marker.name FROM position('-' IN marker.name) + 1)),
-  marker.name,
-  public.hash_pin(lpad(marker.quantity::text, 6, '0'))
-FROM public.orders marker
-WHERE marker.sticker_id IN ('badge__pin', 'plush__pin')
-;
+INSERT INTO public.counter_accounts(
+  namespace, sequence, display_name, legacy_name, pin_hash, status
+)
+SELECT namespace, sequence, display_name, legacy_name, pin_hash, status
+FROM counter_source_accounts;
 
 INSERT INTO public.counter_order_items(account_id, product_id, quantity, updated_at)
 SELECT account.id, legacy.sticker_id, legacy.quantity, legacy.updated_at
@@ -340,6 +346,7 @@ AS $$
 DECLARE
   v_account public.counter_accounts%ROWTYPE;
   v_failures integer;
+  v_pin_valid boolean := false;
 BEGIN
   SELECT * INTO v_account
   FROM public.counter_accounts
@@ -355,7 +362,13 @@ BEGIN
   IF v_account.locked_until IS NOT NULL AND v_account.locked_until > now() THEN
     RETURN jsonb_build_object('ok', false, 'code', 'temporarily_locked');
   END IF;
-  IF p_pin !~ '^\d{6}$' OR NOT public.verify_pin_hash(p_pin, v_account.pin_hash) THEN
+  IF p_pin ~ '^\d{6}$' THEN
+    v_pin_valid := public.verify_pin_hash(p_pin, v_account.pin_hash)
+      -- The June migration hashed legacy integer PIN values before padding them
+      -- back to six digits. Accept that representation only for migrated hashes.
+      OR public.verify_pin_hash((p_pin::integer)::text, v_account.pin_hash);
+  END IF;
+  IF NOT v_pin_valid THEN
     v_failures := v_account.failed_login_attempts + 1;
     UPDATE public.counter_accounts
     SET failed_login_attempts = CASE WHEN v_failures >= 5 THEN 0 ELSE v_failures END,

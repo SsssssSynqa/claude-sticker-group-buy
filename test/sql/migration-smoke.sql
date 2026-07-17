@@ -14,6 +14,21 @@ BEGIN
     RAISE EXCEPTION 'legacy account authentication failed: %', result;
   END IF;
 
+  result := public.authenticate_group_buy_account('Case User', '1111');
+  IF NOT (result->>'ok')::boolean THEN
+    RAISE EXCEPTION 'first exact legacy collision login failed: %', result;
+  END IF;
+  result := public.authenticate_group_buy_account('case   user', '2222');
+  IF NOT (result->>'ok')::boolean THEN
+    RAISE EXCEPTION 'second exact legacy collision login failed: %', result;
+  END IF;
+  BEGIN
+    PERFORM public.register_group_buy_account('CASE USER', '3333', 3);
+    RAISE EXCEPTION 'new normalized collision registration was accepted';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
   SELECT revision INTO initial_revision
   FROM public.legacy_change_state WHERE id = true;
   UPDATE public.settings SET updated_at = now() WHERE key = 'r3_rate';
@@ -154,6 +169,27 @@ BEGIN
   result := public.authenticate_counter_account('badge', 1, 'Badge user', '000123');
   IF NOT (result->>'ok')::boolean THEN
     RAISE EXCEPTION 'migrated leading-zero badge PIN failed: %', result;
+  END IF;
+  result := public.authenticate_counter_account('plush', 2, 'Plush migrated', '000123');
+  IF NOT (result->>'ok')::boolean THEN
+    RAISE EXCEPTION 'account-hash counter fallback failed: %', result;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.counter_accounts account
+    JOIN public.counter_order_items item ON item.account_id = account.id
+    WHERE account.namespace = 'plush'
+      AND account.sequence = 2
+      AND item.product_id = 'plush__sound_qty'
+      AND item.quantity = 4
+  ) THEN
+    RAISE EXCEPTION 'account-hash counter orders were not migrated';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.counter_accounts
+    WHERE namespace = 'plush' AND sequence = 3 AND status = 'disabled'
+  ) THEN
+    RAISE EXCEPTION 'counter account without a PIN was not preserved as disabled';
   END IF;
   SELECT id INTO counter_id FROM public.counter_accounts
   WHERE namespace = 'badge' AND sequence = 1;

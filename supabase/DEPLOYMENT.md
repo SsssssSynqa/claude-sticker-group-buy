@@ -34,15 +34,22 @@ deployment inputs.
 
 `20260717001000_counter_account_migration.sql` performs strict source and target
 preflight checks before inserting counter accounts. Any malformed PIN/quantity,
-normalized sequence collision, orphan counter row, or existing target conflict
-must abort the transaction. Fix the source data and re-run; never bypass the
+normalized sequence collision, unmappable counter row, or existing target
+conflict must abort the transaction. It accepts both untouched PIN-marker data
+and the production layout where PIN hashes were already moved to
+`accounts/user_pins`; a legacy account without a PIN keeps its orders but is
+migrated as disabled. Fix invalid source data and re-run; never bypass the
 failure with conflict-ignore logic.
+
+`20260717000500_legacy_auth_hardening.sql` preserves pre-existing normalized
+name collisions as exact-name login accounts. The partial unique index and
+serialized registration/rename checks still reject every new collision.
 
 ## Cut-over sequence
 
-1. Take a database backup. Run the normalized-name preflight from
-   `20260717000500_legacy_auth_hardening.sql` and the counter preflights from
-   `20260717001000_counter_account_migration.sql` read-only against production.
+1. Take a database backup. Count normalized-name conflicts and run the counter
+   source-map preflights from `20260717001000_counter_account_migration.sql`
+   read-only against production.
 2. Apply `20260625000000_legacy_schema_baseline.sql`, then
    `20260717000000_round4_normalized_schema.sql`, then
    `20260717000500_legacy_auth_hardening.sql`, each as a separate transaction.
