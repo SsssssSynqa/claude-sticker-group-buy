@@ -1,6 +1,7 @@
 # Supabase deployment order
 
-No migration or function in this branch has been applied to production yet.
+This runbook defines the production deployment and verification order for the
+normalized backend and Round4 launch configuration.
 
 ## Required secrets
 
@@ -22,6 +23,7 @@ transaction:
 4. `20260717001000_counter_account_migration.sql`
 5. `20260717001500_legacy_atomic_writes.sql`
 6. `20260717002000_private_legacy_tables.sql`
+7. `20260717002500_round4_launch_config.sql`
 
 The `20260625000000` baseline is the formal, self-contained starting point for
 both fresh databases and existing legacy installations. It additively creates
@@ -54,7 +56,10 @@ failure with conflict-ignore logic.
 6. Publish the frontend and verify all five pages through the Edge Functions.
 7. Only after the checks above pass, apply
    `20260717002000_private_legacy_tables.sql` to remove browser table access.
-8. Verify the migrated counter hashes once more, then remove historical
+8. Apply `20260717002500_round4_launch_config.sql`, then verify the Round4
+   catalog, exchange rate, order window, six-team configuration, and shared
+   `round4_drop4` shipping group through `group-buy`.
+9. Verify the migrated counter hashes once more, then remove historical
    `badge__pin` / `plush__pin` rows in a separately approved cleanup migration.
 
 If a preflight or smoke test fails, stop before the final permission cut-over;

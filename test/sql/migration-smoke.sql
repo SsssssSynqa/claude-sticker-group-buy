@@ -183,7 +183,7 @@ BEGIN
       AND shipping_group_id = 'round4_drop4'
       AND status = 'open'
       AND team_count = 6
-      AND exchange_rate = 6.8
+      AND exchange_rate = 7.1
       AND order_opens_at = '2026-07-20 00:00:00+08'::timestamptz
       AND order_deadline = '2026-07-24 23:59:59+08'::timestamptz
   ) THEN

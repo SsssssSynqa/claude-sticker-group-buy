@@ -57,7 +57,7 @@ test('Round4 使用六团旧规则并按北京时间 7 月 20 日至 24 日开�
   ]);
 
   assert.match(seedSource, /'round4_drop4'/);
-  assert.match(seedSource, /\n\s*6,\n\s*6\.8000,/);
+  assert.match(seedSource, /\n\s*6,\n\s*7\.1000,/);
   assert.match(seedSource, /'2026-07-20 00:00:00\+08'::timestamptz/);
   assert.match(seedSource, /'2026-07-24 23:59:59\+08'::timestamptz/);
   assert.match(seedSource, /group_buy_order_window_guard/);

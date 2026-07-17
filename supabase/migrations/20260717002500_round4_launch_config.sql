@@ -59,7 +59,7 @@ VALUES (
   'round4_drop4',
   'open',
   6,
-  6.8000,
+  7.1000,
   0.001000,
   '{"base_cents":850,"municipality_extra_cents":100,"remote_extra_cents":1300}'::jsonb,
   '2026-07-20 00:00:00+08'::timestamptz,
