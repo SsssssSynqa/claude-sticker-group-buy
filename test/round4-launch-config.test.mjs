@@ -62,7 +62,8 @@ test('Round4 使用六团旧规则并按北京时间 7 月 20 日至 24 日开�
   assert.match(seedSource, /'2026-07-24 23:59:59\+08'::timestamptz/);
   assert.match(seedSource, /group_buy_order_window_guard/);
   assert.match(edgeSource, /shipping_config,order_opens_at,order_deadline/);
-  assert.match(pageSource, /7 月 20 日开始 · 7 月 24 日截团/);
+  assert.match(pageSource, /Round 4 意向登记中 · 开团时间暂定/);
+  assert.doesNotMatch(pageSource, /7 月 20 日开始 · 7 月 24 日截团/);
   assert.match(pageSource, /timeZone:\s*'Asia\/Shanghai'/);
   assert.match(pageSource, /orderWindowState\(round\)\.editable/);
   assert.match(pageSource, /数量 \$\{compactValue\(tier\[0\]\)\} · USD 总价 \$\$\{compactValue\(tier\[1\]\)\}/);
@@ -70,3 +71,25 @@ test('Round4 使用六团旧规则并按北京时间 7 月 20 日至 24 日开�
   assert.match(pageSource, /paymentQrButton['"]\)\.disabled[\s\S]{0,220}Number\(cents\) > 0/);
   assert.doesNotMatch(pageSource, /最终商品、日期与视觉仍待 Synqa 确认/);
 });
+
+test('Round4 意向登记模式：迁移开放填写、汇率 7.0、开团时间留空暂定', async () => {
+  const [intentSource, pageSource] = await Promise.all([
+    readProjectFile('supabase/migrations/20261104000000_round4_intent_mode.sql'),
+    readProjectFile('round4.html'),
+  ]);
+
+  // 后端迁移把第四团拨到意向模式：开放态、汇率 7.0、时间留空
+  assert.match(intentSource, /UPDATE public\.group_buy_rounds/);
+  assert.match(intentSource, /status\s*=\s*'open'/);
+  assert.match(intentSource, /exchange_rate\s*=\s*7\.0000/);
+  assert.match(intentSource, /order_opens_at\s*=\s*NULL/);
+  assert.match(intentSource, /order_deadline\s*=\s*NULL/);
+  assert.match(intentSource, /payment_deadline\s*=\s*NULL/);
+  assert.match(intentSource, /WHERE id = 'round4'/);
+
+  // 前端进入意向模式：总开关开启，状态条显示暂定
+  assert.match(pageSource, /const INTENT_MODE = true/);
+  assert.match(pageSource, /意向登记中/);
+  assert.match(pageSource, /开团时间：暂定/);
+});
+
