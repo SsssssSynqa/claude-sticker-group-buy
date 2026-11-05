@@ -363,14 +363,14 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
 </head>
 <body>
 <a class="skip-link" href="#main">跳到主要内容</a>
-<div class="preview-ribbon">Round 4 已确认 · 7 月 20 日开始 · 7 月 24 日截团</div>
+<div class="preview-ribbon" id="previewRibbon">Round 4 意向登记中 · 开团时间暂定 · 当前仅统计意向，不是正式开团</div>
 
 <header class="site-header">
   <div class="header-inner">
     <div>
       <p class="eyebrow">Clawd group buy · Round 4</p>
       <h1 id="roundTitle">Round 4 贴纸拼团</h1>
-      <p class="subtitle" id="roundSubtitle">沿用 Round 3 的 25 款贴纸、价格档与六团规则；订单和最终应付仍以服务端数据为准。</p>
+      <p class="subtitle" id="roundSubtitle">沿用 Round 3 的 25 款贴纸、价格档与六团规则。当前为意向登记阶段：填写数量只用于统计意向，不是正式下单，最终应付仍以服务端数据为准。</p>
       <div class="round-strip" id="roundMeta" aria-live="polite"></div>
     </div>
     <div class="account-box">
@@ -386,8 +386,8 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
   <section class="preview-note" aria-label="Round 4 开团说明">
     <div class="preview-mark" aria-hidden="true">R4</div>
     <div>
-      <strong>商品和规则与 Round 3 相同</strong>
-      <p>2026 年 7 月 20 日开始登记，7 月 24 日 23:59 截团。商品卡片展示原始 USD 价格档；最终商品应付与运费采用服务端核算结果。</p>
+      <strong>意向登记中 · 商品和规则与 Round 3 相同</strong>
+      <p>现在开放登记：登录后挑选想要的贴纸并填写数量保存，用于统计本团意向。开团时间暂定，正式开团与最终应付会另行确认。商品卡片展示原始 USD 价格档；最终商品应付与运费以服务端核算为准。</p>
     </div>
   </section>
 
@@ -423,7 +423,7 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
       <div>
         <p class="section-kicker">My order</p>
         <h2 id="workspaceHeading">我的 Round 4</h2>
-        <p class="section-description">保存会提交当前目录中每件商品的完整数量快照；锁单后不能自行修改。</p>
+        <p class="section-description">当前是意向登记：保存会记录你想要的每件商品数量，仅用于统计本团意向，暂不进入锁单与付款。</p>
       </div>
     </div>
 
@@ -438,12 +438,12 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
         </div>
         <div class="order-warning" id="orphanWarning" hidden></div>
         <div class="order-actions">
-          <button class="button" id="saveOrderButton" type="button">保存完整订单</button>
+          <button class="button" id="saveOrderButton" type="button">保存我的意向</button>
           <button class="button danger" id="lockOrderButton" type="button">锁定订单</button>
         </div>
       </article>
 
-      <article class="panel" aria-labelledby="paymentPanelHeading">
+      <article class="panel" id="paymentPanel" aria-labelledby="paymentPanelHeading">
         <h3 id="paymentPanelHeading">付款确认</h3>
         <p class="panel-sub">金额未由服务端录入时，不会显示或推算应付。</p>
         <div class="payment-list" id="paymentList"></div>
@@ -531,9 +531,9 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
 <div class="save-dock" id="saveDock" hidden aria-live="polite">
   <div class="save-dock-copy">
     <strong id="saveDockTitle">数量有未保存修改</strong>
-    <span id="saveDockText">将提交当前目录的完整订单快照</span>
+    <span id="saveDockText">将记录你选择的意向数量</span>
   </div>
-  <button class="button" id="dockSaveButton" type="button">保存订单</button>
+  <button class="button" id="dockSaveButton" type="button">保存意向</button>
 </div>
 
 <dialog id="authDialog" aria-labelledby="authTitle">
@@ -593,6 +593,9 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
   'use strict';
 
   const ROUND_ID = 'round4';
+  // 第四团意向登记阶段：开放填数量统计意向，暂不正式开团。
+  // 翻成 false 即恢复正式开团的脸（锁单、付款、硬日期）。
+  const INTENT_MODE = true;
   const SUPABASE_URL = 'https://jbdibeisdydocdfojpup.supabase.co';
   const PUBLIC_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZGliZWlzZHlkb2NkZm9qcHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Mzk0NzcsImV4cCI6MjA4ODAxNTQ3N30.P52kdVxPfbR0K3OEAH6QvFt7LgW9utFi08HacD2PVeo';
   const EDGE_BASE = `${SUPABASE_URL}/functions/v1`;
@@ -1176,7 +1179,10 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
     elements.roundTitle.textContent = round && round.title ? String(round.title) : 'Round 4 贴纸拼团';
     document.title = elements.roundTitle.textContent;
     elements.roundMeta.replaceChildren();
-    if (round) {
+    if (round && INTENT_MODE) {
+      elements.roundMeta.append(createElement('span', 'status-pill active', '意向登记中'));
+      elements.roundMeta.append(createElement('span', 'status-pill', '开团时间：暂定'));
+    } else if (round) {
       const windowState = orderWindowState(round);
       const status = createElement('span', `status-pill ${windowState.editable ? 'active' : 'warning'}`, windowState.label);
       elements.roundMeta.append(status);
@@ -1750,6 +1756,13 @@ dialog::backdrop{background:rgba(47,42,52,.54)}
   $('exportOrderButton').addEventListener('click', exportOrder);
   $('paymentQrButton').addEventListener('click', openPaymentDialog);
   $('closePaymentButton').addEventListener('click', closePaymentDialog);
+  if (INTENT_MODE) {
+    // 意向登记阶段只收数量意向，不走正式锁单与付款，把这两处收起来。
+    const lockBtn = $('lockOrderButton');
+    if (lockBtn) lockBtn.hidden = true;
+    const payPanel = $('paymentPanel');
+    if (payPanel) payPanel.hidden = true;
+  }
   window.addEventListener('online', () => {
     setConnection('', '网络已恢复，正在同步');
     if (!state.dirty && !state.busyAction) refreshData();
